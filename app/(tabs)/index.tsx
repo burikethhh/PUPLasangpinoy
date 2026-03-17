@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +21,7 @@ type Recipe = {
   ingredients: string;
   category: string;
   region: string;
+  image_url: string;
 };
 
 const CATEGORIES = [
@@ -27,6 +30,9 @@ const CATEGORIES = [
   { label: 'Soup', value: 'Soup', color: '#4A8FE7' },
   { label: 'Noodles', value: 'Noodles', color: '#34B36A' },
 ];
+
+const { width } = Dimensions.get('window');
+const CARD_SIZE = (width - 48) / 2;
 
 export default function HomeScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -40,7 +46,9 @@ export default function HomeScreen() {
     setLoading(true);
     let query = supabase.from('recipes').select('*');
     if (activeCategory) query = query.eq('category', activeCategory);
-    if (keyword) query = query.or(`title.ilike.%${keyword}%,ingredients.ilike.%${keyword}%`);
+    if (keyword) query = query.or(
+      `title.ilike.%${keyword}%,ingredients.ilike.%${keyword}%`
+    );
     const { data } = await query.order('created_at', { ascending: false });
     setRecipes(data || []);
     setLoading(false);
@@ -49,13 +57,11 @@ export default function HomeScreen() {
   const catColors: Record<string, string> = {
     'Main Dish': '#F25C05', 'Soup': '#4A8FE7', 'Noodles': '#34B36A',
   };
-  const catIcons: Record<string, string> = {
-    'Main Dish': 'M', 'Soup': 'S', 'Noodles': 'N',
-  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 30 }}>
 
         {/* TOP BAR */}
@@ -78,7 +84,8 @@ export default function HomeScreen() {
 
         {/* SEARCH BAR */}
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={16} color="#aaa" style={{ marginLeft: 14 }} />
+          <Ionicons name="search" size={16} color="#aaa"
+            style={{ marginLeft: 14 }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search recipes..."
@@ -89,7 +96,8 @@ export default function HomeScreen() {
             returnKeyType="search"
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearch(''); fetchRecipes(); }}
+            <TouchableOpacity
+              onPress={() => { setSearch(''); fetchRecipes(); }}
               style={{ marginRight: 12 }}>
               <Ionicons name="close-circle" size={18} color="#aaa" />
             </TouchableOpacity>
@@ -104,7 +112,9 @@ export default function HomeScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.scanTitle}>Scan Ingredients</Text>
-            <Text style={styles.scanSub}>Get recipe suggestions from your pantry</Text>
+            <Text style={styles.scanSub}>
+              Get recipe suggestions from your pantry
+            </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#fff" />
         </TouchableOpacity>
@@ -119,7 +129,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={cat.value}
                 style={[styles.catBtn,
-                  isActive && { backgroundColor: cat.color }]}
+                  isActive && { backgroundColor: cat.color, borderColor: cat.color }]}
                 onPress={() => setActiveCategory(cat.value)}>
                 <Text style={[styles.catText,
                   isActive && { color: '#fff' }]}>{cat.label}</Text>
@@ -128,48 +138,67 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
-        {/* RECIPES */}
+        {/* RECIPES GRID */}
         <Text style={styles.sectionTitle}>
           {activeCategory || 'Popular Dishes'}
         </Text>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color="#F25C05"
+            style={{ marginTop: 40 }} />
         ) : recipes.length === 0 ? (
           <Text style={styles.noResults}>No recipes found.</Text>
         ) : (
-          recipes.map((recipe) => {
-            const color = catColors[recipe.category] || '#F25C05';
-            const icon = catIcons[recipe.category] || 'R';
-            const ing = recipe.ingredients?.length > 48
-              ? recipe.ingredients.substring(0, 48) + '...'
-              : recipe.ingredients;
-            return (
-              <TouchableOpacity
-                key={recipe.id}
-                style={styles.recipeCard}
-                onPress={() => router.push(`/recipe/${recipe.id}`)}>
-                <View style={[styles.iconBox, { backgroundColor: color + '25' }]}>
-                  <Text style={[styles.iconText, { color }]}>{icon}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.recipeTitle}>{recipe.title}</Text>
-                  <Text style={styles.recipeIng}>{ing}</Text>
-                  <View style={styles.tagRow}>
-                    <Text style={[styles.recipeCat, { color }]}>{recipe.category}</Text>
+          <View style={styles.grid}>
+            {recipes.map((recipe) => {
+              const color = catColors[recipe.category] || '#F25C05';
+              return (
+                <TouchableOpacity
+                  key={recipe.id}
+                  style={styles.recipeCard}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(`/recipe/${recipe.id}`)}>
+
+                  {/* IMAGE */}
+                  {recipe.image_url ? (
+                    <Image
+                      source={{ uri: recipe.image_url }}
+                      style={styles.recipeImage}
+                      contentFit="cover"
+                      transition={300}
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <View style={[styles.imagePlaceholder,
+                      { backgroundColor: color + '22' }]}>
+                      <Text style={{ fontSize: 40 }}>🍽️</Text>
+                    </View>
+                  )}
+
+                  {/* CATEGORY TAG */}
+                  <View style={[styles.catTag, { backgroundColor: color }]}>
+                    <Text style={styles.catTagText}>{recipe.category}</Text>
+                  </View>
+
+                  {/* TITLE */}
+                  <View style={styles.cardBottom}>
+                    <Text style={styles.recipeTitle} numberOfLines={2}>
+                      {recipe.title}
+                    </Text>
                     {recipe.region ? (
-                      <View style={styles.regionTag}>
+                      <View style={styles.regionRow}>
                         <Ionicons name="map-outline" size={10} color="#9B59B6" />
                         <Text style={styles.regionText}>{recipe.region}</Text>
                       </View>
                     ) : null}
                   </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#ccc" />
-              </TouchableOpacity>
-            );
-          })
+
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -218,7 +247,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   scanTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-  scanSub: { fontSize: 11, color: 'rgba(255,255,255,0.88)', marginTop: 3 },
+  scanSub: {
+    fontSize: 11, color: 'rgba(255,255,255,0.88)', marginTop: 3,
+  },
   sectionTitle: {
     fontSize: 16, fontWeight: 'bold', color: '#2E1A06',
     marginHorizontal: 16, marginBottom: 10, marginTop: 4,
@@ -230,26 +261,40 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#E8D8A0',
   },
   catText: { fontSize: 13, fontWeight: '600', color: '#888' },
-  recipeCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 16,
-    marginHorizontal: 16, marginBottom: 10,
-    padding: 14, gap: 12,
+  grid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 16, gap: 12,
   },
-  iconBox: {
-    width: 52, height: 52, borderRadius: 26,
+  recipeCard: {
+    width: CARD_SIZE,
+    backgroundColor: '#fff',
+    borderRadius: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  },
+  recipeImage: {
+    width: CARD_SIZE,
+    height: CARD_SIZE,
+  },
+  imagePlaceholder: {
+    width: CARD_SIZE,
+    height: CARD_SIZE,
     justifyContent: 'center', alignItems: 'center',
   },
-  iconText: { fontSize: 20, fontWeight: 'bold' },
-  recipeTitle: { fontSize: 13, fontWeight: 'bold', color: '#2E1A06' },
-  recipeIng: { fontSize: 10, color: '#888', marginTop: 2 },
-  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
-  recipeCat: { fontSize: 10, fontWeight: '600' },
-  regionTag: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: 3, backgroundColor: '#9B59B622',
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  catTag: {
+    position: 'absolute', top: 8, left: 8,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 8,
   },
-  regionText: { fontSize: 9, color: '#9B59B6', fontWeight: '600' },
+  catTagText: { fontSize: 9, color: '#fff', fontWeight: 'bold' },
+  cardBottom: { padding: 10 },
+  recipeTitle: {
+    fontSize: 13, fontWeight: 'bold',
+    color: '#2E1A06', marginBottom: 4,
+  },
+  regionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+  },
+  regionText: { fontSize: 9, color: '#9B59B6' },
   noResults: { textAlign: 'center', color: '#aaa', marginTop: 40 },
 });

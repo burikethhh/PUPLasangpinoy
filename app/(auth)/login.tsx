@@ -1,28 +1,42 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
+  Alert, KeyboardAvoidingView,
+  Platform, ScrollView,
   StyleSheet,
   Text, TextInput, TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+  function validate() {
+    const newErrors: { email?: string; password?: string } = {};
+    if (!email.trim()) {
+      newErrors.email = 'Email is required.';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'Please enter a valid email.';
+    }
+    if (!password.trim()) {
+      newErrors.password = 'Password is required.';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters.';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
 
   async function signIn() {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter your email and password.');
-      return;
-    }
+    if (!validate()) return;
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
@@ -49,40 +63,71 @@ export default function LoginScreen() {
         style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled">
-
-          {/* CARD */}
           <View style={styles.card}>
+
+            {/* BACK */}
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/welcome')}
+              style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={20} color="#2E1A06" />
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+
             <Text style={styles.title}>Welcome Back</Text>
 
             {/* EMAIL */}
             <Text style={styles.label}>Email Address</Text>
-            <View style={styles.inputBox}>
+            <View style={[styles.inputBox,
+              errors.email && styles.inputBoxError]}>
+              <Ionicons name="mail-outline" size={18} color="#aaa"
+                style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="your@email.com"
                 placeholderTextColor="#aaa"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => {
+                  setEmail(v);
+                  if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
               />
             </View>
+            {errors.email ? (
+              <Text style={styles.errorText}>⚠ {errors.email}</Text>
+            ) : null}
 
             {/* PASSWORD */}
             <Text style={styles.label}>Password</Text>
-            <View style={styles.inputBox}>
+            <View style={[styles.inputBox,
+              errors.password && styles.inputBoxError]}>
+              <Ionicons name="lock-closed-outline" size={18} color="#aaa"
+                style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Password"
                 placeholderTextColor="#aaa"
                 value={password}
-                onChangeText={setPassword}
-                secureTextEntry
+                onChangeText={(v) => {
+                  setPassword(v);
+                  if (errors.password) setErrors(prev => ({ ...prev, password: undefined }));
+                }}
+                secureTextEntry={!showPassword}
               />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeBtn}>
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={20} color="#aaa" />
+              </TouchableOpacity>
             </View>
+            {errors.password ? (
+              <Text style={styles.errorText}>⚠ {errors.password}</Text>
+            ) : null}
 
-            {/* FORGOT PASSWORD */}
             <TouchableOpacity style={styles.forgotRow}>
               <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
@@ -97,10 +142,8 @@ export default function LoginScreen() {
                 : <Text style={styles.signInText}>Sign In</Text>}
             </TouchableOpacity>
 
-            {/* OR CONTINUE WITH */}
             <Text style={styles.orText}>Or continue with</Text>
 
-            {/* SOCIAL BUTTONS */}
             <View style={styles.socialRow}>
               <TouchableOpacity style={styles.socialBtn}>
                 <Text style={styles.socialIcon}>🌐</Text>
@@ -112,15 +155,14 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* SIGN UP LINK */}
             <View style={styles.signUpRow}>
               <Text style={styles.signUpGray}>Don't have an account? </Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
                 <Text style={styles.signUpLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>
-          </View>
 
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -131,44 +173,45 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9F0DC' },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    backgroundColor: '#fff', borderRadius: 24, padding: 28,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
   },
+  backBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 6, marginBottom: 16,
+  },
+  backText: { fontSize: 14, color: '#F25C05', fontWeight: '500' },
   title: {
     fontSize: 24, fontWeight: 'bold',
-    color: '#2E1A06', textAlign: 'center',
-    marginBottom: 24,
+    color: '#2E1A06', textAlign: 'center', marginBottom: 24,
   },
-  label: {
-    fontSize: 13, color: '#555',
-    marginBottom: 6, marginTop: 4,
-  },
+  label: { fontSize: 13, color: '#555', marginBottom: 6, marginTop: 4 },
   inputBox: {
-    backgroundColor: '#FDF5E0',
-    borderRadius: 12,
-    marginBottom: 12,
-    height: 50,
-    justifyContent: 'center',
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FDF5E0', borderRadius: 12,
+    marginBottom: 4, height: 50,
+    borderWidth: 1, borderColor: 'transparent',
   },
+  inputBoxError: {
+    borderColor: '#D92614', backgroundColor: '#FFF5F5',
+  },
+  inputIcon: { marginLeft: 14 },
   input: {
-    fontSize: 14, color: '#333',
-    paddingHorizontal: 16, height: '100%',
+    flex: 1, fontSize: 14, color: '#333',
+    paddingHorizontal: 10, height: '100%',
   },
-  forgotRow: { alignItems: 'flex-end', marginBottom: 20 },
+  eyeBtn: { paddingHorizontal: 14 },
+  errorText: {
+    color: '#D92614', fontSize: 11,
+    marginBottom: 8, marginLeft: 4,
+  },
+  forgotRow: { alignItems: 'flex-end', marginBottom: 20, marginTop: 8 },
   forgotText: { color: '#F25C05', fontSize: 13 },
   signInBtn: {
-    backgroundColor: '#F25C05',
-    borderRadius: 30,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: '#F25C05', borderRadius: 30,
+    height: 52, justifyContent: 'center',
+    alignItems: 'center', marginBottom: 20,
   },
   signInText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   orText: {
@@ -180,8 +223,7 @@ const styles = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', gap: 8,
     borderWidth: 1.5, borderColor: '#E8D8A0',
-    borderRadius: 30, height: 46,
-    backgroundColor: '#fff',
+    borderRadius: 30, height: 46, backgroundColor: '#fff',
   },
   socialIcon: { fontSize: 18 },
   socialText: { fontSize: 14, color: '#333', fontWeight: '500' },
