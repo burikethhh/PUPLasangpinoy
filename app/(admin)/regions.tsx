@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Alert, Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert, Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -24,10 +24,12 @@ export default function AdminRegions() {
   useEffect(() => { fetchRegions(); }, []);
 
   async function fetchRegions() {
-    const { data } = await supabase.from('regions').select('*').order('name');
+    const { data, error } = await supabase
+      .from('regions').select('*').order('name');
+    console.log('Regions data:', data);
+    console.log('Regions error:', error);
     setRegions(data || []);
   }
-
   function openAdd() {
     setEditing(null);
     setForm({ name: '', description: '' });
