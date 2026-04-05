@@ -1,0 +1,302 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LasangPinoy Mobile Database Schema",
+  "description": "Firebase Firestore database schema for Filipino recipe application",
+  "version": "1.0.0",
+  "collections": {
+    "profiles": {
+      "description": "User profiles with authentication and admin privileges",
+      "document": {
+        "type": "object",
+        "required": ["email", "username", "is_admin", "created_at"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address (unique)",
+            "example": "user@example.com"
+          },
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 50,
+            "description": "User's display name",
+            "example": "Juan Dela Cruz"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "description": "Admin access flag",
+            "default": false,
+            "example": false
+          },
+          "created_at": {
+            "type": "timestamp",
+            "description": "Account creation timestamp",
+            "example": "2026-03-27T10:30:00.000Z"
+          }
+        }
+      },
+      "indexes": [
+        {
+          "fields": ["created_at"],
+          "order": "descending"
+        }
+      ]
+    },
+    "recipes": {
+      "description": "Filipino recipes with complete cooking information",
+      "document": {
+        "type": "object",
+        "required": ["title", "category", "ingredients", "instructions", "created_at"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100,
+            "description": "Recipe name",
+            "example": "Chicken Adobo"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["Main Dish", "Soup", "Noodles"],
+            "description": "Recipe category",
+            "example": "Main Dish"
+          },
+          "region": {
+            "type": "string",
+            "description": "Philippine region of origin",
+            "example": "NCR - Metro Manila"
+          },
+          "ingredients": {
+            "type": "string",
+            "minLength": 5,
+            "description": "Comma-separated list of ingredients",
+            "example": "Chicken, soy sauce, vinegar, garlic, bay leaves"
+          },
+          "instructions": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Step-by-step cooking instructions",
+            "example": "1. Marinate chicken...\n2. Simmer for 30 minutes..."
+          },
+          "nutrition": {
+            "type": "string",
+            "description": "Nutritional information",
+            "example": "Calories: 350kcal, Protein: 28g, Fat: 22g"
+          },
+          "health_notes": {
+            "type": "string",
+            "description": "Health benefits and dietary information",
+            "example": "High in protein. Good for muscle building."
+          },
+          "history": {
+            "type": "string",
+            "description": "Historical and cultural background",
+            "example": "Adobo predates Spanish colonization..."
+          },
+          "fun_fact": {
+            "type": "string",
+            "description": "Interesting trivia about the dish",
+            "example": "Over 100 variations exist across the Philippines!"
+          },
+          "image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to recipe photo",
+            "example": "https://storage.googleapis.com/..."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "Creator's user ID (empty for admin-created)",
+            "example": ""
+          },
+          "created_at": {
+            "type": "timestamp",
+            "description": "Recipe creation timestamp",
+            "example": "2026-03-27T10:30:00.000Z"
+          }
+        }
+      },
+      "indexes": [
+        {
+          "fields": ["category", "created_at"],
+          "order": "ascending, descending"
+        },
+        {
+          "fields": ["region", "created_at"],
+          "order": "ascending, descending"
+        }
+      ]
+    },
+    "regions": {
+      "description": "Philippine regions with culinary descriptions",
+      "document": {
+        "type": "object",
+        "required": ["name", "created_at"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100,
+            "description": "Region name (unique)",
+            "example": "Bicol Region"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of regional cuisine",
+            "example": "Famous for spicy coconut-based dishes"
+          },
+          "created_at": {
+            "type": "timestamp",
+            "description": "Region creation timestamp",
+            "example": "2026-03-27T10:30:00.000Z"
+          }
+        }
+      },
+      "indexes": [
+        {
+          "fields": ["name"],
+          "order": "ascending"
+        }
+      ]
+    },
+    "bookmarks": {
+      "description": "User's saved favorite recipes",
+      "document": {
+        "type": "object",
+        "required": ["user_id", "recipe_id", "created_at"],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User's unique ID (foreign key)",
+            "example": "abc123xyz"
+          },
+          "recipe_id": {
+            "type": "string",
+            "description": "Recipe's unique ID (foreign key)",
+            "example": "recipe_001"
+          },
+          "created_at": {
+            "type": "timestamp",
+            "description": "Bookmark creation timestamp",
+            "example": "2026-03-27T10:30:00.000Z"
+          }
+        }
+      },
+      "indexes": [
+        {
+          "fields": ["user_id", "created_at"],
+          "order": "ascending, descending"
+        },
+        {
+          "fields": ["recipe_id", "created_at"],
+          "order": "ascending, descending"
+        },
+        {
+          "fields": ["user_id", "recipe_id"],
+          "unique": true,
+          "description": "Composite unique index to prevent duplicate bookmarks"
+        }
+      ]
+    },
+    "feedback": {
+      "description": "User ratings and comments on recipes",
+      "document": {
+        "type": "object",
+        "required": ["user_id", "recipe_id", "rating", "comment", "created_at"],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "User's unique ID (foreign key)",
+            "example": "abc123xyz"
+          },
+          "recipe_id": {
+            "type": "string",
+            "description": "Recipe's unique ID (foreign key)",
+            "example": "recipe_001"
+          },
+          "rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Star rating (1-5)",
+            "example": 5
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "User's written feedback",
+            "example": "Delicious! Just like my lola used to make."
+          },
+          "created_at": {
+            "type": "timestamp",
+            "description": "Feedback submission timestamp",
+            "example": "2026-03-27T10:30:00.000Z"
+          }
+        }
+      },
+      "indexes": [
+        {
+          "fields": ["recipe_id", "created_at"],
+          "order": "ascending, descending"
+        },
+        {
+          "fields": ["user_id", "created_at"],
+          "order": "ascending, descending"
+        }
+      ]
+    }
+  },
+  "relationships": {
+    "profiles_to_bookmarks": {
+      "type": "one-to-many",
+      "from": "profiles",
+      "to": "bookmarks",
+      "foreignKey": "user_id",
+      "description": "One user can have many bookmarks"
+    },
+    "profiles_to_feedback": {
+      "type": "one-to-many",
+      "from": "profiles",
+      "to": "feedback",
+      "foreignKey": "user_id",
+      "description": "One user can submit many feedback entries"
+    },
+    "profiles_to_recipes": {
+      "type": "one-to-many",
+      "from": "profiles",
+      "to": "recipes",
+      "foreignKey": "user_id",
+      "description": "One user (admin) can create many recipes"
+    },
+    "recipes_to_bookmarks": {
+      "type": "one-to-many",
+      "from": "recipes",
+      "to": "bookmarks",
+      "foreignKey": "recipe_id",
+      "description": "One recipe can be bookmarked by many users"
+    },
+    "recipes_to_feedback": {
+      "type": "one-to-many",
+      "from": "recipes",
+      "to": "feedback",
+      "foreignKey": "recipe_id",
+      "description": "One recipe can have many feedback entries"
+    },
+    "regions_to_recipes": {
+      "type": "one-to-many",
+      "from": "regions",
+      "to": "recipes",
+      "foreignKey": "region",
+      "description": "One region can have many recipes (referenced by name)"
+    }
+  },
+  "metadata": {
+    "database": "Firebase Firestore",
+    "region": "asia-southeast1",
+    "created": "2026-03-27",
+    "version": "1.0.0",
+    "projectId": "lasangpinoy-mobile"
+  }
+}
