@@ -3,31 +3,32 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
-
-type Recipe = {
-  id: number;
-  title: string;
-  category: string;
-  ingredients: string;
-  instructions: string;
-  nutrition: string;
-  health_notes: string;
-  region: string;
-  image_url: string;
-};
+import { FOOD_CATEGORIES, FOOD_CATEGORY_COLORS } from '../../constants/food-categories';
+import {
+    addRecipe,
+    addRegion,
+    deleteRecipe as deleteRecipeFromDb,
+    getRecipeEngagement,
+    getRecipes,
+    getRegions,
+    Recipe,
+    RecipeEngagement,
+    Region,
+    updateRecipe,
+    uploadRecipeImage,
+} from '../../lib/firebase';
 
 type Errors = {
   title?: string;
@@ -38,17 +39,21 @@ type Errors = {
 
 export default function AdminRecipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [regions, setRegions] = useState<{ id: number; name: string }[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Recipe | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [engagementVisible, setEngagementVisible] = useState(false);
+  const [engagementLoading, setEngagementLoading] = useState(false);
+  const [engagementRecipe, setEngagementRecipe] = useState<Recipe | null>(null);
+  const [engagement, setEngagement] = useState<RecipeEngagement | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [form, setForm] = useState({
     title: '', category: '', ingredients: '',
     instructions: '', nutrition: '', health_notes: '',
-    region: '', image_url: ''
+    region: '', image_url: '', history: '', fun_fact: ''
   });
 
   useEffect(() => {
@@ -58,17 +63,22 @@ export default function AdminRecipes() {
 
   async function fetchRecipes() {
     setLoading(true);
-    const { data } = await supabase
-      .from('recipes').select('*')
-      .order('created_at', { ascending: false });
-    setRecipes(data || []);
+    try {
+      const data = await getRecipes();
+      setRecipes(data);
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
+    }
     setLoading(false);
   }
 
   async function fetchRegions() {
-    const { data } = await supabase
-      .from('regions').select('id, name').order('name');
-    setRegions(data || []);
+    try {
+      const data = await getRegions();
+      setRegions(data);
+    } catch (error) {
+      console.error('Error fetching regions:', error);
+    }
   }
 
   function openAdd() {
@@ -78,7 +88,7 @@ export default function AdminRecipes() {
     setForm({
       title: '', category: '', ingredients: '',
       instructions: '', nutrition: '', health_notes: '',
-      region: '', image_url: ''
+      region: '', image_url: '', history: '', fun_fact: ''
     });
     setModalVisible(true);
   }
@@ -96,6 +106,8 @@ export default function AdminRecipes() {
       health_notes: recipe.health_notes || '',
       region: recipe.region || '',
       image_url: recipe.image_url || '',
+      history: recipe.history || '',
+      fun_fact: recipe.fun_fact || '',
     });
     setModalVisible(true);
   }
@@ -107,7 +119,7 @@ export default function AdminRecipes() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -126,8 +138,8 @@ export default function AdminRecipes() {
     }
     if (!form.category.trim()) {
       newErrors.category = 'Category is required.';
-    } else if (!['Main Dish', 'Soup', 'Noodles'].includes(form.category.trim())) {
-      newErrors.category = 'Category must be: Main Dish, Soup, or Noodles';
+    } else if (!FOOD_CATEGORIES.includes(form.category.trim() as any)) {
+      newErrors.category = `Category must be one of: ${FOOD_CATEGORIES.join(', ')}`;
     }
     if (!form.ingredients.trim()) {
       newErrors.ingredients = 'Ingredients are required.';
@@ -145,17 +157,15 @@ export default function AdminRecipes() {
 
   async function autoSaveRegion(regionName: string) {
     if (!regionName.trim()) return;
-    const { data: existing } = await supabase
-      .from('regions')
-      .select('id')
-      .eq('name', regionName.trim())
-      .single();
-    if (!existing) {
-      await supabase.from('regions').insert({
-        name: regionName.trim(),
-        description: ''
-      });
-      fetchRegions();
+    // Check if region already exists
+    const existingRegion = regions.find(r => r.name.toLowerCase() === regionName.trim().toLowerCase());
+    if (!existingRegion) {
+      try {
+        await addRegion(regionName.trim(), '');
+        fetchRegions();
+      } catch (error) {
+        console.error('Error auto-saving region:', error);
+      }
     }
   }
 
@@ -164,40 +174,45 @@ export default function AdminRecipes() {
     setUploading(true);
     try {
       let imageUrl = form.image_url || '';
+      
+      // Upload local image to Firebase Storage
       if (selectedImage) {
-        const fileName = `recipe_${Date.now()}.jpg`;
-        const response = await fetch(selectedImage);
-        const blob = await response.blob();
-        const arrayBuffer = await new Response(blob).arrayBuffer();
-        const { error: uploadError } = await supabase.storage
-          .from('recipe-images')
-          .upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage
-          .from('recipe-images').getPublicUrl(fileName);
-        imageUrl = urlData.publicUrl;
+        const tempId = editing?.id || `new_${Date.now()}`;
+        imageUrl = await uploadRecipeImage(selectedImage, tempId);
       }
 
-      // Auto-save region to regions table
+      // Auto-save region to regions collection
       await autoSaveRegion(form.region);
 
-      const recipeData = { ...form, image_url: imageUrl };
+      const recipeData = {
+        title: form.title,
+        category: form.category,
+        ingredients: form.ingredients,
+        instructions: form.instructions,
+        nutrition: form.nutrition,
+        health_notes: form.health_notes,
+        region: form.region,
+        image_url: imageUrl,
+        history: form.history,
+        fun_fact: form.fun_fact,
+      };
+
       if (editing) {
-        await supabase.from('recipes').update(recipeData).eq('id', editing.id);
+        await updateRecipe(editing.id, recipeData);
       } else {
-        await supabase.from('recipes').insert({ ...recipeData, user_id: null });
+        await addRecipe({ ...recipeData, user_id: '' });
       }
       setModalVisible(false);
       setSelectedImage(null);
       fetchRecipes();
-      Alert.alert('Success ✅', editing ? 'Recipe updated!' : 'Recipe added!');
+      Alert.alert('Success', editing ? 'Recipe updated!' : 'Recipe added!');
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
     setUploading(false);
   }
 
-  async function deleteRecipe(id: number, title: string) {
+  async function handleDeleteRecipe(id: string, title: string) {
     Alert.alert(
       'Delete Recipe',
       `Are you sure you want to delete "${title}"?`,
@@ -206,18 +221,35 @@ export default function AdminRecipes() {
         {
           text: 'Delete', style: 'destructive',
           onPress: async () => {
-            await supabase.from('recipes').delete().eq('id', id);
-            fetchRecipes();
-            Alert.alert('Deleted ✅', `"${title}" has been deleted.`);
+            try {
+              await deleteRecipeFromDb(id);
+              fetchRecipes();
+              Alert.alert('Deleted', `"${title}" has been deleted.`);
+            } catch (error: any) {
+              Alert.alert('Error', error.message);
+            }
           }
         }
       ]
     );
   }
 
-  const catColors: Record<string, string> = {
-    'Main Dish': '#F25C05', 'Soup': '#4A8FE7', 'Noodles': '#34B36A',
-  };
+  async function openEngagement(recipe: Recipe) {
+    setEngagementRecipe(recipe);
+    setEngagementVisible(true);
+    setEngagementLoading(true);
+    try {
+      const data = await getRecipeEngagement(recipe.id);
+      setEngagement(data);
+    } catch (error) {
+      console.error('Error loading engagement:', error);
+      Alert.alert('Error', 'Failed to load engagement data.');
+    } finally {
+      setEngagementLoading(false);
+    }
+  }
+
+  const catColors: Record<string, string> = FOOD_CATEGORY_COLORS;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -272,11 +304,14 @@ export default function AdminRecipes() {
                   </View>
                 </View>
                 <View style={styles.actionBtns}>
+                  <TouchableOpacity style={styles.statsBtn} onPress={() => openEngagement(recipe)}>
+                    <Ionicons name="analytics" size={16} color="#9B59B6" />
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(recipe)}>
                     <Ionicons name="pencil" size={16} color="#4A8FE7" />
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.deleteBtn}
-                    onPress={() => deleteRecipe(recipe.id, recipe.title)}>
+                    onPress={() => handleDeleteRecipe(recipe.id, recipe.title)}>
                     <Ionicons name="trash" size={16} color="#D92614" />
                   </TouchableOpacity>
                 </View>
@@ -313,6 +348,20 @@ export default function AdminRecipes() {
                 )}
               </TouchableOpacity>
 
+              {/* IMAGE URL INPUT */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Or paste Image URL</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="https://example.com/image.jpg"
+                  placeholderTextColor="#bbb"
+                  value={form.image_url}
+                  onChangeText={(v) => setForm(prev => ({ ...prev, image_url: v }))}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+              </View>
+
               {/* TITLE */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>
@@ -329,7 +378,7 @@ export default function AdminRecipes() {
                   }}
                 />
                 {errors.title ? (
-                  <Text style={styles.errorText}>⚠ {errors.title}</Text>
+                  <Text style={styles.errorText}>{errors.title}</Text>
                 ) : null}
               </View>
 
@@ -339,7 +388,7 @@ export default function AdminRecipes() {
                   Category <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={styles.catButtons}>
-                  {['Main Dish', 'Soup', 'Noodles'].map((cat) => (
+                  {FOOD_CATEGORIES.map((cat) => (
                     <TouchableOpacity
                       key={cat}
                       style={[styles.catSelectBtn,
@@ -357,7 +406,7 @@ export default function AdminRecipes() {
                   ))}
                 </View>
                 {errors.category ? (
-                  <Text style={styles.errorText}>⚠ {errors.category}</Text>
+                  <Text style={styles.errorText}>{errors.category}</Text>
                 ) : null}
               </View>
 
@@ -399,7 +448,7 @@ export default function AdminRecipes() {
                 />
                 {form.region ? (
                   <Text style={{ fontSize: 11, color: '#9B59B6', marginTop: 4 }}>
-                    📍 Selected: {form.region}
+                    Selected: {form.region}
                   </Text>
                 ) : null}
               </View>
@@ -422,7 +471,7 @@ export default function AdminRecipes() {
                   multiline
                 />
                 {errors.ingredients ? (
-                  <Text style={styles.errorText}>⚠ {errors.ingredients}</Text>
+                  <Text style={styles.errorText}>{errors.ingredients}</Text>
                 ) : null}
               </View>
 
@@ -444,7 +493,7 @@ export default function AdminRecipes() {
                   multiline
                 />
                 {errors.instructions ? (
-                  <Text style={styles.errorText}>⚠ {errors.instructions}</Text>
+                  <Text style={styles.errorText}>{errors.instructions}</Text>
                 ) : null}
               </View>
 
@@ -474,6 +523,32 @@ export default function AdminRecipes() {
                 />
               </View>
 
+              {/* HISTORY / BACKGROUND */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>History / Background</Text>
+                <TextInput
+                  style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+                  placeholder="Historical background of this dish..."
+                  placeholderTextColor="#bbb"
+                  value={form.history}
+                  onChangeText={(v) => setForm(prev => ({ ...prev, history: v }))}
+                  multiline
+                />
+              </View>
+
+              {/* FUN FACT */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Fun Fact</Text>
+                <TextInput
+                  style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                  placeholder="Interesting fact about this dish..."
+                  placeholderTextColor="#bbb"
+                  value={form.fun_fact}
+                  onChangeText={(v) => setForm(prev => ({ ...prev, fun_fact: v }))}
+                  multiline
+                />
+              </View>
+
               <View style={styles.modalBtns}>
                 <TouchableOpacity style={styles.cancelBtn}
                   onPress={() => setModalVisible(false)}>
@@ -489,6 +564,78 @@ export default function AdminRecipes() {
                 </TouchableOpacity>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={engagementVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={styles.modalTitle}>Recipe Engagement</Text>
+                <Text style={{ color: '#888', fontSize: 12 }} numberOfLines={1}>
+                  {engagementRecipe?.title || 'Recipe'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setEngagementVisible(false)}>
+                <Ionicons name="close" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
+
+            {engagementLoading ? (
+              <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 24 }} />
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.engagementSummaryRow}>
+                  <View style={styles.engagementSummaryCard}>
+                    <Text style={styles.engagementSummaryNumber}>
+                      {engagement?.bookmark_users.length || 0}
+                    </Text>
+                    <Text style={styles.engagementSummaryLabel}>Bookmarked</Text>
+                  </View>
+                  <View style={styles.engagementSummaryCard}>
+                    <Text style={styles.engagementSummaryNumber}>
+                      {engagement?.rating_users.length || 0}
+                    </Text>
+                    <Text style={styles.engagementSummaryLabel}>Rated</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.engagementTitle}>Users Who Bookmarked</Text>
+                {(engagement?.bookmark_users.length || 0) === 0 ? (
+                  <Text style={styles.engagementEmpty}>No bookmark data yet.</Text>
+                ) : (
+                  engagement?.bookmark_users.map((u) => (
+                    <View key={`b_${u.user_id}_${u.email}`} style={styles.engagementRow}>
+                      <Ionicons name="bookmark" size={16} color="#F25C05" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.engagementName}>{u.username}</Text>
+                        <Text style={styles.engagementSub}>{u.email}</Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+
+                <Text style={[styles.engagementTitle, { marginTop: 16 }]}>Users Who Rated</Text>
+                {(engagement?.rating_users.length || 0) === 0 ? (
+                  <Text style={styles.engagementEmpty}>No rating data yet.</Text>
+                ) : (
+                  engagement?.rating_users.map((u) => (
+                    <View key={`r_${u.user_id}_${u.email}_${u.rating}`} style={styles.engagementRow}>
+                      <Ionicons name="star" size={16} color="#FFB800" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.engagementName}>{u.username}</Text>
+                        <Text style={styles.engagementSub}>{u.email}</Text>
+                        <Text style={styles.engagementComment}>
+                          {u.rating}/5{u.comment ? ` • ${u.comment}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>
@@ -512,8 +659,9 @@ const styles = StyleSheet.create({
   recipeCard: {
     flexDirection: 'row', backgroundColor: '#fff',
     borderRadius: 14, marginBottom: 10, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    elevation: 2,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 1px 6px rgba(0, 0, 0, 0.06)',
   },
   recipeImage: { width: 80, height: 80 },
   recipeImagePlaceholder: {
@@ -527,6 +675,10 @@ const styles = StyleSheet.create({
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   tagText: { fontSize: 10, fontWeight: '600' },
   actionBtns: { gap: 8, justifyContent: 'center', paddingRight: 12 },
+  statsBtn: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: '#9B59B622', justifyContent: 'center', alignItems: 'center',
+  },
   editBtn: {
     width: 34, height: 34, borderRadius: 10,
     backgroundColor: '#4A8FE722', justifyContent: 'center', alignItems: 'center',
@@ -575,7 +727,7 @@ const styles = StyleSheet.create({
     color: '#D92614', fontSize: 11,
     marginTop: 4, marginLeft: 4,
   },
-  catButtons: { flexDirection: 'row', gap: 8 },
+  catButtons: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   catSelectBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 10,
     borderWidth: 1.5, borderColor: '#E8D8A0',
@@ -599,4 +751,61 @@ const styles = StyleSheet.create({
     padding: 14, alignItems: 'center',
   },
   saveText: { color: '#fff', fontWeight: 'bold' },
+  engagementSummaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  engagementSummaryCard: {
+    flex: 1,
+    backgroundColor: '#F9F5EF',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  engagementSummaryNumber: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2E1A06',
+  },
+  engagementSummaryLabel: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
+  },
+  engagementTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2E1A06',
+    marginBottom: 8,
+  },
+  engagementEmpty: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 8,
+  },
+  engagementRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#FAF7F2',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+  },
+  engagementName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2E1A06',
+  },
+  engagementSub: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
+  },
+  engagementComment: {
+    fontSize: 11,
+    color: '#555',
+    marginTop: 4,
+  },
 });

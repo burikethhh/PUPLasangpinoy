@@ -10,9 +10,10 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
+import { signUp, getProfile, verifyEmail } from '../../lib/firebase';
 
 export default function SignUpScreen() {
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,6 +21,7 @@ export default function SignUpScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{
+    displayName?: string;
     email?: string;
     password?: string;
     confirmPassword?: string;
@@ -27,10 +29,17 @@ export default function SignUpScreen() {
 
   function validate() {
     const newErrors: {
+      displayName?: string;
       email?: string;
       password?: string;
       confirmPassword?: string;
     } = {};
+
+    if (!displayName.trim()) {
+      newErrors.displayName = 'Display name is required.';
+    } else if (displayName.trim().length < 2) {
+      newErrors.displayName = 'Display name must be at least 2 characters.';
+    }
 
     if (!email.trim()) {
       newErrors.email = 'Email is required.';
@@ -54,23 +63,36 @@ export default function SignUpScreen() {
     return Object.keys(newErrors).length === 0;
   }
 
-  async function signUp() {
+  async function handleSignUp() {
     if (!validate()) return;
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      Alert.alert('Sign Up Failed', error.message);
-    } else if (data.user) {
-      await supabase.from('profiles').insert({
-        id: data.user.id,
-        email,
-        username: email.split('@')[0],
-        is_admin: false,
-      });
-      Alert.alert('Success! 🎉', 'Account created! Please sign in.', [
-        { text: 'OK', onPress: () => router.replace('/(auth)/login') }
-      ]);
+    
+    try {
+      const username = displayName.trim();
+      const userCredential = await signUp(email, password, username);
+      
+      // Send verification email (non-blocking — don't wait or fail on this)
+      verifyEmail().catch(e => console.log('[Auth] Verification email skipped:', e.message));
+      
+      // User is already authenticated after signUp — redirect directly
+      const profile = await getProfile(userCredential.user.uid);
+      if (profile?.is_admin) {
+        router.replace('/(admin)');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      let message = error.message;
+      if (error.code === 'auth/email-already-in-use') {
+        message = 'This email is already registered.';
+      } else if (error.code === 'auth/invalid-email') {
+        message = 'Invalid email address.';
+      } else if (error.code === 'auth/weak-password') {
+        message = 'Password is too weak. Please use a stronger password.';
+      }
+      Alert.alert('Sign Up Failed', message);
     }
+    
     setLoading(false);
   }
 
@@ -93,6 +115,29 @@ export default function SignUpScreen() {
 
             <Text style={styles.title}>Create Account</Text>
 
+            {/* DISPLAY NAME */}
+            <Text style={styles.label}>Display Name</Text>
+            <View style={[styles.inputBox,
+              errors.displayName && styles.inputBoxError]}>
+              <Ionicons name="person-outline" size={18} color="#aaa"
+                style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Your name"
+                placeholderTextColor="#aaa"
+                value={displayName}
+                onChangeText={(v) => {
+                  setDisplayName(v);
+                  if (errors.displayName) setErrors(prev => ({ ...prev, displayName: undefined }));
+                }}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+            </View>
+            {errors.displayName ? (
+              <Text style={styles.errorText}>{errors.displayName}</Text>
+            ) : null}
+
             {/* EMAIL */}
             <Text style={styles.label}>Email Address</Text>
             <View style={[styles.inputBox,
@@ -114,7 +159,7 @@ export default function SignUpScreen() {
               />
             </View>
             {errors.email ? (
-              <Text style={styles.errorText}>⚠ {errors.email}</Text>
+              <Text style={styles.errorText}>{errors.email}</Text>
             ) : null}
 
             {/* PASSWORD */}
@@ -143,7 +188,7 @@ export default function SignUpScreen() {
               </TouchableOpacity>
             </View>
             {errors.password ? (
-              <Text style={styles.errorText}>⚠ {errors.password}</Text>
+              <Text style={styles.errorText}>{errors.password}</Text>
             ) : null}
 
             {/* CONFIRM PASSWORD */}
@@ -172,7 +217,7 @@ export default function SignUpScreen() {
               </TouchableOpacity>
             </View>
             {errors.confirmPassword ? (
-              <Text style={styles.errorText}>⚠ {errors.confirmPassword}</Text>
+              <Text style={styles.errorText}>{errors.confirmPassword}</Text>
             ) : null}
 
             <View style={{ height: 20 }} />
@@ -180,7 +225,7 @@ export default function SignUpScreen() {
             {/* SIGN UP BUTTON */}
             <TouchableOpacity
               style={[styles.signUpBtn, loading && { opacity: 0.7 }]}
-              onPress={signUp}
+              onPress={handleSignUp}
               disabled={loading}>
               {loading
                 ? <ActivityIndicator color="#fff" />
@@ -206,8 +251,9 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   card: {
     backgroundColor: '#fff', borderRadius: 24, padding: 28,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
+    elevation: 4,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 2px 12px rgba(0, 0, 0, 0.08)',
   },
   backBtn: {
     flexDirection: 'row', alignItems: 'center',

@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert, Modal,
+  ActivityIndicator,
+  Alert, 
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,12 +13,17 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
-
-type Region = { id: number; name: string; description: string; };
+import {
+  getRegions,
+  addRegion,
+  updateRegion,
+  deleteRegion as deleteRegionFromDb,
+  Region
+} from '../../lib/firebase';
 
 export default function AdminRegions() {
   const [regions, setRegions] = useState<Region[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Region | null>(null);
   const [form, setForm] = useState({ name: '', description: '' });
@@ -24,12 +31,16 @@ export default function AdminRegions() {
   useEffect(() => { fetchRegions(); }, []);
 
   async function fetchRegions() {
-    const { data, error } = await supabase
-      .from('regions').select('*').order('name');
-    console.log('Regions data:', data);
-    console.log('Regions error:', error);
-    setRegions(data || []);
+    setLoading(true);
+    try {
+      const data = await getRegions();
+      setRegions(data);
+    } catch (error) {
+      console.error('Error fetching regions:', error);
+    }
+    setLoading(false);
   }
+
   function openAdd() {
     setEditing(null);
     setForm({ name: '', description: '' });
@@ -43,23 +54,39 @@ export default function AdminRegions() {
   }
 
   async function saveRegion() {
-    if (!form.name) { Alert.alert('Error', 'Region name is required.'); return; }
-    if (editing) {
-      await supabase.from('regions').update(form).eq('id', editing.id);
-    } else {
-      await supabase.from('regions').insert(form);
+    if (!form.name.trim()) { 
+      Alert.alert('Error', 'Region name is required.'); 
+      return; 
     }
-    setModalVisible(false);
-    fetchRegions();
+    try {
+      if (editing) {
+        await updateRegion(editing.id, { 
+          name: form.name, 
+          description: form.description 
+        });
+      } else {
+        await addRegion(form.name, form.description);
+      }
+      setModalVisible(false);
+      fetchRegions();
+      Alert.alert('Success', editing ? 'Region updated!' : 'Region added!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
   }
 
-  async function deleteRegion(id: number) {
-    Alert.alert('Delete Region', 'Are you sure?', [
+  async function handleDeleteRegion(id: string, name: string) {
+    Alert.alert('Delete Region', `Are you sure you want to delete "${name}"?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive',
         onPress: async () => {
-          await supabase.from('regions').delete().eq('id', id);
-          fetchRegions();
+          try {
+            await deleteRegionFromDb(id);
+            fetchRegions();
+            Alert.alert('Deleted', `"${name}" has been deleted.`);
+          } catch (error: any) {
+            Alert.alert('Error', error.message);
+          }
         }
       }
     ]);
@@ -77,32 +104,36 @@ export default function AdminRegions() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-        {regions.length === 0 && (
-          <Text style={styles.empty}>No regions yet. Add one!</Text>
-        )}
-        {regions.map((region) => (
-          <View key={region.id} style={styles.regionCard}>
-            <View style={styles.regionIcon}>
-              <Ionicons name="map" size={22} color="#9B59B6" />
+      {loading ? (
+        <ActivityIndicator size="large" color="#9B59B6" style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+          {regions.length === 0 && (
+            <Text style={styles.empty}>No regions yet. Add one!</Text>
+          )}
+          {regions.map((region) => (
+            <View key={region.id} style={styles.regionCard}>
+              <View style={styles.regionIcon}>
+                <Ionicons name="map" size={22} color="#9B59B6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.regionName}>{region.name}</Text>
+                {region.description ? (
+                  <Text style={styles.regionDesc}>{region.description}</Text>
+                ) : null}
+              </View>
+              <View style={styles.actionBtns}>
+                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(region)}>
+                  <Ionicons name="pencil" size={16} color="#4A8FE7" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteRegion(region.id, region.name)}>
+                  <Ionicons name="trash" size={16} color="#D92614" />
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.regionName}>{region.name}</Text>
-              {region.description ? (
-                <Text style={styles.regionDesc}>{region.description}</Text>
-              ) : null}
-            </View>
-            <View style={styles.actionBtns}>
-              <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(region)}>
-                <Ionicons name="pencil" size={16} color="#4A8FE7" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteRegion(region.id)}>
-                <Ionicons name="trash" size={16} color="#D92614" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      )}
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -166,8 +197,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', backgroundColor: '#fff',
     borderRadius: 14, padding: 14, marginBottom: 10,
     alignItems: 'center', gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    elevation: 2,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 1px 6px rgba(0, 0, 0, 0.06)',
   },
   regionIcon: {
     width: 44, height: 44, borderRadius: 12,

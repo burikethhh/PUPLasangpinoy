@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -12,12 +13,11 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
-
-type Recipe = {
-  id: number; title: string;
-  nutrition: string; health_notes: string;
-};
+import {
+  getRecipes,
+  updateRecipe,
+  Recipe
+} from '../../lib/firebase';
 
 export default function AdminNutrition() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -30,10 +30,14 @@ export default function AdminNutrition() {
 
   async function fetchRecipes() {
     setLoading(true);
-    const { data } = await supabase
-      .from('recipes').select('id, title, nutrition, health_notes')
-      .order('title');
-    setRecipes(data || []);
+    try {
+      const data = await getRecipes();
+      // Sort by title
+      data.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      setRecipes(data);
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
+    }
     setLoading(false);
   }
 
@@ -48,11 +52,17 @@ export default function AdminNutrition() {
 
   async function saveNutrition() {
     if (!editing) return;
-    await supabase.from('recipes')
-      .update({ nutrition: form.nutrition, health_notes: form.health_notes })
-      .eq('id', editing.id);
-    setModalVisible(false);
-    fetchRecipes();
+    try {
+      await updateRecipe(editing.id, { 
+        nutrition: form.nutrition, 
+        health_notes: form.health_notes 
+      });
+      setModalVisible(false);
+      fetchRecipes();
+      Alert.alert('Success', 'Nutrition info updated!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
   }
 
   return (
@@ -68,25 +78,29 @@ export default function AdminNutrition() {
         <ActivityIndicator size="large" color="#34B36A" style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-          {recipes.map((recipe) => (
-            <TouchableOpacity
-              key={recipe.id}
-              style={styles.recipeCard}
-              onPress={() => openEdit(recipe)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.recipeTitle}>{recipe.title}</Text>
-                {recipe.nutrition ? (
-                  <Text style={styles.nutritionText}>🥗 {recipe.nutrition}</Text>
-                ) : (
-                  <Text style={styles.emptyText}>No nutrition info yet</Text>
-                )}
-                {recipe.health_notes ? (
-                  <Text style={styles.healthText}>💚 {recipe.health_notes}</Text>
-                ) : null}
-              </View>
-              <Ionicons name="pencil" size={18} color="#34B36A" />
-            </TouchableOpacity>
-          ))}
+          {recipes.length === 0 ? (
+            <Text style={styles.emptyText}>No recipes found.</Text>
+          ) : (
+            recipes.map((recipe) => (
+              <TouchableOpacity
+                key={recipe.id}
+                style={styles.recipeCard}
+                onPress={() => openEdit(recipe)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.recipeTitle}>{recipe.title}</Text>
+                  {recipe.nutrition ? (
+                    <Text style={styles.nutritionText}>{recipe.nutrition}</Text>
+                  ) : (
+                    <Text style={styles.emptyInfoText}>No nutrition info yet</Text>
+                  )}
+                  {recipe.health_notes ? (
+                    <Text style={styles.healthText}>{recipe.health_notes}</Text>
+                  ) : null}
+                </View>
+                <Ionicons name="pencil" size={18} color="#34B36A" />
+              </TouchableOpacity>
+            ))
+          )}
         </ScrollView>
       )}
 
@@ -100,7 +114,7 @@ export default function AdminNutrition() {
               </TouchableOpacity>
             </View>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>🥗 Nutrition Info</Text>
+              <Text style={styles.inputLabel}>Nutrition Info</Text>
               <TextInput
                 style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
                 placeholder="e.g. Calories: 320kcal, Protein: 28g, Fat: 12g"
@@ -111,7 +125,7 @@ export default function AdminNutrition() {
               />
             </View>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>💚 Health Notes</Text>
+              <Text style={styles.inputLabel}>Health Notes</Text>
               <TextInput
                 style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
                 placeholder="e.g. High protein, Low fat, Good for immunity"
@@ -144,17 +158,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#2E1A06' },
+  emptyText: { textAlign: 'center', color: '#aaa', marginTop: 40, fontSize: 14 },
   recipeCard: {
     flexDirection: 'row', backgroundColor: '#fff',
     borderRadius: 14, padding: 14, marginBottom: 10,
     alignItems: 'center', gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    elevation: 2,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 1px 6px rgba(0, 0, 0, 0.06)',
   },
   recipeTitle: { fontSize: 14, fontWeight: 'bold', color: '#2E1A06', marginBottom: 4 },
   nutritionText: { fontSize: 11, color: '#34B36A', marginBottom: 2 },
   healthText: { fontSize: 11, color: '#4A8FE7' },
-  emptyText: { fontSize: 11, color: '#bbb', fontStyle: 'italic' },
+  emptyInfoText: { fontSize: 11, color: '#bbb', fontStyle: 'italic' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: '#fff', borderTopLeftRadius: 24,

@@ -13,15 +13,13 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
-
-type Profile = {
-  id: string;
-  email: string;
-  username: string;
-  is_admin: boolean;
-  created_at: string;
-};
+import {
+  getAllUsers,
+  updateProfile,
+  deleteUser as deleteUserFromDb,
+  setUserAdmin,
+  Profile
+} from '../../lib/firebase';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<Profile[]>([]);
@@ -34,9 +32,12 @@ export default function AdminUsers() {
 
   async function fetchUsers() {
     setLoading(true);
-    const { data } = await supabase
-      .from('profiles').select('*').order('created_at', { ascending: false });
-    setUsers(data || []);
+    try {
+      const data = await getAllUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
     setLoading(false);
   }
 
@@ -48,11 +49,17 @@ export default function AdminUsers() {
 
   async function saveUser() {
     if (!editing) return;
-    await supabase.from('profiles')
-      .update({ username: form.username, email: form.email })
-      .eq('id', editing.id);
-    setModalVisible(false);
-    fetchUsers();
+    try {
+      await updateProfile(editing.id, { 
+        username: form.username, 
+        email: form.email 
+      });
+      setModalVisible(false);
+      fetchUsers();
+      Alert.alert('Success', 'User updated successfully.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
   }
 
   async function deleteUser(user: Profile) {
@@ -64,11 +71,39 @@ export default function AdminUsers() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive',
         onPress: async () => {
-          await supabase.from('profiles').delete().eq('id', user.id);
-          fetchUsers();
+          try {
+            await deleteUserFromDb(user.id);
+            fetchUsers();
+            Alert.alert('Deleted', 'User has been deleted.');
+          } catch (error: any) {
+            Alert.alert('Error', error.message);
+          }
         }
       }
     ]);
+  }
+
+  async function toggleAdmin(user: Profile) {
+    const newStatus = !user.is_admin;
+    Alert.alert(
+      newStatus ? 'Promote to Admin' : 'Remove Admin',
+      `${newStatus ? 'Make' : 'Remove'} ${user.email} ${newStatus ? 'an admin' : 'from admin'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            try {
+              await setUserAdmin(user.id, newStatus);
+              fetchUsers();
+              Alert.alert('Success', `User is ${newStatus ? 'now an admin' : 'no longer an admin'}.`);
+            } catch (error: any) {
+              Alert.alert('Error', error.message);
+            }
+          }
+        }
+      ]
+    );
   }
 
   return (
@@ -85,38 +120,53 @@ export default function AdminUsers() {
         <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-          {users.map((user) => (
-            <View key={user.id} style={styles.userCard}>
-              <View style={[styles.avatar, { backgroundColor: user.is_admin ? '#F25C05' : '#4A8FE7' }]}>
-                <Text style={styles.avatarText}>
-                  {(user.username || user.email || 'U').charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.userInfo}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.userName}>
-                    {user.username || user.email?.split('@')[0] || 'Unknown'}
+          {users.length === 0 ? (
+            <Text style={styles.emptyText}>No users found.</Text>
+          ) : (
+            users.map((user) => (
+              <View key={user.id} style={styles.userCard}>
+                <View style={[styles.avatar, { backgroundColor: user.is_admin ? '#F25C05' : '#4A8FE7' }]}>
+                  <Text style={styles.avatarText}>
+                    {(user.username || user.email || 'U').charAt(0).toUpperCase()}
                   </Text>
-                  {user.is_admin && (
-                    <View style={styles.adminBadge}>
-                      <Text style={styles.adminBadgeText}>ADMIN</Text>
-                    </View>
+                </View>
+                <View style={styles.userInfo}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.userName}>
+                      {user.username || user.email?.split('@')[0] || 'Unknown'}
+                    </Text>
+                    {user.is_admin && (
+                      <View style={styles.adminBadge}>
+                        <Text style={styles.adminBadgeText}>ADMIN</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.userEmail}>{user.email}</Text>
+                </View>
+                <View style={styles.actionBtns}>
+                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(user)}>
+                    <Ionicons name="pencil" size={16} color="#4A8FE7" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.adminToggleBtn, {
+                      backgroundColor: user.is_admin ? '#F25C0522' : '#34B36A22'
+                    }]}
+                    onPress={() => toggleAdmin(user)}>
+                    <Ionicons
+                      name={user.is_admin ? 'shield-outline' : 'shield-checkmark-outline'}
+                      size={16}
+                      color={user.is_admin ? '#F25C05' : '#34B36A'}
+                    />
+                  </TouchableOpacity>
+                  {!user.is_admin && (
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteUser(user)}>
+                      <Ionicons name="trash" size={16} color="#D92614" />
+                    </TouchableOpacity>
                   )}
                 </View>
-                <Text style={styles.userEmail}>{user.email}</Text>
               </View>
-              <View style={styles.actionBtns}>
-                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(user)}>
-                  <Ionicons name="pencil" size={16} color="#4A8FE7" />
-                </TouchableOpacity>
-                {!user.is_admin && (
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteUser(user)}>
-                    <Ionicons name="trash" size={16} color="#D92614" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          ))}
+            ))
+          )}
         </ScrollView>
       )}
 
@@ -179,12 +229,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4,
     borderRadius: 10, fontSize: 12, fontWeight: '600',
   },
+  emptyText: { textAlign: 'center', color: '#aaa', marginTop: 40, fontSize: 14 },
   userCard: {
     flexDirection: 'row', backgroundColor: '#fff',
     borderRadius: 14, padding: 14, marginBottom: 10,
     alignItems: 'center', gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    elevation: 2,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 1px 6px rgba(0, 0, 0, 0.06)',
   },
   avatar: {
     width: 44, height: 44, borderRadius: 22,
@@ -204,6 +256,10 @@ const styles = StyleSheet.create({
   editBtn: {
     width: 34, height: 34, borderRadius: 10,
     backgroundColor: '#4A8FE722', justifyContent: 'center', alignItems: 'center',
+  },
+  adminToggleBtn: {
+    width: 34, height: 34, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
   },
   deleteBtn: {
     width: 34, height: 34, borderRadius: 10,

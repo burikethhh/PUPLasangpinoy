@@ -1,69 +1,101 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
+    ActivityIndicator,
+    Dimensions,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { FOOD_CATEGORIES, FOOD_CATEGORY_COLORS } from "../../constants/food-categories";
+import {
+    Recipe as FirebaseRecipe,
+    Region as FirebaseRegion,
+    getRecipes,
+    getRegions,
+} from "../../lib/firebase";
 
-type Recipe = {
-  id: number;
-  title: string;
-  ingredients: string;
-  category: string;
-  region: string;
-  image_url: string;
-};
+type Recipe = FirebaseRecipe;
+type Region = FirebaseRegion;
 
 const CATEGORIES = [
-  { label: 'All', value: '', color: '#F25C05' },
-  { label: 'Main Dish', value: 'Main Dish', color: '#F25C05' },
-  { label: 'Soup', value: 'Soup', color: '#4A8FE7' },
-  { label: 'Noodles', value: 'Noodles', color: '#34B36A' },
+  { label: "All", value: "", color: "#F25C05" },
+  ...FOOD_CATEGORIES.map((category) => ({
+    label: category,
+    value: category,
+    color: FOOD_CATEGORY_COLORS[category] || "#F25C05",
+  })),
 ];
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 const CARD_SIZE = (width - 48) / 2;
 
 export default function HomeScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [search, setSearch] = useState('');
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState('');
+  const [activeCategory, setActiveCategory] = useState("");
+  const [activeRegion, setActiveRegion] = useState("");
 
-  useEffect(() => { fetchRecipes(); }, [activeCategory]);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function fetchRecipes(keyword = '') {
+  useEffect(() => {
+    fetchRegionsData();
+  }, []);
+  useEffect(() => {
+    fetchRecipesData(search);
+  }, [activeCategory, activeRegion]);
+
+  // Debounced search — triggers 400ms after user stops typing
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchRecipesData(search);
+    }, 400);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [search]);
+
+  async function fetchRegionsData() {
+    try {
+      const data = await getRegions();
+      setRegions(data);
+    } catch (error) {
+      console.error("Error fetching regions:", error);
+    }
+  }
+
+  async function fetchRecipesData(keyword = "") {
     setLoading(true);
-    let query = supabase.from('recipes').select('*');
-    if (activeCategory) query = query.eq('category', activeCategory);
-    if (keyword) query = query.or(
-      `title.ilike.%${keyword}%,ingredients.ilike.%${keyword}%`
-    );
-    const { data } = await query.order('created_at', { ascending: false });
-    setRecipes(data || []);
+    try {
+      const data = await getRecipes({
+        category: activeCategory || undefined,
+        region: activeRegion || undefined,
+        search: keyword || undefined,
+      });
+      setRecipes(data);
+    } catch (error) {
+      console.error("Error fetching recipes:", error);
+    }
     setLoading(false);
   }
 
-  const catColors: Record<string, string> = {
-    'Main Dish': '#F25C05', 'Soup': '#4A8FE7', 'Noodles': '#34B36A',
-  };
+  const catColors: Record<string, string> = FOOD_CATEGORY_COLORS;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 30 }}>
-
+        contentContainerStyle={{ paddingBottom: 30 }}
+      >
         {/* TOP BAR */}
         <View style={styles.topBar}>
           <View>
@@ -71,12 +103,16 @@ export default function HomeScreen() {
             <Text style={styles.appSub}>Discover Filipino flavors</Text>
           </View>
           <View style={styles.topBtns}>
-            <TouchableOpacity style={styles.chatBtn}
-              onPress={() => router.push('/(tabs)/chat')}>
+            <TouchableOpacity
+              style={styles.chatBtn}
+              onPress={() => router.push("/(tabs)/chat")}
+            >
               <Text style={styles.chatBtnText}>Chat</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.userBtn}
-              onPress={() => router.push('/(tabs)/profile')}>
+            <TouchableOpacity
+              style={styles.userBtn}
+              onPress={() => router.push("/(tabs)/profile")}
+            >
               <Text style={styles.userBtnText}>User</Text>
             </TouchableOpacity>
           </View>
@@ -84,29 +120,39 @@ export default function HomeScreen() {
 
         {/* SEARCH BAR */}
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={16} color="#aaa"
-            style={{ marginLeft: 14 }} />
+          <Ionicons
+            name="search"
+            size={16}
+            color="#aaa"
+            style={{ marginLeft: 14 }}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search recipes..."
             placeholderTextColor="#aaa"
             value={search}
             onChangeText={setSearch}
-            onSubmitEditing={() => fetchRecipes(search)}
+            onSubmitEditing={() => fetchRecipesData(search)}
             returnKeyType="search"
           />
           {search.length > 0 && (
             <TouchableOpacity
-              onPress={() => { setSearch(''); fetchRecipes(); }}
-              style={{ marginRight: 12 }}>
+              onPress={() => {
+                setSearch("");
+                fetchRecipesData();
+              }}
+              style={{ marginRight: 12 }}
+            >
               <Ionicons name="close-circle" size={18} color="#aaa" />
             </TouchableOpacity>
           )}
         </View>
 
         {/* SCAN BANNER */}
-        <TouchableOpacity style={styles.scanBanner}
-          onPress={() => router.push('/(tabs)/scan')}>
+        <TouchableOpacity
+          style={styles.scanBanner}
+          onPress={() => router.push("/(tabs)/scan")}
+        >
           <View style={styles.scanIconBox}>
             <Ionicons name="camera" size={26} color="#fff" />
           </View>
@@ -121,44 +167,125 @@ export default function HomeScreen() {
 
         {/* CATEGORY FILTER */}
         <Text style={styles.sectionTitle}>Categories</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.catRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.catRow}
+        >
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.value;
             return (
               <TouchableOpacity
                 key={cat.value}
-                style={[styles.catBtn,
-                  isActive && { backgroundColor: cat.color, borderColor: cat.color }]}
-                onPress={() => setActiveCategory(cat.value)}>
-                <Text style={[styles.catText,
-                  isActive && { color: '#fff' }]}>{cat.label}</Text>
+                style={[
+                  styles.catBtn,
+                  isActive && {
+                    backgroundColor: cat.color,
+                    borderColor: cat.color,
+                  },
+                ]}
+                onPress={() => setActiveCategory(cat.value)}
+              >
+                <Text style={[styles.catText, isActive && { color: "#fff" }]}>
+                  {cat.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* REGION FILTER */}
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="map-outline" size={14} color="#9B59B6" /> Regions
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.catRow}
+        >
+          <TouchableOpacity
+            style={[
+              styles.regionBtn,
+              activeRegion === "" && {
+                backgroundColor: "#9B59B6",
+                borderColor: "#9B59B6",
+              },
+            ]}
+            onPress={() => setActiveRegion("")}
+          >
+            <Text
+              style={[
+                styles.regionBtnText,
+                activeRegion === "" && { color: "#fff" },
+              ]}
+            >
+              All Regions
+            </Text>
+          </TouchableOpacity>
+          {regions.map((region) => {
+            const isActive = activeRegion === region.name;
+            return (
+              <TouchableOpacity
+                key={region.id}
+                style={[
+                  styles.regionBtn,
+                  isActive && {
+                    backgroundColor: "#9B59B6",
+                    borderColor: "#9B59B6",
+                  },
+                ]}
+                onPress={() => setActiveRegion(region.name)}
+              >
+                <Text
+                  style={[styles.regionBtnText, isActive && { color: "#fff" }]}
+                >
+                  {region.name}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
         {/* RECIPES GRID */}
-        <Text style={styles.sectionTitle}>
-          {activeCategory || 'Popular Dishes'}
-        </Text>
+        <View style={styles.resultsHeader}>
+          <Text style={styles.sectionTitle}>
+            {activeCategory || activeRegion
+              ? `${activeCategory || "All"}${activeRegion ? ` • ${activeRegion}` : ""}`
+              : "Popular Dishes"}
+          </Text>
+          {!!(activeCategory || activeRegion) && (
+            <TouchableOpacity
+              style={styles.clearFiltersBtn}
+              onPress={() => {
+                setActiveCategory("");
+                setActiveRegion("");
+              }}
+            >
+              <Ionicons name="close-circle" size={14} color="#888" />
+              <Text style={styles.clearFiltersText}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#F25C05"
-            style={{ marginTop: 40 }} />
+          <ActivityIndicator
+            size="large"
+            color="#F25C05"
+            style={{ marginTop: 40 }}
+          />
         ) : recipes.length === 0 ? (
           <Text style={styles.noResults}>No recipes found.</Text>
         ) : (
           <View style={styles.grid}>
             {recipes.map((recipe) => {
-              const color = catColors[recipe.category] || '#F25C05';
+              const color = catColors[recipe.category] || "#F25C05";
               return (
                 <TouchableOpacity
                   key={recipe.id}
                   style={styles.recipeCard}
                   activeOpacity={0.85}
-                  onPress={() => router.push(`/recipe/${recipe.id}`)}>
-
+                  onPress={() => router.push(`/recipe/${recipe.id}`)}
+                >
                   {/* IMAGE */}
                   {recipe.image_url ? (
                     <Image
@@ -169,8 +296,12 @@ export default function HomeScreen() {
                       cachePolicy="memory-disk"
                     />
                   ) : (
-                    <View style={[styles.imagePlaceholder,
-                      { backgroundColor: color + '22' }]}>
+                    <View
+                      style={[
+                        styles.imagePlaceholder,
+                        { backgroundColor: color + "22" },
+                      ]}
+                    >
                       <Text style={{ fontSize: 40 }}>🍽️</Text>
                     </View>
                   )}
@@ -187,90 +318,154 @@ export default function HomeScreen() {
                     </Text>
                     {recipe.region ? (
                       <View style={styles.regionRow}>
-                        <Ionicons name="map-outline" size={10} color="#9B59B6" />
+                        <Ionicons
+                          name="map-outline"
+                          size={10}
+                          color="#9B59B6"
+                        />
                         <Text style={styles.regionText}>{recipe.region}</Text>
                       </View>
                     ) : null}
                   </View>
-
                 </TouchableOpacity>
               );
             })}
           </View>
         )}
-
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9F0DC' },
+  container: { flex: 1, backgroundColor: "#F9F0DC" },
   topBar: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 16,
-    paddingTop: 8, paddingBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
-  appTitle: { fontSize: 18, fontWeight: 'bold', color: '#2E1A06' },
-  appSub: { fontSize: 11, color: '#B07820', marginTop: 2 },
-  topBtns: { flexDirection: 'row', gap: 8 },
+  appTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06" },
+  appSub: { fontSize: 11, color: "#B07820", marginTop: 2 },
+  topBtns: { flexDirection: "row", gap: 8 },
   chatBtn: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: '#F25C05',
-    justifyContent: 'center', alignItems: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F25C05",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  chatBtnText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  chatBtnText: { color: "#fff", fontSize: 11, fontWeight: "bold" },
   userBtn: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: '#DDDDDD',
-    justifyContent: 'center', alignItems: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#DDDDDD",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  userBtnText: { color: '#444', fontSize: 11, fontWeight: 'bold' },
+  userBtnText: { color: "#444", fontSize: 11, fontWeight: "bold" },
   searchBar: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 28,
-    marginHorizontal: 16, marginBottom: 14, height: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 28,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    height: 50,
   },
   searchInput: {
-    flex: 1, fontSize: 13, color: '#333',
-    paddingHorizontal: 8, height: '100%',
+    flex: 1,
+    fontSize: 13,
+    color: "#333",
+    paddingHorizontal: 8,
+    height: "100%",
   },
   scanBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#4A8FE7', borderRadius: 18,
-    marginHorizontal: 16, marginBottom: 16,
-    padding: 16, gap: 14, minHeight: 90,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4A8FE7",
+    borderRadius: 18,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    gap: 14,
+    minHeight: 90,
   },
   scanIconBox: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    justifyContent: 'center', alignItems: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  scanTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
+  scanTitle: { fontSize: 16, fontWeight: "bold", color: "#fff" },
   scanSub: {
-    fontSize: 11, color: 'rgba(255,255,255,0.88)', marginTop: 3,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.88)",
+    marginTop: 3,
   },
   sectionTitle: {
-    fontSize: 16, fontWeight: 'bold', color: '#2E1A06',
-    marginHorizontal: 16, marginBottom: 10, marginTop: 4,
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2E1A06",
+    marginHorizontal: 16,
+    marginBottom: 10,
+    marginTop: 4,
   },
+  resultsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingRight: 16,
+  },
+  clearFiltersBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: "#F0EAE0",
+  },
+  clearFiltersText: { fontSize: 11, color: "#888" },
   catRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
   catBtn: {
-    paddingHorizontal: 18, paddingVertical: 8,
-    borderRadius: 20, backgroundColor: '#fff',
-    borderWidth: 1.5, borderColor: '#E8D8A0',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "#E8D8A0",
   },
-  catText: { fontSize: 13, fontWeight: '600', color: '#888' },
+  catText: { fontSize: 13, fontWeight: "600", color: "#888" },
+  regionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "#D8C8E8",
+  },
+  regionBtnText: { fontSize: 12, fontWeight: "600", color: "#9B59B6" },
   grid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    paddingHorizontal: 16, gap: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 16,
+    gap: 12,
   },
   recipeCard: {
     width: CARD_SIZE,
-    backgroundColor: '#fff',
-    borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    overflow: "hidden",
+    elevation: 3,
+    // @ts-ignore - web shadow
+    boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.08)",
   },
   recipeImage: {
     width: CARD_SIZE,
@@ -279,22 +474,30 @@ const styles = StyleSheet.create({
   imagePlaceholder: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   catTag: {
-    position: 'absolute', top: 8, left: 8,
-    paddingHorizontal: 8, paddingVertical: 3,
+    position: "absolute",
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 8,
   },
-  catTagText: { fontSize: 9, color: '#fff', fontWeight: 'bold' },
+  catTagText: { fontSize: 9, color: "#fff", fontWeight: "bold" },
   cardBottom: { padding: 10 },
   recipeTitle: {
-    fontSize: 13, fontWeight: 'bold',
-    color: '#2E1A06', marginBottom: 4,
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#2E1A06",
+    marginBottom: 4,
   },
   regionRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
-  regionText: { fontSize: 9, color: '#9B59B6' },
-  noResults: { textAlign: 'center', color: '#aaa', marginTop: 40 },
+  regionText: { fontSize: 9, color: "#9B59B6" },
+  noResults: { textAlign: "center", color: "#aaa", marginTop: 40 },
 });

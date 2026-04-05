@@ -2,74 +2,68 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
+import { FOOD_CATEGORIES, FOOD_CATEGORY_COLORS } from '../../constants/food-categories';
+import { getAllUsers, getRecipes, getRegions, getSubmissions, logOut, Profile, Recipe } from '../../lib/firebase';
+
+type CategoryStats = Record<string, number>;
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     recipes: 0, users: 0, regions: 0,
-    mainDish: 0, soup: 0, noodles: 0,
+    pendingSubmissions: 0,
   });
-  const [recentRecipes, setRecentRecipes] = useState<any[]>([]);
-  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+  const [categoryStats, setCategoryStats] = useState<CategoryStats>({});
+  const [recentRecipes, setRecentRecipes] = useState<Recipe[]>([]);
+  const [recentUsers, setRecentUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchStats(); }, []);
 
   async function fetchStats() {
     setLoading(true);
-    const [
-      { count: recipes },
-      { count: users },
-      { count: regions },
-      { count: mainDish },
-      { count: soup },
-      { count: noodles },
-    ] = await Promise.all([
-      supabase.from('recipes').select('*', { count: 'exact', head: true }),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('regions').select('*', { count: 'exact', head: true }),
-      supabase.from('recipes').select('*', { count: 'exact', head: true }).eq('category', 'Main Dish'),
-      supabase.from('recipes').select('*', { count: 'exact', head: true }).eq('category', 'Soup'),
-      supabase.from('recipes').select('*', { count: 'exact', head: true }).eq('category', 'Noodles'),
-    ]);
+    try {
+      const [recipes, regions, users, pendingSubs] = await Promise.all([
+        getRecipes(),
+        getRegions(),
+        getAllUsers(),
+        getSubmissions('pending'),
+      ]);
 
-    const { data: recentR } = await supabase
-      .from('recipes').select('id, title, category, created_at')
-      .order('created_at', { ascending: false }).limit(5);
+      const computedCategoryStats: CategoryStats = FOOD_CATEGORIES.reduce(
+        (acc, category) => ({ ...acc, [category]: recipes.filter((r) => r.category === category).length }),
+        {},
+      );
 
-    const { data: recentU } = await supabase
-      .from('profiles').select('id, email, username, created_at')
-      .order('created_at', { ascending: false }).limit(5);
+      setStats({
+        recipes: recipes.length,
+        users: users.length,
+        regions: regions.length,
+        pendingSubmissions: pendingSubs.length,
+      });
+      setCategoryStats(computedCategoryStats);
 
-    setStats({
-      recipes: recipes || 0,
-      users: users || 0,
-      regions: regions || 0,
-      mainDish: mainDish || 0,
-      soup: soup || 0,
-      noodles: noodles || 0,
-    });
-    setRecentRecipes(recentR || []);
-    setRecentUsers(recentU || []);
+      setRecentRecipes(recipes.slice(0, 5));
+      setRecentUsers(users.slice(0, 5));
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
     setLoading(false);
   }
 
-  async function logout() {
-    await supabase.auth.signOut();
-    router.replace('/(auth)/login');
+  async function handleLogout() {
+    await logOut();
+    router.replace('/(auth)/welcome');
   }
 
-  const catColors: Record<string, string> = {
-    'Main Dish': '#F25C05', 'Soup': '#4A8FE7', 'Noodles': '#34B36A',
-  };
+  const catColors: Record<string, string> = FOOD_CATEGORY_COLORS;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -82,7 +76,7 @@ export default function AdminDashboard() {
             <Text style={styles.headerSub}>Welcome back,</Text>
             <Text style={styles.headerTitle}>⚙ Admin Panel</Text>
           </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color="#F25C05" />
           </TouchableOpacity>
         </View>
@@ -113,9 +107,12 @@ export default function AdminDashboard() {
             <Text style={styles.sectionTitle}>🍽️ Recipes by Category</Text>
             <View style={styles.reportCard}>
               {[
-                { label: 'Main Dish', value: stats.mainDish, color: '#F25C05', total: stats.recipes },
-                { label: 'Soup', value: stats.soup, color: '#4A8FE7', total: stats.recipes },
-                { label: 'Noodles', value: stats.noodles, color: '#34B36A', total: stats.recipes },
+                ...FOOD_CATEGORIES.map((label) => ({
+                  label,
+                  value: categoryStats[label] || 0,
+                  color: FOOD_CATEGORY_COLORS[label] || '#888',
+                  total: stats.recipes,
+                })),
               ].map((cat) => {
                 const percent = stats.recipes > 0
                   ? Math.round((cat.value / cat.total) * 100) : 0;
@@ -145,6 +142,8 @@ export default function AdminDashboard() {
                 { icon: 'people', label: 'Manage Users', color: '#4A8FE7', route: '/(admin)/users' },
                 { icon: 'nutrition', label: 'Nutrition Info', color: '#34B36A', route: '/(admin)/nutrition' },
                 { icon: 'map', label: 'Regions', color: '#9B59B6', route: '/(admin)/regions' },
+                { icon: 'chatbubbles', label: 'Reviews', color: '#F4A623', route: '/(admin)/feedback' },
+                { icon: 'document-text', label: `Submissions${stats.pendingSubmissions > 0 ? ` (${stats.pendingSubmissions})` : ''}`, color: '#6366F1', route: '/(admin)/submissions' },
               ].map((item) => (
                 <TouchableOpacity
                   key={item.label}
@@ -254,8 +253,9 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1, backgroundColor: '#fff', borderRadius: 16,
     padding: 14, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    elevation: 2,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 1px 8px rgba(0, 0, 0, 0.06)',
   },
   statIcon: {
     width: 44, height: 44, borderRadius: 12,
@@ -266,8 +266,9 @@ const styles = StyleSheet.create({
   reportCard: {
     backgroundColor: '#fff', borderRadius: 16,
     marginHorizontal: 16, marginBottom: 8, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    elevation: 2,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 1px 8px rgba(0, 0, 0, 0.06)',
   },
   catReportRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -292,8 +293,9 @@ const styles = StyleSheet.create({
   menuCard: {
     width: '47%', backgroundColor: '#fff',
     borderRadius: 16, padding: 20, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    elevation: 2,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 1px 8px rgba(0, 0, 0, 0.06)',
   },
   menuIcon: {
     width: 56, height: 56, borderRadius: 16,
