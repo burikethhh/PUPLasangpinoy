@@ -1,50 +1,146 @@
-# Welcome to your Expo app 👋
+# LasangPinoy Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Filipino Cuisine Discovery App with AI-Powered Features**
 
-## Get started
+A cross-platform mobile application dedicated to preserving and sharing Filipino culinary heritage through traditional recipes, AI-powered food recognition, and an intelligent chatbot.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Quick Start
 
 ```bash
-npm run reset-project
+# Install dependencies
+npm install
+
+# Start development server
+npx expo start
+
+# Run on specific platform
+npx expo start --web      # Web browser
+npx expo start --android  # Android emulator
+npx expo start --ios      # iOS simulator
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+## Features
 
-To learn more about developing your project with Expo, look at the following resources:
+### For Users
+- Browse Filipino recipes by region and category
+- AI-powered food scanner (identifies dishes from photos)
+- AI chatbot "Chef Pinoy" for cuisine questions
+- Bookmark favorite recipes
+- Rate and review dishes
+- Password reset via email
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### For Admins
+- Dashboard with statistics
+- Recipe management (CRUD)
+- User management
+- Region management
+- Nutrition information editor
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
+## Tech Stack
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+| Layer | Technology |
+|-------|------------|
+| Frontend | React Native, Expo SDK 54, TypeScript |
+| Backend | Firebase (Auth, Firestore, Storage) |
+| AI | Alibaba Cloud Qwen (Vision & Chat) |
+| Navigation | Expo Router (file-based) |
+
+---
+
+## Project Structure
+
+```
+├── app/                    # Screens (Expo Router)
+│   ├── (auth)/            # Authentication screens
+│   ├── (tabs)/            # User tab screens
+│   ├── (admin)/           # Admin screens
+│   └── recipe/            # Recipe detail
+├── lib/                   # Core libraries
+│   ├── firebase.ts        # Firebase + REST API
+│   ├── firestore-rest.ts  # REST API fallback
+│   ├── firebase-helpers.ts # Error handling utilities
+│   └── qwen-ai.ts         # AI integration
+├── components/            # Reusable UI components
+├── constants/             # App constants and themes
+├── hooks/                 # Custom React hooks
+├── scripts/               # Utility scripts
+├── .env                   # Environment variables
+└── DOCUMENTATION.md       # Full documentation
+```
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [DOCUMENTATION.md](DOCUMENTATION.md) | Complete project documentation |
+
+---
+
+## Test Credentials
+
+### Admin Account
+- **Email:** Kethaguacito@gmail.com
+- **Password:** Totogwapo123
+
+### User Account
+Create your own via the Sign Up screen.
+
+---
+
+## Environment Setup
+
+Create a `.env` file with:
+
+```env
+# Firebase
+EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_bucket.appspot.com
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+# Alibaba Cloud Qwen AI
+EXPO_PUBLIC_QWEN_API_KEY=your_qwen_api_key
+```
+
+---
+
+## Commands
+
+```bash
+# Development
+npx expo start              # Start dev server
+npx expo start -c           # Clear cache and start
+npx tsc --noEmit           # TypeScript check
+npx expo-doctor            # Expo diagnostics
+
+# Firebase
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+
+# Build
+npx expo export:web        # Build for web
+```
+
+---
+
+## Status
+
+- **Version:** 1.0.0
+- **Status:** Active Development
+- **Platform:** iOS, Android, Web
+
+---
+
+## License
+
+Private - All rights reserved. © 2026 LasangPinoy.

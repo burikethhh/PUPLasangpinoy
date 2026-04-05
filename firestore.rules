@@ -1,0 +1,66 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.is_admin == true;
+    }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    match /profiles/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isOwner(userId) && request.resource.data.is_admin == resource.data.is_admin || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+    match /recipes/{recipeId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /regions/{regionId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /bookmarks/{bookmarkId} {
+      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if false;
+      allow delete: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+    }
+    match /feedback/{feedbackId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid && request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
+      allow update: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+    }
+    match /recipe_submissions/{submissionId} {
+      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+    }
+    match /meal_plans/{planId} {
+      allow read: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.user_id == request.auth.uid;
+    }
+    match /collections/{collectionId} {
+      allow read: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.user_id == request.auth.uid;
+    }
+    match /_connectivity_test/{docId} {
+      allow read: if true;
+    }
+  }
+}

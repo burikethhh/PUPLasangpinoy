@@ -70,7 +70,7 @@ export default function WelcomeScreen() {
 
         </View>
 
-        <Text style={styles.footer}>Lasang Pinoy © 2025</Text>
+        <Text style={styles.footer}>Lasang Pinoy © 2026</Text>
       </View>
     </SafeAreaView>
   );
@@ -85,8 +85,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F25C05',
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#F25C05', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
+    elevation: 6,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 4px 10px rgba(242, 92, 5, 0.3)',
   },
   logoEmoji: { fontSize: 40 },
   appName: { fontSize: 28, fontWeight: 'bold', color: '#2E1A06' },
@@ -95,8 +96,9 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff', borderRadius: 20,
     padding: 20, gap: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
+    elevation: 3,
+    // @ts-ignore - web shadow
+    boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.08)',
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   cardIcon: {
