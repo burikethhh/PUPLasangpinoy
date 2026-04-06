@@ -19,7 +19,9 @@ import { FOOD_CATEGORIES, FOOD_CATEGORY_COLORS } from '../../constants/food-cate
 import {
     addRecipe,
     addRegion,
+    Category,
     deleteRecipe as deleteRecipeFromDb,
+    getCategories,
     getRecipeEngagement,
     getRecipes,
     getRegions,
@@ -40,6 +42,7 @@ type Errors = {
 export default function AdminRecipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Recipe | null>(null);
@@ -59,6 +62,7 @@ export default function AdminRecipes() {
   useEffect(() => {
     fetchRecipes();
     fetchRegions();
+    fetchCategories();
   }, []);
 
   async function fetchRecipes() {
@@ -78,6 +82,28 @@ export default function AdminRecipes() {
       setRegions(data);
     } catch (error) {
       console.error('Error fetching regions:', error);
+    }
+  }
+
+  async function fetchCategories() {
+    try {
+      const data = await getCategories();
+      // Fall back to hardcoded constants if Firestore empty
+      if (data.length > 0) {
+        setCategories(data);
+      } else {
+        setCategories(FOOD_CATEGORIES.map((name) => ({
+          id: name, name,
+          color: FOOD_CATEGORY_COLORS[name] || '#888',
+          created_at: new Date() as any,
+        })));
+      }
+    } catch (error) {
+      setCategories(FOOD_CATEGORIES.map((name) => ({
+        id: name, name,
+        color: FOOD_CATEGORY_COLORS[name] || '#888',
+        created_at: new Date() as any,
+      })));
     }
   }
 
@@ -138,8 +164,6 @@ export default function AdminRecipes() {
     }
     if (!form.category.trim()) {
       newErrors.category = 'Category is required.';
-    } else if (!FOOD_CATEGORIES.includes(form.category.trim() as any)) {
-      newErrors.category = `Category must be one of: ${FOOD_CATEGORIES.join(', ')}`;
     }
     if (!form.ingredients.trim()) {
       newErrors.ingredients = 'Ingredients are required.';
@@ -249,7 +273,10 @@ export default function AdminRecipes() {
     }
   }
 
-  const catColors: Record<string, string> = FOOD_CATEGORY_COLORS;
+  const catColors: Record<string, string> = {
+    ...FOOD_CATEGORY_COLORS,
+    ...Object.fromEntries(categories.map((c) => [c.name, c.color])),
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -388,20 +415,20 @@ export default function AdminRecipes() {
                   Category <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={styles.catButtons}>
-                  {FOOD_CATEGORIES.map((cat) => (
+                  {categories.map((cat) => (
                     <TouchableOpacity
-                      key={cat}
+                      key={cat.id}
                       style={[styles.catSelectBtn,
-                        form.category === cat && {
-                          backgroundColor: catColors[cat],
-                          borderColor: catColors[cat]
+                        form.category === cat.name && {
+                          backgroundColor: cat.color || catColors[cat.name],
+                          borderColor: cat.color || catColors[cat.name]
                         }]}
                       onPress={() => {
-                        setForm(prev => ({ ...prev, category: cat }));
+                        setForm(prev => ({ ...prev, category: cat.name }));
                         if (errors.category) setErrors(prev => ({ ...prev, category: undefined }));
                       }}>
                       <Text style={[styles.catSelectText,
-                        form.category === cat && { color: '#fff' }]}>{cat}</Text>
+                        form.category === cat.name && { color: '#fff' }]}>{cat.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

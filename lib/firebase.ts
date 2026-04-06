@@ -42,6 +42,7 @@ const log = createLogger("Firebase");
 // Cache keys
 const CACHE_KEY_RECIPES = "@lasangpinoy_recipes_cache";
 const CACHE_KEY_REGIONS = "@lasangpinoy_regions_cache";
+const CACHE_KEY_CATEGORIES = "@lasangpinoy_categories_cache";
 
 // Types
 export interface Profile {
@@ -72,6 +73,13 @@ export interface Region {
   id: string;
   name: string;
   description: string;
+  created_at: Timestamp | { seconds: number };
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  color: string;
   created_at: Timestamp | { seconds: number };
 }
 
@@ -702,6 +710,115 @@ export async function deleteRegion(regionId: string) {
     try {
       await AsyncStorage.removeItem(CACHE_KEY_REGIONS);
     } catch {}
+  }
+}
+
+// ==================== CATEGORIES FUNCTIONS ====================
+
+export async function getCategories(): Promise<Category[]> {
+  let categories: Category[] = [];
+  let fetchedFromNetwork = false;
+
+  if (useRestApi) {
+    try {
+      const data = await RestApi.getCollection("categories", "name");
+      categories = data as Category[];
+      fetchedFromNetwork = true;
+    } catch (error) {
+      log.error("REST getCategories failed", error);
+    }
+  } else {
+    try {
+      const q = query(collection(db, "categories"), orderBy("name"));
+      const snapshot = await getDocs(q);
+      categories = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Category[];
+      fetchedFromNetwork = true;
+    } catch (error) {
+      markSdkBlocked(error);
+      try {
+        const data = await RestApi.getCollection("categories", "name");
+        categories = data as Category[];
+        fetchedFromNetwork = true;
+      } catch (restError) {
+        log.error("Both SDK and REST getCategories failed", restError);
+      }
+    }
+  }
+
+  if (fetchedFromNetwork && categories.length > 0) {
+    try {
+      await AsyncStorage.setItem(CACHE_KEY_CATEGORIES, JSON.stringify(categories));
+    } catch {}
+  }
+
+  if (!fetchedFromNetwork || categories.length === 0) {
+    try {
+      const cached = await AsyncStorage.getItem(CACHE_KEY_CATEGORIES);
+      if (cached) {
+        categories = JSON.parse(cached) as Category[];
+      }
+    } catch {}
+  }
+
+  return categories;
+}
+
+export async function addCategory(name: string, color: string) {
+  const categoryData = { name, color, created_at: new Date() };
+
+  if (useRestApi) {
+    const docId = await RestApi.createDocument("categories", categoryData);
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
+    return { id: docId };
+  }
+
+  try {
+    const result = await addDoc(collection(db, "categories"), {
+      name, color, created_at: createTimestamp(),
+    });
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
+    return result;
+  } catch (error) {
+    markSdkBlocked(error);
+    const docId = await RestApi.createDocument("categories", categoryData);
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
+    return { id: docId };
+  }
+}
+
+export async function updateCategory(categoryId: string, data: Partial<Category>) {
+  if (useRestApi) {
+    await RestApi.updateDocument("categories", categoryId, data);
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
+    return;
+  }
+
+  try {
+    const docRef = doc(db, "categories", categoryId);
+    await updateDoc(docRef, data as any);
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
+  } catch (error) {
+    markSdkBlocked(error);
+    await RestApi.updateDocument("categories", categoryId, data);
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
+  }
+}
+
+export async function deleteCategory(categoryId: string) {
+  if (useRestApi) {
+    await RestApi.deleteDocument("categories", categoryId);
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
+    return;
+  }
+
+  try {
+    const docRef = doc(db, "categories", categoryId);
+    await deleteDoc(docRef);
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
+  } catch (error) {
+    markSdkBlocked(error);
+    await RestApi.deleteDocument("categories", categoryId);
+    try { await AsyncStorage.removeItem(CACHE_KEY_CATEGORIES); } catch {}
   }
 }
 

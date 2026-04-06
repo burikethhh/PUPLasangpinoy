@@ -1,6 +1,6 @@
 // Test with explicit database URL configuration
 import { initializeApp } from 'firebase/app';
-import { getFirestore, connectFirestoreEmulator, collection, doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, getFirestore, setDoc, Timestamp } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",

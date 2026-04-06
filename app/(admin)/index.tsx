@@ -11,16 +11,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FOOD_CATEGORIES, FOOD_CATEGORY_COLORS } from '../../constants/food-categories';
-import { getAllUsers, getRecipes, getRegions, getSubmissions, logOut, Profile, Recipe } from '../../lib/firebase';
+import { Category, getAllUsers, getCategories, getRecipes, getRegions, getSubmissions, logOut, Profile, Recipe } from '../../lib/firebase';
 
 type CategoryStats = Record<string, number>;
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     recipes: 0, users: 0, regions: 0,
-    pendingSubmissions: 0,
+    pendingSubmissions: 0, categories: 0,
   });
   const [categoryStats, setCategoryStats] = useState<CategoryStats>({});
+  const [dynamicCategories, setDynamicCategories] = useState<Category[]>([]);
   const [recentRecipes, setRecentRecipes] = useState<Recipe[]>([]);
   const [recentUsers, setRecentUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,15 +31,20 @@ export default function AdminDashboard() {
   async function fetchStats() {
     setLoading(true);
     try {
-      const [recipes, regions, users, pendingSubs] = await Promise.all([
+      const [recipes, regions, users, pendingSubs, cats] = await Promise.all([
         getRecipes(),
         getRegions(),
         getAllUsers(),
         getSubmissions('pending'),
+        getCategories(),
       ]);
 
-      const computedCategoryStats: CategoryStats = FOOD_CATEGORIES.reduce(
-        (acc, category) => ({ ...acc, [category]: recipes.filter((r) => r.category === category).length }),
+      // Use dynamic categories if available, fall back to FOOD_CATEGORIES constants
+      const activeCats = cats.length > 0 ? cats : FOOD_CATEGORIES.map((name) => ({ id: name, name, color: FOOD_CATEGORY_COLORS[name] || '#888' }));
+      setDynamicCategories(activeCats as Category[]);
+
+      const computedCategoryStats: CategoryStats = activeCats.reduce(
+        (acc, cat) => ({ ...acc, [cat.name]: recipes.filter((r) => r.category === cat.name).length }),
         {},
       );
 
@@ -47,6 +53,7 @@ export default function AdminDashboard() {
         users: users.length,
         regions: regions.length,
         pendingSubmissions: pendingSubs.length,
+        categories: cats.length,
       });
       setCategoryStats(computedCategoryStats);
 
@@ -92,6 +99,7 @@ export default function AdminDashboard() {
                 { label: 'Recipes', value: stats.recipes, color: '#F25C05', icon: 'restaurant' },
                 { label: 'Users', value: stats.users, color: '#4A8FE7', icon: 'people' },
                 { label: 'Regions', value: stats.regions, color: '#9B59B6', icon: 'map' },
+                { label: 'Categories', value: stats.categories, color: '#F39C12', icon: 'pricetag' },
               ].map((s) => (
                 <View key={s.label} style={styles.statCard}>
                   <View style={[styles.statIcon, { backgroundColor: s.color + '22' }]}>
@@ -106,28 +114,21 @@ export default function AdminDashboard() {
             {/* RECIPE BY CATEGORY REPORT */}
             <Text style={styles.sectionTitle}>🍽️ Recipes by Category</Text>
             <View style={styles.reportCard}>
-              {[
-                ...FOOD_CATEGORIES.map((label) => ({
-                  label,
-                  value: categoryStats[label] || 0,
-                  color: FOOD_CATEGORY_COLORS[label] || '#888',
-                  total: stats.recipes,
-                })),
-              ].map((cat) => {
-                const percent = stats.recipes > 0
-                  ? Math.round((cat.value / cat.total) * 100) : 0;
+              {dynamicCategories.map((cat) => {
+                const value = categoryStats[cat.name] || 0;
+                const percent = stats.recipes > 0 ? Math.round((value / stats.recipes) * 100) : 0;
                 return (
-                  <View key={cat.label} style={styles.catReportRow}>
+                  <View key={cat.name} style={styles.catReportRow}>
                     <View style={styles.catReportLeft}>
-                      <View style={[styles.catDot, { backgroundColor: cat.color }]} />
-                      <Text style={styles.catReportLabel}>{cat.label}</Text>
+                      <View style={[styles.catDot, { backgroundColor: cat.color || '#888' }]} />
+                      <Text style={styles.catReportLabel}>{cat.name}</Text>
                     </View>
                     <View style={styles.progressBarBg}>
                       <View style={[styles.progressBarFill,
-                        { width: `${percent}%` as any, backgroundColor: cat.color }]} />
+                        { width: `${percent}%` as any, backgroundColor: cat.color || '#888' }]} />
                     </View>
-                    <Text style={[styles.catReportCount, { color: cat.color }]}>
-                      {cat.value}
+                    <Text style={[styles.catReportCount, { color: cat.color || '#888' }]}>
+                      {value}
                     </Text>
                   </View>
                 );
@@ -142,6 +143,7 @@ export default function AdminDashboard() {
                 { icon: 'people', label: 'Manage Users', color: '#4A8FE7', route: '/(admin)/users' },
                 { icon: 'nutrition', label: 'Nutrition Info', color: '#34B36A', route: '/(admin)/nutrition' },
                 { icon: 'map', label: 'Regions', color: '#9B59B6', route: '/(admin)/regions' },
+                { icon: 'pricetag', label: 'Categories', color: '#F39C12', route: '/(admin)/categories' },
                 { icon: 'chatbubbles', label: 'Reviews', color: '#F4A623', route: '/(admin)/feedback' },
                 { icon: 'document-text', label: `Submissions${stats.pendingSubmissions > 0 ? ` (${stats.pendingSubmissions})` : ''}`, color: '#6366F1', route: '/(admin)/submissions' },
               ].map((item) => (
