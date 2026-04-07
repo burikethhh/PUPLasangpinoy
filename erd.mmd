@@ -1,0 +1,93 @@
+erDiagram
+    PROFILES {
+        string id PK "Document ID (Firebase Auth UID)"
+        string email "User email (unique)"
+        string username "Display name"
+        boolean is_admin "Admin access flag"
+        timestamp created_at "Account creation date"
+    }
+
+    RECIPES {
+        string id PK "Auto-generated document ID"
+        string title "Recipe name"
+        string category "Food category (FK to categories.name)"
+        string region "Philippine region (FK to regions.name)"
+        string ingredients "Comma-separated ingredients"
+        string instructions "Step-by-step cooking guide"
+        string nutrition "Nutritional information"
+        string health_notes "Health benefits and dietary info"
+        string history "Cultural and historical background"
+        string fun_fact "Interesting trivia"
+        string image_url "Cloudinary image URL"
+        string user_id "Creator user ID (FK to profiles.id)"
+        timestamp created_at "Creation timestamp"
+    }
+
+    CATEGORIES {
+        string id PK "Auto-generated document ID"
+        string name "Category name (unique)"
+        string color "Hex color code for UI display"
+        timestamp created_at "Creation timestamp"
+    }
+
+    REGIONS {
+        string id PK "Auto-generated document ID"
+        string name "Region name (unique)"
+        string description "Regional cuisine description"
+        timestamp created_at "Creation timestamp"
+    }
+
+    BOOKMARKS {
+        string id PK "Auto-generated document ID"
+        string user_id "FK to profiles.id"
+        string recipe_id "FK to recipes.id"
+        timestamp created_at "Bookmark timestamp"
+    }
+
+    FEEDBACK {
+        string id PK "Auto-generated document ID"
+        string user_id "FK to profiles.id"
+        string recipe_id "FK to recipes.id"
+        number rating "Star rating 1-5"
+        string comment "User feedback text"
+        timestamp created_at "Feedback timestamp"
+    }
+
+    RECIPE_SUBMISSIONS {
+        string id PK "Auto-generated document ID"
+        string user_id "FK to profiles.id"
+        string title "Submitted recipe name"
+        string category "Food category"
+        string region "Philippine region"
+        string ingredients "Comma-separated ingredients"
+        string instructions "Cooking instructions"
+        string image_url "Uploaded image URL"
+        string status "pending | approved | rejected"
+        timestamp created_at "Submission timestamp"
+    }
+
+    COLLECTIONS {
+        string id PK "Auto-generated document ID"
+        string user_id "FK to profiles.id"
+        string name "Collection name"
+        string description "Collection description"
+        array recipe_ids "Array of recipe document IDs"
+        timestamp created_at "Creation timestamp"
+        timestamp updated_at "Last update timestamp"
+    }
+
+    %% Relationships
+    PROFILES ||--o{ RECIPES : ""
+    PROFILES ||--o{ BOOKMARKS : ""
+    PROFILES ||--o{ FEEDBACK : ""
+    PROFILES ||--o{ RECIPE_SUBMISSIONS : ""
+    PROFILES ||--o{ COLLECTIONS : ""
+
+    RECIPES ||--o{ BOOKMARKS : ""
+    RECIPES ||--o{ FEEDBACK : ""
+
+    CATEGORIES ||--o{ RECIPES : ""
+    REGIONS ||--o{ RECIPES : ""
+
+    COLLECTIONS }o--o{ RECIPES : ""
+    RECIPE_SUBMISSIONS }o--|| CATEGORIES : ""

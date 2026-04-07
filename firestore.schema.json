@@ -246,6 +246,159 @@
           "order": "ascending, descending"
         }
       ]
+    },
+    "categories": {
+      "description": "Dynamic food categories for recipe classification",
+      "document": {
+        "type": "object",
+        "required": ["name", "color", "created_at"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 50,
+            "description": "Category name (unique)",
+            "example": "Main Dish"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "Hex color code for UI display",
+            "example": "#FF6B35"
+          },
+          "created_at": {
+            "type": "timestamp",
+            "description": "Category creation timestamp",
+            "example": "2026-04-01T10:00:00.000Z"
+          }
+        }
+      },
+      "indexes": [
+        {
+          "fields": ["name"],
+          "order": "ascending"
+        }
+      ]
+    },
+    "recipe_submissions": {
+      "description": "User-submitted recipes pending admin review",
+      "document": {
+        "type": "object",
+        "required": ["user_id", "title", "category", "ingredients", "instructions", "status", "created_at"],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "Submitting user's ID (foreign key)",
+            "example": "abc123xyz"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100,
+            "description": "Submitted recipe name",
+            "example": "Kare-Kare"
+          },
+          "category": {
+            "type": "string",
+            "description": "Food category",
+            "example": "Main Dish"
+          },
+          "region": {
+            "type": "string",
+            "description": "Philippine region of origin",
+            "example": "Central Luzon"
+          },
+          "ingredients": {
+            "type": "string",
+            "minLength": 5,
+            "description": "Comma-separated list of ingredients",
+            "example": "Oxtail, peanut butter, vegetables, shrimp paste"
+          },
+          "instructions": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Step-by-step cooking instructions",
+            "example": "1. Boil oxtail until tender..."
+          },
+          "image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Uploaded image URL",
+            "example": "https://res.cloudinary.com/..."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "approved", "rejected"],
+            "description": "Review status workflow",
+            "default": "pending",
+            "example": "pending"
+          },
+          "created_at": {
+            "type": "timestamp",
+            "description": "Submission timestamp",
+            "example": "2026-04-01T10:00:00.000Z"
+          }
+        }
+      },
+      "indexes": [
+        {
+          "fields": ["status", "created_at"],
+          "order": "ascending, descending"
+        },
+        {
+          "fields": ["user_id", "created_at"],
+          "order": "ascending, descending"
+        }
+      ]
+    },
+    "collections": {
+      "description": "User-curated recipe collections/folders",
+      "document": {
+        "type": "object",
+        "required": ["user_id", "name", "recipe_ids", "created_at"],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "Collection owner's ID (foreign key)",
+            "example": "abc123xyz"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Collection name",
+            "example": "Weekend Favorites"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Collection description",
+            "example": "My go-to recipes for weekend cooking"
+          },
+          "recipe_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Array of recipe document IDs",
+            "example": ["recipe_001", "recipe_002"]
+          },
+          "created_at": {
+            "type": "timestamp",
+            "description": "Collection creation timestamp",
+            "example": "2026-04-01T10:00:00.000Z"
+          },
+          "updated_at": {
+            "type": "timestamp",
+            "description": "Last update timestamp",
+            "example": "2026-04-05T15:00:00.000Z"
+          }
+        }
+      },
+      "indexes": [
+        {
+          "fields": ["user_id", "created_at"],
+          "order": "ascending, descending"
+        }
+      ]
     }
   },
   "relationships": {
@@ -290,13 +443,48 @@
       "to": "recipes",
       "foreignKey": "region",
       "description": "One region can have many recipes (referenced by name)"
+    },
+    "categories_to_recipes": {
+      "type": "one-to-many",
+      "from": "categories",
+      "to": "recipes",
+      "foreignKey": "category",
+      "description": "One category can classify many recipes (referenced by name)"
+    },
+    "profiles_to_submissions": {
+      "type": "one-to-many",
+      "from": "profiles",
+      "to": "recipe_submissions",
+      "foreignKey": "user_id",
+      "description": "One user can submit many recipes for review"
+    },
+    "profiles_to_collections": {
+      "type": "one-to-many",
+      "from": "profiles",
+      "to": "collections",
+      "foreignKey": "user_id",
+      "description": "One user can own many recipe collections"
+    },
+    "collections_to_recipes": {
+      "type": "many-to-many",
+      "from": "collections",
+      "to": "recipes",
+      "foreignKey": "recipe_ids",
+      "description": "Collections contain many recipes via recipe_ids array"
+    },
+    "categories_to_submissions": {
+      "type": "one-to-many",
+      "from": "categories",
+      "to": "recipe_submissions",
+      "foreignKey": "category",
+      "description": "One category can be referenced by many submissions"
     }
   },
   "metadata": {
     "database": "Firebase Firestore",
     "region": "asia-southeast1",
     "created": "2026-03-27",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "projectId": "lasangpinoy-mobile"
   }
 }

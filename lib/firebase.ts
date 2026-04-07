@@ -1659,7 +1659,7 @@ export async function deleteSubmission(submissionId: string): Promise<void> {
   }
 }
 
-// ==================== MEAL PLANS ====================
+// ==================== MEAL PLANS (FEATURE ON HOLD) ====================
 
 export interface MealPlan {
   id: string;

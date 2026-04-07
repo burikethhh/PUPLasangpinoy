@@ -41,17 +41,11 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* Meal Planner - feature on hold */}
       <Tabs.Screen
         name="meal-plan"
         options={{
-          title: "Planner",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "calendar" : "calendar-outline"}
-              size={22}
-              color={color}
-            />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen
