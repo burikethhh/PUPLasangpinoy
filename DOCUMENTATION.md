@@ -1101,7 +1101,6 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 | Feature | Description | Difficulty | Estimated Effort |
 |---------|-------------|------------|------------------|
-| Meal Planning | Calendar to plan weekly meals | Hard | 4-5 days |
 | Recipe Collections | Create custom lists/folders of recipes | Medium | 2-3 days |
 
 ### Low Priority (Future Enhancements)
@@ -1186,22 +1185,14 @@ The following features are **planned but not yet coded**:
 - Profile Settings row with live item count badge
 - Native Share API export with emoji-formatted grouped text
 
-### 8. Meal Planning Calendar
-**Status:** Not started  
-**Requirements:**
-- New Firestore collection: `meal_plans`
-- Calendar UI component
-- Date picker integration
-- Weekly/monthly views
-
-### 9. User Recipe Submissions
+### 8. User Recipe Submissions
 **Status:** Not started  
 **Requirements:**
 - New collection: `recipe_submissions` (pending approval)
 - Admin approval workflow
 - User notification on approval/rejection
 
-### 10. Custom ML Recommendation Engine
+### 9. Custom ML Recommendation Engine
 **Status:** Documented only (see Section 15)  
 **Requirements:**
 - Content-based filtering algorithm

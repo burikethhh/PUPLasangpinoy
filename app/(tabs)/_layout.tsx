@@ -41,13 +41,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* Meal Planner - feature on hold */}
-      <Tabs.Screen
-        name="meal-plan"
-        options={{
-          href: null,
-        }}
-      />
       <Tabs.Screen
         name="collections"
         options={{

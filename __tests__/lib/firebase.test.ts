@@ -37,19 +37,16 @@ import * as RestApi from "../../lib/firestore-rest";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   addBookmark,
-  addMealPlan,
   addRecipe,
   addRecipeToCollection,
   createCollection,
   deleteCollection,
   getBookmarks,
   getCollections,
-  getMealPlans,
   getProfile,
   getRecipe,
   getRecipes,
   isBookmarked,
-  removeMealPlan,
   removeRecipeFromCollection,
   updateProfile,
 } from "../../lib/firebase";
@@ -301,57 +298,6 @@ describe("getBookmarks", () => {
       "u1",
     );
     expect(result).toHaveLength(1);
-  });
-});
-
-// ────────────────────────────────────────────────────────────
-// MEAL PLANS
-// ────────────────────────────────────────────────────────────
-
-describe("addMealPlan", () => {
-  it("creates a meal plan document and returns {id}", async () => {
-    mockCreateDocument.mockResolvedValueOnce("plan-id-1");
-
-    const result = await addMealPlan("u1", {
-      date: "2024-12-25",
-      meal_type: "lunch",
-      recipe_id: "r1",
-      recipe_title: "Adobo",
-      recipe_image: "",
-    });
-
-    expect(mockCreateDocument).toHaveBeenCalledWith(
-      "meal_plans",
-      expect.objectContaining({
-        user_id: "u1",
-        date: "2024-12-25",
-        meal_type: "lunch",
-        recipe_id: "r1",
-      }),
-    );
-    expect(result).toEqual({ id: "plan-id-1" });
-  });
-});
-
-describe("getMealPlans", () => {
-  it("queries meal_plans by user_id and filters by date range", async () => {
-    mockQueryCollection.mockResolvedValueOnce([
-      { id: "p1", user_id: "u1", date: "2024-12-20", meal_type: "lunch" },
-      { id: "p2", user_id: "u1", date: "2024-12-25", meal_type: "dinner" },
-      { id: "p3", user_id: "u1", date: "2024-12-31", meal_type: "breakfast" },
-    ]);
-
-    const result = await getMealPlans("u1", "2024-12-22", "2024-12-29");
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("p2");
-  });
-});
-
-describe("removeMealPlan", () => {
-  it("calls RestApi.deleteDocument('meal_plans', planId)", async () => {
-    mockDeleteDocument.mockResolvedValueOnce(undefined);
-    await removeMealPlan("plan-id-1");
-    expect(mockDeleteDocument).toHaveBeenCalledWith("meal_plans", "plan-id-1");
   });
 });
 
