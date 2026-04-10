@@ -6,6 +6,21 @@ Estimated setup time: **15–25 minutes** (most of it is the dependency install)
 
 ---
 
+## The easy way — one-click script
+
+If the developer gave you **`run-demo.bat`** (Windows) or **`run-demo.sh`** (macOS) together with **`.env.demo`**, you can skip sections 2–5 entirely:
+
+1. Install the prerequisites in **section 1** below (Node.js + Git).
+2. Put `run-demo.bat` (or `run-demo.sh`) and `.env.demo` in the **same folder** — for example, a new folder on your Desktop called `LasangPinoyDemo`.
+3. **Windows:** double-click `run-demo.bat`. If SmartScreen warns you, click *More info → Run anyway*.
+   **macOS:** open Terminal, drag the folder into it to `cd` there, then run `bash run-demo.sh`.
+4. Follow the on-screen prompts. The script will clone the code, set up `.env`, install dependencies, and launch the app in your browser automatically.
+5. To stop the demo later, come back to the black window and press **Ctrl + C**.
+
+If the script errors out, read the last red `[ERROR]` message — it tells you exactly what to do. Otherwise fall back to the manual steps below.
+
+---
+
 ## 1. Install the prerequisites
 
 Install these three tools, in order, before touching the project.
