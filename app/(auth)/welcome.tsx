@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import {
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -11,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.inner}>
+      <ScrollView contentContainerStyle={styles.inner}>
 
         {/* LOGO / TITLE */}
         <View style={styles.logoBox}>
@@ -19,21 +20,21 @@ export default function WelcomeScreen() {
             <Text style={styles.logoEmoji}>🍽️</Text>
           </View>
           <Text style={styles.appName}>Lasang Pinoy</Text>
-          <Text style={styles.appSub}>Authentic Filipino Recipes</Text>
+          <Text style={styles.appSub}>Filipino Food Ordering System</Text>
         </View>
 
         {/* CARDS */}
         <View style={styles.cardsBox}>
 
-          {/* USER CARD */}
+          {/* CUSTOMER CARD */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={[styles.cardIcon, { backgroundColor: '#F25C0522' }]}>
-                <Ionicons name="person" size={24} color="#F25C05" />
+                <Ionicons name="fast-food" size={24} color="#F25C05" />
               </View>
-              <View>
-                <Text style={styles.cardTitle}>Continue as User</Text>
-                <Text style={styles.cardSub}>Browse and discover Filipino recipes</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Order as Customer</Text>
+                <Text style={styles.cardSub}>Browse menu, order food, track delivery</Text>
               </View>
             </View>
             <View style={styles.cardBtns}>
@@ -50,15 +51,33 @@ export default function WelcomeScreen() {
             </View>
           </View>
 
-          {/* ADMIN CARD */}
+          {/* STAFF CARD */}
+          <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: '#3498DB' }]}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.cardIcon, { backgroundColor: '#3498DB22' }]}>
+                <Ionicons name="restaurant" size={24} color="#3498DB" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Staff Portal</Text>
+                <Text style={styles.cardSub}>View orders, mark prepared, attendance</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.signInBtn, { backgroundColor: '#3498DB' }]}
+              onPress={() => router.push('/(auth)/login')}>
+              <Text style={styles.signInText}>Staff Sign In</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ADMIN / OWNER CARD */}
           <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: '#2E1A06' }]}>
             <View style={styles.cardHeader}>
               <View style={[styles.cardIcon, { backgroundColor: '#2E1A0622' }]}>
                 <Ionicons name="settings" size={24} color="#2E1A06" />
               </View>
-              <View>
-                <Text style={styles.cardTitle}>Admin Portal</Text>
-                <Text style={styles.cardSub}>Manage recipes, users and more</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Owner / Admin</Text>
+                <Text style={styles.cardSub}>Manage orders, menu, staff, sales</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -70,16 +89,16 @@ export default function WelcomeScreen() {
 
         </View>
 
-        <Text style={styles.footer}>Lasang Pinoy © 2026</Text>
-      </View>
+        <Text style={styles.footer}>Lasang Pinoy  2026</Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9F0DC' },
-  inner: { flex: 1, justifyContent: 'space-between', padding: 24 },
-  logoBox: { alignItems: 'center', marginTop: 20 },
+  inner: { flexGrow: 1, justifyContent: 'space-between', padding: 24 },
+  logoBox: { alignItems: 'center', marginTop: 20, marginBottom: 10 },
   logoCircle: {
     width: 90, height: 90, borderRadius: 45,
     backgroundColor: '#F25C05',
@@ -119,5 +138,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#F25C05',
   },
   signUpText: { color: '#F25C05', fontWeight: 'bold', fontSize: 14 },
-  footer: { textAlign: 'center', color: '#bbb', fontSize: 11 },
+  footer: { textAlign: 'center', color: '#bbb', fontSize: 11, marginTop: 16 },
 });

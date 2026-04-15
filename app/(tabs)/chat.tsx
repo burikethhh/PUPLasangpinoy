@@ -1,225 +1,140 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+    ActivityIndicator, FlatList, KeyboardAvoidingView, Platform,
+    StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { chatWithQwen, QwenMessage, testQwenConnectivity } from '../../lib/qwen-ai';
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
-const WELCOME_MESSAGE: ChatMessage = {
-  id: 'welcome',
-  role: 'assistant',
-  content: `Mabuhay! I'm Chef Pinoy, your AI guide to Filipino cuisine! 🇵🇭
-
-I can help you with:
-• Learning about Filipino dishes and their history
-• Finding recipes based on ingredients you have
-• Understanding regional variations of dishes
-• Cooking tips and techniques
-• Fun facts about Filipino food culture
-
-What would you like to know about Filipino cuisine today?`,
-  timestamp: new Date(),
-};
+import { getCurrentUser, getProfile } from '../../lib/firebase';
+import { getMessages, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
 
 export default function ChatScreen() {
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [aiReady, setAiReady] = useState<boolean | null>(null);
-  const [aiStatusText, setAiStatusText] = useState('Checking AI...');
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState('Customer');
   const flatListRef = useRef<FlatList>(null);
 
+  useFocusEffect(useCallback(() => { loadMessages(); }, []));
+
   useEffect(() => {
-    (async () => {
-      const result = await testQwenConnectivity();
-      setAiReady(result.ok);
-      setAiStatusText(result.ok ? 'Online' : result.error || 'AI unavailable');
-    })();
+    const user = getCurrentUser();
+    if (user) {
+      getProfile(user.uid).then((p) => { if (p) setUserName(p.username); });
+    }
   }, []);
 
-  async function sendMessage() {
-    if (!inputText.trim() || isLoading) return;
+  // Poll for new messages every 10s
+  useEffect(() => {
+    const interval = setInterval(loadMessages, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: inputText.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputText('');
-    setIsLoading(true);
-
+  async function loadMessages() {
+    const user = getCurrentUser();
+    if (!user) { setLoading(false); return; }
     try {
-      // Build conversation history for context (last 10 messages)
-      const history: QwenMessage[] = messages.slice(-10).map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
+      const msgs = await getMessages(user.uid);
+      setMessages(msgs.reverse()); // oldest first
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
 
-      const response = await chatWithQwen(userMessage.content, history);
+  async function handleSend() {
+    if (!inputText.trim() || sending) return;
+    const user = getCurrentUser();
+    if (!user) return;
 
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response,
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-      // Mark AI as ready if it was previously shown as offline
-      if (!aiReady) {
-        setAiReady(true);
-        setAiStatusText('Online');
-      }
-    } catch (error: any) {
-      console.error('Chat error:', error);
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content:
-          "Pasensya na, I’m having trouble reaching the AI right now. In the meantime, try asking about: Adobo, Sinigang, Kare-Kare, regional dishes, or ingredient substitutions.",
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      setAiReady(false);
-      setAiStatusText('Temporarily unavailable');
-      Alert.alert('Chef Pinoy', 'AI is temporarily unavailable. Please try again in a moment.');
-    } finally {
-      setIsLoading(false);
+    setSending(true);
+    try {
+      await sendMsg({
+        conversation_id: user.uid,
+        sender_id: user.uid,
+        sender_name: userName,
+        sender_role: 'customer',
+        content: inputText.trim(),
+      });
+      setInputText('');
+      await loadMessages();
+    } catch (e: any) {
+      console.error('Send error:', e);
     }
+    setSending(false);
   }
 
-  function clearChat() {
-    setMessages([WELCOME_MESSAGE]);
-  }
+  const userId = getCurrentUser()?.uid;
 
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
-    const isUser = item.role === 'user';
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isMe = item.sender_id === userId;
     return (
-      <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-        {!isUser && (
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>👨‍🍳</Text>
-            </View>
+      <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
+        {!isMe && (
+          <View style={styles.avatarBox}>
+            <Ionicons name="storefront" size={16} color="#F25C05" />
           </View>
         )}
-        <View style={[styles.messageContent, isUser ? styles.userContent : styles.assistantContent]}>
-          <Text style={[styles.messageText, isUser && styles.userText]}>{item.content}</Text>
-          <Text style={[styles.timestamp, isUser && styles.userTimestamp]}>
-            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <View style={[styles.msgContent, isMe ? styles.myContent : styles.theirContent]}>
+          {!isMe && <Text style={styles.senderName}>{item.sender_name || 'Store'}</Text>}
+          <Text style={[styles.msgText, isMe && { color: '#fff' }]}>{item.content}</Text>
+          <Text style={[styles.timeText, isMe && { color: 'rgba(255,255,255,0.6)' }]}>
+            {item.created_at?.seconds
+              ? new Date(item.created_at.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : ''}
           </Text>
         </View>
       </View>
     );
   };
 
-  const renderSuggestions = () => (
-    <View style={styles.suggestionsContainer}>
-      <Text style={styles.suggestionsLabel}>Try asking:</Text>
-      <View style={styles.suggestionsRow}>
-        {[
-          'What is Adobo?',
-          'Best Sinigang recipe',
-          'Regional dishes of Pampanga',
-        ].map((suggestion, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.suggestionChip}
-            onPress={() => setInputText(suggestion)}>
-            <Text style={styles.suggestionText}>{suggestion}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.headerAvatar}>
-            <Text style={{ fontSize: 24 }}>👨‍🍳</Text>
+            <Ionicons name="storefront" size={22} color="#F25C05" />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Chef Pinoy</Text>
-            <Text style={styles.headerStatus}>
-              {isLoading ? 'Typing...' : aiReady === false ? 'Offline' : aiStatusText}
-            </Text>
+            <Text style={styles.headerTitle}>Lasang Pinoy</Text>
+            <Text style={styles.headerSub}>Message the store</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.clearBtn} onPress={clearChat}>
+        <TouchableOpacity onPress={loadMessages} style={{ padding: 8 }}>
           <Ionicons name="refresh" size={20} color="#888" />
         </TouchableOpacity>
       </View>
 
-      {/* MESSAGES */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-        ListFooterComponent={
-          isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#F25C05" />
-              <Text style={styles.loadingText}>Chef Pinoy is thinking...</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(i) => i.id}
+          contentContainerStyle={styles.list}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="chatbubbles-outline" size={48} color="#ddd" />
+              <Text style={styles.emptyText}>No messages yet</Text>
+              <Text style={styles.emptySubtext}>Send a message to the store!</Text>
             </View>
-          ) : null
-        }
-      />
+          }
+        />
+      )}
 
-      {/* SUGGESTIONS (show only at start) */}
-      {messages.length <= 1 && renderSuggestions()}
-
-      {/* INPUT */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Ask about Filipino cuisine..."
-            placeholderTextColor="#aaa"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-            onSubmitEditing={sendMessage}
-            returnKeyType="send"
-            editable={!isLoading}
-          />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+        <View style={styles.inputRow}>
+          <TextInput style={styles.input} placeholder="Type a message..."
+            placeholderTextColor="#aaa" value={inputText} onChangeText={setInputText}
+            multiline maxLength={500} returnKeyType="send" onSubmitEditing={handleSend} />
           <TouchableOpacity
-            style={[styles.sendBtn, (!inputText.trim() || isLoading) && styles.sendBtnDisabled]}
-            onPress={sendMessage}
-            disabled={!inputText.trim() || isLoading}>
-            <Ionicons 
-              name="send" 
-              size={20} 
-              color={inputText.trim() && !isLoading ? '#fff' : '#ccc'} 
-            />
+            style={[styles.sendBtn, (!inputText.trim() || sending) && { backgroundColor: '#E0D8C8' }]}
+            onPress={handleSend} disabled={!inputText.trim() || sending}>
+            {sending ? <ActivityIndicator size="small" color="#fff" /> :
+              <Ionicons name="send" size={18} color={inputText.trim() ? '#fff' : '#ccc'} />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -229,126 +144,45 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9F0DC' },
-  
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8D8A0',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 12, paddingHorizontal: 16, backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#E8D8A0',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFF5EE',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF5EE',
+    justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#2E1A06' },
-  headerStatus: { fontSize: 11, color: '#34B36A' },
-  clearBtn: { padding: 8 },
-  
-  messagesList: { padding: 16, paddingBottom: 8 },
-  messageBubble: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    maxWidth: '85%',
+  headerSub: { fontSize: 11, color: '#888' },
+  list: { padding: 16, paddingBottom: 8 },
+  bubble: { flexDirection: 'row', marginBottom: 10, maxWidth: '85%' },
+  myBubble: { alignSelf: 'flex-end' },
+  theirBubble: { alignSelf: 'flex-start' },
+  avatarBox: {
+    width: 30, height: 30, borderRadius: 15, backgroundColor: '#FFF5EE',
+    justifyContent: 'center', alignItems: 'center', marginRight: 8,
   },
-  userBubble: { alignSelf: 'flex-end' },
-  assistantBubble: { alignSelf: 'flex-start' },
-  
-  avatarContainer: { marginRight: 8 },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFF5EE',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: { fontSize: 16 },
-  
-  messageContent: {
-    padding: 12,
-    borderRadius: 16,
-    maxWidth: '100%',
-  },
-  userContent: {
-    backgroundColor: '#F25C05',
-    borderBottomRightRadius: 4,
-  },
-  assistantContent: {
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
-    elevation: 1,
-    // @ts-ignore
-    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
-  },
-  
-  messageText: { fontSize: 14, lineHeight: 20, color: '#2E1A06' },
-  userText: { color: '#fff' },
-  
-  timestamp: { fontSize: 10, color: '#aaa', marginTop: 6, alignSelf: 'flex-end' },
-  userTimestamp: { color: 'rgba(255,255,255,0.7)' },
-  
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    alignSelf: 'flex-start',
-  },
-  loadingText: { fontSize: 12, color: '#888' },
-  
-  suggestionsContainer: {
-    padding: 16,
-    paddingTop: 0,
-  },
-  suggestionsLabel: { fontSize: 12, color: '#888', marginBottom: 8 },
-  suggestionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  suggestionChip: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E8D8A0',
-  },
-  suggestionText: { fontSize: 12, color: '#F25C05' },
-  
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E8D8A0',
-    gap: 10,
+  msgContent: { padding: 12, borderRadius: 16, maxWidth: '100%' },
+  myContent: { backgroundColor: '#F25C05', borderBottomRightRadius: 4 },
+  theirContent: { backgroundColor: '#fff', borderBottomLeftRadius: 4, elevation: 1 },
+  senderName: { fontSize: 11, fontWeight: 'bold', color: '#F25C05', marginBottom: 2 },
+  msgText: { fontSize: 14, lineHeight: 20, color: '#2E1A06' },
+  timeText: { fontSize: 10, color: '#aaa', marginTop: 4, alignSelf: 'flex-end' },
+  empty: { alignItems: 'center', marginTop: 80 },
+  emptyText: { fontSize: 16, fontWeight: 'bold', color: '#aaa', marginTop: 12 },
+  emptySubtext: { fontSize: 13, color: '#bbb', marginTop: 4 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'flex-end', padding: 12, paddingHorizontal: 16,
+    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#E8D8A0', gap: 10,
   },
   input: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 100,
-    backgroundColor: '#F9F5EF',
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#2E1A06',
+    flex: 1, minHeight: 44, maxHeight: 100, backgroundColor: '#F9F5EF',
+    borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#2E1A06',
   },
   sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F25C05',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#F25C05',
+    justifyContent: 'center', alignItems: 'center',
   },
-  sendBtnDisabled: { backgroundColor: '#E0D8C8' },
 });

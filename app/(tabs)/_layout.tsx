@@ -17,18 +17,27 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Menu",
           tabBarIcon: ({ color }) => (
-            <Ionicons name="home" size={22} color={color} />
+            <Ionicons name="fast-food" size={22} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="scan"
         options={{
-          title: "Scan",
+          title: "Cart",
           tabBarIcon: ({ color }) => (
-            <Ionicons name="camera" size={22} color={color} />
+            <Ionicons name="cart" size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="collections"
+        options={{
+          title: "Orders",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="receipt" size={22} color={color} />
           ),
         }}
       />
@@ -42,28 +51,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="collections"
-        options={{
-          title: "Collections",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "folder" : "folder-outline"}
-              size={22}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="submit"
         options={{
-          title: "Submit",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "add-circle" : "add-circle-outline"}
-              size={22}
-              color={color}
-            />
+          title: "Favorites",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="heart" size={22} color={color} />
           ),
         }}
       />

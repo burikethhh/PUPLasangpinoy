@@ -50,6 +50,9 @@ export interface Profile {
   email: string;
   username: string;
   is_admin: boolean;
+  role: 'admin' | 'staff' | 'customer';
+  phone?: string;
+  address?: string;
   created_at: Timestamp | { seconds: number };
 }
 
@@ -247,6 +250,9 @@ export async function signUp(
   email: string,
   password: string,
   username: string,
+  role: 'admin' | 'staff' | 'customer' = 'customer',
+  phone?: string,
+  address?: string,
 ) {
   const userCredential = await createUserWithEmailAndPassword(
     auth,
@@ -264,7 +270,10 @@ export async function signUp(
   const profileData = {
     email,
     username,
-    is_admin: false,
+    is_admin: role === 'admin',
+    role,
+    phone: phone || '',
+    address: address || '',
     created_at: new Date(),
   };
 
@@ -1353,7 +1362,7 @@ export async function getRecipeEngagement(
 
 // ==================== USER PROFILE SELF-EDIT ====================
 
-export async function updateMyProfile(data: { username?: string }) {
+export async function updateMyProfile(data: { username?: string; phone?: string; address?: string }) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not authenticated");
   return updateProfile(user.uid, data);
@@ -1836,6 +1845,13 @@ export async function removeRecipeFromCollection(
   }
 }
 
+// Export shared infrastructure for firebase-store.ts
+export function shouldUseRest() { return useRestApi; }
+export function handleSdkBlocked(error: any) { markSdkBlocked(error); }
+export function newTimestamp() { return createTimestamp(); }
+export async function refreshRestToken() { return ensureRestAuthToken(); }
+export { RestApi };
+
 // Export instances
-export { auth, db, facebookProvider, googleProvider };
+    export { auth, db, facebookProvider, googleProvider };
 

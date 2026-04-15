@@ -1,298 +1,198 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+  ActivityIndicator, Alert, ScrollView, StyleSheet, Switch,
+  Text, TextInput, TouchableOpacity, View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { getAllUsers, logOut, type Profile } from "../../lib/firebase";
+import { router } from "expo-router";
 import {
-  getAllUsers,
-  updateProfile,
-  deleteUser as deleteUserFromDb,
-  setUserAdmin,
-  Profile
-} from '../../lib/firebase';
+  getSettings, updateSettings, getStaffAttendanceSummary,
+  getOrders, type AppSettings, type Order,
+} from "../../lib/firebase-store";
 
-export default function AdminUsers() {
-  const [users, setUsers] = useState<Profile[]>([]);
+export default function AdminMoreScreen() {
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editing, setEditing] = useState<Profile | null>(null);
-  const [form, setForm] = useState({ username: '', email: '' });
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [staff, setStaff] = useState<{ staff_id: string; staff_name: string; present: number; status: string }[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState("");
+  const [gcashNumber, setGcashNumber] = useState("");
+  const [gcashEnabled, setGcashEnabled] = useState(false);
 
-  useEffect(() => { fetchUsers(); }, []);
+  useFocusEffect(useCallback(() => { loadAll(); }, []));
 
-  async function fetchUsers() {
+  async function loadAll() {
     setLoading(true);
     try {
-      const data = await getAllUsers();
-      setUsers(data);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    }
+      const [s, st, u, o] = await Promise.all([
+        getSettings(), getStaffAttendanceSummary(), getAllUsers(), getOrders(),
+      ]);
+      setSettings(s);
+      setDeliveryFee(s.delivery_fee.toString());
+      setGcashEnabled(s.gcash_enabled);
+      setGcashNumber(s.gcash_number || "");
+      setStaff(st);
+      setUsers(u);
+      setOrders(o);
+    } catch (e) { console.error(e); }
     setLoading(false);
   }
 
-  function openEdit(user: Profile) {
-    setEditing(user);
-    setForm({ username: user.username || '', email: user.email || '' });
-    setModalVisible(true);
-  }
-
-  async function saveUser() {
-    if (!editing) return;
+  async function saveSettings() {
+    setSaving(true);
     try {
-      await updateProfile(editing.id, { 
-        username: form.username, 
-        email: form.email 
+      await updateSettings({
+        delivery_fee: parseFloat(deliveryFee) || 50,
+        gcash_enabled: gcashEnabled,
+        gcash_number: gcashNumber.trim(),
       });
-      setModalVisible(false);
-      fetchUsers();
-      Alert.alert('Success', 'User updated successfully.');
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
+      Alert.alert("Saved", "Settings updated!");
+    } catch (e: any) { Alert.alert("Error", e.message); }
+    setSaving(false);
   }
 
-  async function deleteUser(user: Profile) {
-    if (user.is_admin) {
-      Alert.alert('Cannot Delete', 'Admin accounts cannot be deleted.');
-      return;
-    }
-    Alert.alert('Delete User', `Delete ${user.email}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteUserFromDb(user.id);
-            fetchUsers();
-            Alert.alert('Deleted', 'User has been deleted.');
-          } catch (error: any) {
-            Alert.alert('Error', error.message);
-          }
-        }
-      }
-    ]);
-  }
+  // Sales summary
+  const delivered = orders.filter((o) => o.status === "delivered");
+  const totalRevenue = delivered.reduce((s, o) => s + (o.total || 0), 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const todayOrders = delivered.filter((o) => {
+    const d = o.created_at?.seconds ? new Date(o.created_at.seconds * 1000) : new Date();
+    return d.toISOString().slice(0, 10) === today;
+  });
+  const todayRevenue = todayOrders.reduce((s, o) => s + (o.total || 0), 0);
 
-  async function toggleAdmin(user: Profile) {
-    const newStatus = !user.is_admin;
-    Alert.alert(
-      newStatus ? 'Promote to Admin' : 'Remove Admin',
-      `${newStatus ? 'Make' : 'Remove'} ${user.email} ${newStatus ? 'an admin' : 'from admin'}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            try {
-              await setUserAdmin(user.id, newStatus);
-              fetchUsers();
-              Alert.alert('Success', `User is ${newStatus ? 'now an admin' : 'no longer an admin'}.`);
-            } catch (error: any) {
-              Alert.alert('Error', error.message);
-            }
-          }
-        }
-      ]
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 60 }} />
+      </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={20} color="#2E1A06" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Users</Text>
-        <Text style={styles.countBadge}>{users.length} users</Text>
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <Text style={styles.title}>More</Text>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
-      ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-          {users.length === 0 ? (
-            <Text style={styles.emptyText}>No users found.</Text>
-          ) : (
-            users.map((user) => (
-              <View key={user.id} style={styles.userCard}>
-                <View style={[styles.avatar, { backgroundColor: user.is_admin ? '#F25C05' : '#4A8FE7' }]}>
-                  <Text style={styles.avatarText}>
-                    {(user.username || user.email || 'U').charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.userInfo}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.userName}>
-                      {user.username || user.email?.split('@')[0] || 'Unknown'}
-                    </Text>
-                    {user.is_admin && (
-                      <View style={styles.adminBadge}>
-                        <Text style={styles.adminBadgeText}>ADMIN</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.userEmail}>{user.email}</Text>
-                </View>
-                <View style={styles.actionBtns}>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(user)}>
-                    <Ionicons name="pencil" size={16} color="#4A8FE7" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.adminToggleBtn, {
-                      backgroundColor: user.is_admin ? '#F25C0522' : '#34B36A22'
-                    }]}
-                    onPress={() => toggleAdmin(user)}>
-                    <Ionicons
-                      name={user.is_admin ? 'shield-outline' : 'shield-checkmark-outline'}
-                      size={16}
-                      color={user.is_admin ? '#F25C05' : '#34B36A'}
-                    />
-                  </TouchableOpacity>
-                  {!user.is_admin && (
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteUser(user)}>
-                      <Ionicons name="trash" size={16} color="#D92614" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      )}
-
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit User</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#888" />
-              </TouchableOpacity>
+        {/* Sales Summary */}
+        <Text style={styles.sectionTitle}>Sales Summary</Text>
+        <View style={styles.card}>
+          <View style={styles.salesRow}>
+            <View style={styles.salesItem}>
+              <Text style={styles.salesValue}>P{todayRevenue.toFixed(0)}</Text>
+              <Text style={styles.salesLabel}>Today</Text>
             </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Username</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Username"
-                placeholderTextColor="#bbb"
-                value={form.username}
-                onChangeText={(v) => setForm(prev => ({ ...prev, username: v }))}
-              />
+            <View style={styles.salesDiv} />
+            <View style={styles.salesItem}>
+              <Text style={styles.salesValue}>P{totalRevenue.toFixed(0)}</Text>
+              <Text style={styles.salesLabel}>All Time</Text>
             </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor="#bbb"
-                value={form.email}
-                onChangeText={(v) => setForm(prev => ({ ...prev, email: v }))}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-            <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={saveUser}>
-                <Text style={styles.saveText}>Save</Text>
-              </TouchableOpacity>
+            <View style={styles.salesDiv} />
+            <View style={styles.salesItem}>
+              <Text style={styles.salesValue}>{delivered.length}</Text>
+              <Text style={styles.salesLabel}>Completed</Text>
             </View>
           </View>
         </View>
-      </Modal>
+
+        {/* Staff Overview */}
+        <Text style={styles.sectionTitle}>Staff ({staff.length})</Text>
+        <View style={styles.card}>
+          {staff.length === 0 ? (
+            <Text style={styles.emptyText}>No staff registered</Text>
+          ) : (
+            staff.map((s) => (
+              <View key={s.staff_id} style={styles.staffRow}>
+                <View style={[styles.statusDot, { backgroundColor: s.status === "on_duty" ? "#27AE60" : "#95A5A6" }]} />
+                <Text style={styles.staffName}>{s.staff_name}</Text>
+                <Text style={styles.staffInfo}>{s.present} days present</Text>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Users Overview */}
+        <Text style={styles.sectionTitle}>Users ({users.length})</Text>
+        <View style={styles.card}>
+          {users.slice(0, 10).map((u) => (
+            <View key={u.id} style={styles.staffRow}>
+              <View style={[styles.statusDot, { backgroundColor: u.role === "admin" ? "#F25C05" : u.role === "staff" ? "#3498DB" : "#27AE60" }]} />
+              <Text style={styles.staffName}>{u.username || u.email?.split("@")[0]}</Text>
+              <Text style={styles.staffInfo}>{u.role}</Text>
+            </View>
+          ))}
+          {users.length > 10 && <Text style={styles.moreText}>+{users.length - 10} more</Text>}
+        </View>
+
+        {/* App Settings */}
+        <Text style={styles.sectionTitle}>App Settings</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>Delivery Fee (PHP)</Text>
+          <TextInput style={styles.input} value={deliveryFee} keyboardType="numeric"
+            onChangeText={setDeliveryFee} placeholder="50" placeholderTextColor="#aaa" />
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleLabel}>GCash Payment</Text>
+            <Switch value={gcashEnabled} onValueChange={setGcashEnabled}
+              trackColor={{ false: "#ddd", true: "#F25C05" }} thumbColor="#fff" />
+          </View>
+          {gcashEnabled && (
+            <>
+              <Text style={styles.label}>GCash Number</Text>
+              <TextInput style={styles.input} value={gcashNumber} keyboardType="phone-pad"
+                onChangeText={setGcashNumber} placeholder="09XX XXX XXXX" placeholderTextColor="#aaa" />
+            </>
+          )}
+          <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+            onPress={saveSettings} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> :
+              <Text style={styles.saveBtnText}>Save Settings</Text>}
+          </TouchableOpacity>
+        </View>
+
+        {/* Logout */}
+        <TouchableOpacity style={styles.logoutBtn}
+          onPress={() => Alert.alert("Log Out", "Are you sure?", [
+            { text: "Cancel", style: "cancel" },
+            { text: "Log Out", style: "destructive", onPress: async () => { await logOut(); router.replace("/(auth)/welcome"); } },
+          ])}>
+          <Ionicons name="log-out-outline" size={20} color="#D92614" />
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9F0DC' },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
-  backBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center',
+  container: { flex: 1, backgroundColor: "#F9F0DC" },
+  title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 4 },
+  sectionTitle: { fontSize: 15, fontWeight: "bold", color: "#2E1A06", marginHorizontal: 16, marginTop: 12, marginBottom: 8 },
+  card: { backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 16, padding: 16, marginBottom: 4, elevation: 2 },
+  salesRow: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
+  salesItem: { alignItems: "center" },
+  salesValue: { fontSize: 20, fontWeight: "bold", color: "#F25C05" },
+  salesLabel: { fontSize: 11, color: "#888", marginTop: 2 },
+  salesDiv: { width: 1, height: 36, backgroundColor: "#f0e8d0" },
+  staffRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  staffName: { flex: 1, fontSize: 13, color: "#2E1A06", fontWeight: "600" },
+  staffInfo: { fontSize: 11, color: "#888" },
+  moreText: { textAlign: "center", color: "#F25C05", fontSize: 12, marginTop: 8, fontWeight: "600" },
+  emptyText: { textAlign: "center", color: "#aaa", fontSize: 13 },
+  label: { fontSize: 12, color: "#888", marginBottom: 4, marginTop: 10, fontWeight: "600" },
+  input: { backgroundColor: "#F9F5EF", borderRadius: 10, padding: 12, fontSize: 14, color: "#333" },
+  toggleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12 },
+  toggleLabel: { fontSize: 14, color: "#333" },
+  saveBtn: { backgroundColor: "#F25C05", borderRadius: 12, padding: 14, alignItems: "center", marginTop: 16 },
+  saveBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  logoutBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: "#FFE8E5", marginHorizontal: 16, borderRadius: 14, padding: 16, marginTop: 16,
   },
-  headerTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#2E1A06' },
-  countBadge: {
-    backgroundColor: '#4A8FE722', color: '#4A8FE7',
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 10, fontSize: 12, fontWeight: '600',
-  },
-  emptyText: { textAlign: 'center', color: '#aaa', marginTop: 40, fontSize: 14 },
-  userCard: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    borderRadius: 14, padding: 14, marginBottom: 10,
-    alignItems: 'center', gap: 12,
-    elevation: 2,
-    // @ts-ignore - web shadow
-    boxShadow: '0px 1px 6px rgba(0, 0, 0, 0.06)',
-  },
-  avatar: {
-    width: 44, height: 44, borderRadius: 22,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  avatarText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
-  userInfo: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  userName: { fontSize: 14, fontWeight: 'bold', color: '#2E1A06' },
-  adminBadge: {
-    backgroundColor: '#F25C0522', paddingHorizontal: 6,
-    paddingVertical: 2, borderRadius: 6,
-  },
-  adminBadgeText: { fontSize: 9, color: '#F25C05', fontWeight: 'bold' },
-  userEmail: { fontSize: 11, color: '#888', marginTop: 2 },
-  actionBtns: { flexDirection: 'row', gap: 8 },
-  editBtn: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: '#4A8FE722', justifyContent: 'center', alignItems: 'center',
-  },
-  adminToggleBtn: {
-    width: 34, height: 34, borderRadius: 10,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  deleteBtn: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: '#D9261422', justifyContent: 'center', alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24,
-    borderTopRightRadius: 24, padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 16,
-  },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#2E1A06' },
-  inputGroup: { marginBottom: 12 },
-  inputLabel: { fontSize: 12, color: '#555', marginBottom: 4, fontWeight: '600' },
-  input: {
-    backgroundColor: '#FDF5E0', borderRadius: 10,
-    padding: 12, fontSize: 13, color: '#333', height: 46,
-  },
-  modalBtns: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  cancelBtn: {
-    flex: 1, backgroundColor: '#eee', borderRadius: 12,
-    padding: 14, alignItems: 'center',
-  },
-  cancelText: { color: '#666', fontWeight: '600' },
-  saveBtn: {
-    flex: 1, backgroundColor: '#F25C05', borderRadius: 12,
-    padding: 14, alignItems: 'center',
-  },
-  saveText: { color: '#fff', fontWeight: 'bold' },
+  logoutText: { color: "#D92614", fontWeight: "bold", fontSize: 15 },
 });

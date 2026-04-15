@@ -1,28 +1,22 @@
 import { Redirect } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import { onAuthChange, getProfile } from '../lib/firebase';
 import { User } from 'firebase/auth';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { getProfile, onAuthChange } from '../lib/firebase';
 
-type AuthState = 'loading' | 'admin' | 'user' | 'guest';
+type AuthState = 'loading' | 'admin' | 'staff' | 'customer' | 'guest';
 
 export default function Index() {
   const [authState, setAuthState] = useState<AuthState>('loading');
 
   useEffect(() => {
-    // Use onAuthChange from firebase.ts which also sets REST API auth token
     const unsubscribe = onAuthChange(async (user: User | null) => {
       try {
         if (user) {
-          // User is signed in, check if admin
           const profile = await getProfile(user.uid);
-          if (profile?.is_admin) {
-            setAuthState('admin');
-          } else {
-            setAuthState('user');
-          }
+          const role = profile?.role || (profile?.is_admin ? 'admin' : 'customer');
+          setAuthState(role as AuthState);
         } else {
-          // User is signed out
           setAuthState('guest');
         }
       } catch (error) {
@@ -34,7 +28,6 @@ export default function Index() {
     return () => unsubscribe();
   }, []);
 
-  // Show loading spinner while checking auth
   if (authState === 'loading') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1A1A2E' }}>
@@ -43,16 +36,9 @@ export default function Index() {
     );
   }
 
-  // Use Redirect component instead of programmatic navigation
-  // This ensures navigation happens after the router is mounted
-  if (authState === 'admin') {
-    return <Redirect href="/(admin)" />;
-  }
+  if (authState === 'admin') return <Redirect href="/(admin)" />;
+  if (authState === 'staff') return <Redirect href={"/(staff)" as any} />;
+  if (authState === 'customer') return <Redirect href="/(tabs)" />;
 
-  if (authState === 'user') {
-    return <Redirect href="/(tabs)" />;
-  }
-
-  // Default: guest - redirect to welcome screen
   return <Redirect href="/(auth)/welcome" />;
 }
