@@ -57,8 +57,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "lasangpinoy-mobile"
-      }
-    }
+        "projectId": "446b4bd5-8373-4cd2-b91c-ff5e8f4d5eac"
+      },
+      "router": {}
+    },
+    "owner": "keth"
   }
 }
