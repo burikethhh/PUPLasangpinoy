@@ -1,26 +1,25 @@
 // Firebase Store - Food Ordering System CRUD Operations
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  orderBy,
-  query,
-  setDoc,
-  updateDoc,
-  where,
-} from "firebase/firestore";
 import type { Timestamp } from "firebase/firestore";
+import {
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    orderBy,
+    query,
+    setDoc,
+    updateDoc,
+    where,
+} from "firebase/firestore";
 import type { OrderStatus, OrderType, PaymentMethod, StaffStatus } from "../constants/order";
 import {
-  db,
-  shouldUseRest,
-  handleSdkBlocked,
-  RestApi,
-  refreshRestToken,
-  type Profile,
+    db,
+    handleSdkBlocked,
+    RestApi,
+    shouldUseRest,
+    type Profile
 } from "./firebase";
 import { createLogger } from "./logger";
 
@@ -97,6 +96,7 @@ export interface Favorite {
   id: string;
   user_id: string;
   menu_item_id: string;
+  collection_id?: string;
   created_at: Timestamp | { seconds: number };
 }
 
@@ -542,6 +542,57 @@ export async function getFavoritesWithItems(userId: string): Promise<MenuItem[]>
     }),
   );
   return items.filter((i): i is MenuItem => i !== null);
+}
+
+// ==================== FAVORITE COLLECTIONS ====================
+
+export async function getFavoriteCollections(userId: string): Promise<{ id: string; name: string; count: number }[]> {
+  return firestoreOp(
+    async () => {
+      const q = query(collection(db, "favorite_collections"), where("user_id", "==", userId));
+      const snapshot = await getDocs(q);
+      const cols = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+      const favs = await getFavorites(userId);
+      return cols.map((c) => ({
+        id: c.id,
+        name: c.name,
+        count: favs.filter((f) => f.collection_id === c.id).length,
+      }));
+    },
+    async () => {
+      const data = await RestApi.queryCollection("favorite_collections", "user_id", "==", userId);
+      const favs = await getFavorites(userId);
+      return (data as any[]).map((c) => ({
+        id: c.id,
+        name: c.name,
+        count: favs.filter((f: any) => f.collection_id === c.id).length,
+      }));
+    },
+  );
+}
+
+export async function createFavoriteCollection(userId: string, name: string): Promise<{ id: string }> {
+  const payload = { user_id: userId, name, created_at: new Date() };
+  return firestoreOp(
+    async () => {
+      const ref = await addDoc(collection(db, "favorite_collections"), payload);
+      return { id: ref.id };
+    },
+    async () => {
+      const result = await RestApi.createDocument("favorite_collections", payload);
+      return { id: typeof result === "string" ? result : (result as any).id || "" };
+    },
+  );
+}
+
+export async function moveFavoriteToCollection(userId: string, menuItemId: string, collectionId: string): Promise<void> {
+  const favs = await getFavorites(userId);
+  const fav = favs.find((f) => f.menu_item_id === menuItemId);
+  if (!fav) return;
+  await firestoreOp(
+    async () => { await updateDoc(doc(db, "favorites", fav.id), { collection_id: collectionId || null }); },
+    async () => { await RestApi.updateDocument("favorites", fav.id, { collection_id: collectionId || null }); },
+  );
 }
 
 // ==================== ATTENDANCE ====================

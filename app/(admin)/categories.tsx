@@ -1,16 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator, Alert, FlatList, Modal, RefreshControl,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+    ActivityIndicator, Alert, FlatList, Modal, RefreshControl,
+    ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MENU_CATEGORIES, MENU_CATEGORY_COLORS } from "../../constants/order";
 import {
-  getMenuItems, addMenuItem, updateMenuItem, deleteMenuItem,
-  type MenuItem,
+    addMenuItem,
+    deleteMenuItem,
+    getMenuItems,
+    updateMenuItem,
+    type MenuItem,
 } from "../../lib/firebase-store";
 
 const EMPTY_FORM = {
@@ -26,6 +30,8 @@ export default function AdminMenuScreen() {
   const [editing, setEditing] = useState<MenuItem | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [customCategory, setCustomCategory] = useState("");
+  const [showCustomCat, setShowCustomCat] = useState(false);
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
@@ -165,19 +171,46 @@ export default function AdminMenuScreen() {
                 {MENU_CATEGORIES.map((c) => (
                   <TouchableOpacity key={c}
                     style={[styles.chip, form.category === c && styles.chipActive]}
-                    onPress={() => setForm((f) => ({ ...f, category: c }))}>
+                    onPress={() => { setForm((f) => ({ ...f, category: c })); setShowCustomCat(false); }}>
                     <Text style={[styles.chipText, form.category === c && styles.chipTextActive]}>{c}</Text>
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity
+                  style={[styles.chip, showCustomCat && styles.chipActive]}
+                  onPress={() => setShowCustomCat(true)}>
+                  <Ionicons name="add" size={14} color={showCustomCat ? "#F25C05" : "#888"} />
+                  <Text style={[styles.chipText, showCustomCat && styles.chipTextActive]}>Custom</Text>
+                </TouchableOpacity>
               </ScrollView>
+              {showCustomCat && (
+                <TextInput style={[styles.input, { marginBottom: 8 }]} value={customCategory}
+                  onChangeText={(v) => { setCustomCategory(v); setForm((f) => ({ ...f, category: v })); }}
+                  placeholder="Enter custom category" placeholderTextColor="#aaa" />
+              )}
               <Text style={styles.label}>Description</Text>
               <TextInput style={[styles.input, { minHeight: 60 }]} value={form.description}
                 onChangeText={(v) => setForm((f) => ({ ...f, description: v }))}
                 multiline placeholder="Description" placeholderTextColor="#aaa" />
-              <Text style={styles.label}>Image URL</Text>
-              <TextInput style={styles.input} value={form.image_url}
-                onChangeText={(v) => setForm((f) => ({ ...f, image_url: v }))}
-                placeholder="https://..." placeholderTextColor="#aaa" autoCapitalize="none" />
+              <Text style={styles.label}>Image</Text>
+              <View style={styles.imagePickRow}>
+                <TouchableOpacity style={styles.galleryBtn} onPress={async () => {
+                  const result = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ["images"],
+                    allowsEditing: true,
+                    aspect: [1, 1],
+                    quality: 0.8,
+                  });
+                  if (!result.canceled && result.assets[0]) {
+                    setForm((f) => ({ ...f, image_url: result.assets[0].uri }));
+                  }
+                }}>
+                  <Ionicons name="images" size={18} color="#fff" />
+                  <Text style={styles.galleryBtnText}>Gallery</Text>
+                </TouchableOpacity>
+                <TextInput style={[styles.input, { flex: 1 }]} value={form.image_url}
+                  onChangeText={(v) => setForm((f) => ({ ...f, image_url: v }))}
+                  placeholder="or paste URL" placeholderTextColor="#aaa" autoCapitalize="none" />
+              </View>
               <Text style={styles.label}>Stock Quantity</Text>
               <TextInput style={styles.input} value={form.stock_quantity} keyboardType="numeric"
                 onChangeText={(v) => setForm((f) => ({ ...f, stock_quantity: v }))}
@@ -232,4 +265,7 @@ const styles = StyleSheet.create({
   toggleText: { fontSize: 14, color: "#333" },
   saveBtn: { backgroundColor: "#F25C05", borderRadius: 12, padding: 14, alignItems: "center", marginTop: 16 },
   saveBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  imagePickRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  galleryBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#3498DB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  galleryBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
 });

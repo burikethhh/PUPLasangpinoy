@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
     ActivityIndicator, Alert,
@@ -159,6 +159,10 @@ export default function CartScreen() {
             <Ionicons name="cart-outline" size={64} color="#ddd" />
             <Text style={styles.emptyText}>Your cart is empty</Text>
             <Text style={styles.emptySubtext}>Browse the menu and add items!</Text>
+            <TouchableOpacity style={styles.browseBtn} onPress={() => router.replace("/(tabs)")}>
+              <Ionicons name="fast-food-outline" size={18} color="#fff" />
+              <Text style={styles.browseBtnText}>Browse Menu</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -291,6 +295,11 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", marginTop: 80 },
   emptyText: { fontSize: 18, fontWeight: "bold", color: "#aaa", marginTop: 12 },
   emptySubtext: { fontSize: 13, color: "#bbb", marginTop: 4 },
+  browseBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F25C05",
+    borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14, marginTop: 20,
+  },
+  browseBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
   cartItem: {
     flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
     marginHorizontal: 16, marginBottom: 8, padding: 14, borderRadius: 14, elevation: 1,

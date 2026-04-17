@@ -20,7 +20,7 @@ import {
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalOrders: 0, pendingOrders: 0, todayRevenue: 0,
+    totalOrders: 0, pendingOrders: 0, todayOrders: 0,
     menuItems: 0, unreadMessages: 0, staffOnDuty: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
@@ -36,13 +36,10 @@ export default function AdminDashboard() {
       ]);
 
       const today = new Date().toISOString().slice(0, 10);
-      const todayOrders = orders.filter((o) => {
+      const todayOrderCount = orders.filter((o) => {
         const d = o.created_at?.seconds ? new Date(o.created_at.seconds * 1000) : new Date();
         return d.toISOString().slice(0, 10) === today;
-      });
-      const todayRevenue = todayOrders
-        .filter((o) => o.status === "delivered")
-        .reduce((s, o) => s + (o.total || 0), 0);
+      }).length;
 
       const statusCounts: Record<string, number> = {};
       orders.forEach((o) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
@@ -53,7 +50,7 @@ export default function AdminDashboard() {
       setStats({
         totalOrders: orders.length,
         pendingOrders: statusCounts["pending"] || 0,
-        todayRevenue,
+        todayOrders: todayOrderCount,
         menuItems: menu.length,
         unreadMessages: unread,
         staffOnDuty: onDuty,
@@ -93,7 +90,7 @@ export default function AdminDashboard() {
               {[
                 { label: "Total Orders", value: stats.totalOrders, color: "#F25C05", icon: "receipt" },
                 { label: "Pending", value: stats.pendingOrders, color: "#F39C12", icon: "time" },
-                { label: "Revenue Today", value: `P${stats.todayRevenue.toFixed(0)}`, color: "#27AE60", icon: "cash" },
+                { label: "Today", value: stats.todayOrders, color: "#27AE60", icon: "today" },
                 { label: "Menu Items", value: stats.menuItems, color: "#9B59B6", icon: "restaurant" },
               ].map((s) => (
                 <View key={s.label} style={styles.statCard}>

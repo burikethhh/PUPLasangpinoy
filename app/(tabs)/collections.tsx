@@ -86,18 +86,25 @@ export default function OrdersScreen() {
 
                 {/* Order Tracking */}
                 {item.status !== "rejected" && item.status !== "cancelled" && (
-                  <View style={styles.tracker}>
-                    {["pending", "accepted", "preparing", "out_for_delivery", "delivered"].map((s, idx) => {
-                      const steps = ["pending", "accepted", "preparing", "out_for_delivery", "delivered"];
-                      const currentIdx = steps.indexOf(item.status);
-                      const isActive = idx <= currentIdx;
-                      return (
-                        <View key={s} style={styles.trackStep}>
-                          <View style={[styles.trackDot, isActive && { backgroundColor: "#F25C05" }]} />
-                          {idx < 4 && <View style={[styles.trackLine, isActive && { backgroundColor: "#F25C05" }]} />}
-                        </View>
-                      );
-                    })}
+                  <View style={styles.trackerWrap}>
+                    <View style={styles.tracker}>
+                      {["pending", "accepted", "preparing", "out_for_delivery", "delivered"].map((s, idx) => {
+                        const steps = ["pending", "accepted", "preparing", "out_for_delivery", "delivered"];
+                        const currentIdx = steps.indexOf(item.status);
+                        const isActive = idx <= currentIdx;
+                        return (
+                          <View key={s} style={styles.trackStep}>
+                            <View style={[styles.trackDot, isActive && { backgroundColor: "#F25C05" }]} />
+                            {idx < 4 && <View style={[styles.trackLine, isActive && { backgroundColor: "#F25C05" }]} />}
+                          </View>
+                        );
+                      })}
+                    </View>
+                    <View style={styles.trackerLabels}>
+                      {["Placed", "Accepted", "Preparing", "Delivering", "Done"].map((lbl) => (
+                        <Text key={lbl} style={styles.trackerLabel}>{lbl}</Text>
+                      ))}
+                    </View>
                   </View>
                 )}
               </View>
@@ -141,4 +148,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", marginTop: 80 },
   emptyText: { fontSize: 18, fontWeight: "bold", color: "#aaa", marginTop: 12 },
   emptySubtext: { fontSize: 13, color: "#bbb", marginTop: 4 },
+  trackerWrap: { marginTop: 12, paddingTop: 8 },
+  trackerLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
+  trackerLabel: { fontSize: 9, color: "#aaa", textAlign: "center", flex: 1 },
 });

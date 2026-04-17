@@ -1,16 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet, Switch,
-  Text, TextInput, TouchableOpacity, View,
+    ActivityIndicator, Alert, ScrollView, StyleSheet, Switch,
+    Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getAllUsers, logOut, type Profile } from "../../lib/firebase";
-import { router } from "expo-router";
+import { getAllUsers, logOut, signUp, type Profile } from "../../lib/firebase";
 import {
-  getSettings, updateSettings, getStaffAttendanceSummary,
-  getOrders, type AppSettings, type Order,
+    getOrders,
+    getSettings,
+    getStaffAttendanceSummary,
+    updateSettings,
+    type AppSettings, type Order,
 } from "../../lib/firebase-store";
 
 export default function AdminMoreScreen() {
@@ -23,6 +25,9 @@ export default function AdminMoreScreen() {
   const [deliveryFee, setDeliveryFee] = useState("");
   const [gcashNumber, setGcashNumber] = useState("");
   const [gcashEnabled, setGcashEnabled] = useState(false);
+  const [staffModal, setStaffModal] = useState(false);
+  const [staffForm, setStaffForm] = useState({ name: "", email: "", password: "", phone: "" });
+  const [creatingStaff, setCreatingStaff] = useState(false);
 
   useFocusEffect(useCallback(() => { loadAll(); }, []));
 
@@ -56,15 +61,34 @@ export default function AdminMoreScreen() {
     setSaving(false);
   }
 
-  // Sales summary
+  // Order summary
   const delivered = orders.filter((o) => o.status === "delivered");
-  const totalRevenue = delivered.reduce((s, o) => s + (o.total || 0), 0);
+  const pending = orders.filter((o) => o.status === "pending");
   const today = new Date().toISOString().slice(0, 10);
-  const todayOrders = delivered.filter((o) => {
+  const todayOrders = orders.filter((o) => {
     const d = o.created_at?.seconds ? new Date(o.created_at.seconds * 1000) : new Date();
     return d.toISOString().slice(0, 10) === today;
   });
-  const todayRevenue = todayOrders.reduce((s, o) => s + (o.total || 0), 0);
+
+  async function handleCreateStaff() {
+    if (!staffForm.name.trim() || !staffForm.email.trim() || !staffForm.password.trim()) {
+      Alert.alert("Error", "Name, email and password are required."); return;
+    }
+    if (staffForm.password.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters."); return;
+    }
+    setCreatingStaff(true);
+    try {
+      await signUp(staffForm.email.trim(), staffForm.password, staffForm.name.trim(), "staff", staffForm.phone.trim());
+      Alert.alert("Success", `Staff account created for ${staffForm.name.trim()}!`);
+      setStaffModal(false);
+      setStaffForm({ name: "", email: "", password: "", phone: "" });
+      loadAll();
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    }
+    setCreatingStaff(false);
+  }
 
   if (loading) {
     return (
@@ -79,18 +103,23 @@ export default function AdminMoreScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Text style={styles.title}>More</Text>
 
-        {/* Sales Summary */}
-        <Text style={styles.sectionTitle}>Sales Summary</Text>
+        {/* Order Summary */}
+        <Text style={styles.sectionTitle}>Order Summary</Text>
         <View style={styles.card}>
           <View style={styles.salesRow}>
             <View style={styles.salesItem}>
-              <Text style={styles.salesValue}>P{todayRevenue.toFixed(0)}</Text>
+              <Text style={styles.salesValue}>{todayOrders.length}</Text>
               <Text style={styles.salesLabel}>Today</Text>
             </View>
             <View style={styles.salesDiv} />
             <View style={styles.salesItem}>
-              <Text style={styles.salesValue}>P{totalRevenue.toFixed(0)}</Text>
-              <Text style={styles.salesLabel}>All Time</Text>
+              <Text style={styles.salesValue}>{orders.length}</Text>
+              <Text style={styles.salesLabel}>Total</Text>
+            </View>
+            <View style={styles.salesDiv} />
+            <View style={styles.salesItem}>
+              <Text style={styles.salesValue}>{pending.length}</Text>
+              <Text style={styles.salesLabel}>Pending</Text>
             </View>
             <View style={styles.salesDiv} />
             <View style={styles.salesItem}>
@@ -101,7 +130,13 @@ export default function AdminMoreScreen() {
         </View>
 
         {/* Staff Overview */}
-        <Text style={styles.sectionTitle}>Staff ({staff.length})</Text>
+        <View style={styles.sectionRow}>
+          <Text style={[styles.sectionTitle, { marginHorizontal: 0, marginTop: 0, marginBottom: 0 }]}>Staff ({staff.length})</Text>
+          <TouchableOpacity style={styles.addStaffBtn} onPress={() => setStaffModal(true)}>
+            <Ionicons name="person-add" size={16} color="#fff" />
+            <Text style={styles.addStaffText}>Add Staff</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.card}>
           {staff.length === 0 ? (
             <Text style={styles.emptyText}>No staff registered</Text>
@@ -164,6 +199,41 @@ export default function AdminMoreScreen() {
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Create Staff Modal */}
+      {staffModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Create Staff Account</Text>
+            <Text style={styles.label}>Full Name *</Text>
+            <TextInput style={styles.input} value={staffForm.name}
+              onChangeText={(v) => setStaffForm((f) => ({ ...f, name: v }))}
+              placeholder="Staff name" placeholderTextColor="#aaa" />
+            <Text style={styles.label}>Email *</Text>
+            <TextInput style={styles.input} value={staffForm.email}
+              onChangeText={(v) => setStaffForm((f) => ({ ...f, email: v }))}
+              placeholder="staff@email.com" placeholderTextColor="#aaa" keyboardType="email-address" autoCapitalize="none" />
+            <Text style={styles.label}>Password *</Text>
+            <TextInput style={styles.input} value={staffForm.password}
+              onChangeText={(v) => setStaffForm((f) => ({ ...f, password: v }))}
+              placeholder="Min 6 characters" placeholderTextColor="#aaa" secureTextEntry />
+            <Text style={styles.label}>Phone</Text>
+            <TextInput style={styles.input} value={staffForm.phone}
+              onChangeText={(v) => setStaffForm((f) => ({ ...f, phone: v }))}
+              placeholder="09XX XXX XXXX" placeholderTextColor="#aaa" keyboardType="phone-pad" />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setStaffModal(false)}>
+                <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveBtn, creatingStaff && { opacity: 0.6 }]}
+                onPress={handleCreateStaff} disabled={creatingStaff}>
+                {creatingStaff ? <ActivityIndicator color="#fff" /> :
+                  <Text style={styles.saveBtnText}>Create</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -195,4 +265,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFE8E5", marginHorizontal: 16, borderRadius: 14, padding: 16, marginTop: 16,
   },
   logoutText: { color: "#D92614", fontWeight: "bold", fontSize: 15 },
+  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginHorizontal: 16, marginTop: 12, marginBottom: 8 },
+  addStaffBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#3498DB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  addStaffText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
+  modalOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  modalCard: { backgroundColor: "#fff", borderRadius: 20, padding: 20, width: "85%" },
+  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06", marginBottom: 4 },
+  modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
+  modalCancel: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#eee" },
 });
