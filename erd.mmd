@@ -103,18 +103,6 @@ erDiagram
         timestamp created_at "Creation timestamp"
     }
 
-    %% Collection: attendance
-    ATTENDANCE {
-        string id PK "Auto-generated document ID"
-        string staff_id FK "FK to profiles.id (staff)"
-        string staff_name "Staff display name"
-        string date "Date string (YYYY-MM-DD)"
-        string status "on_duty | off_duty"
-        string clock_in "Clock-in ISO timestamp (optional)"
-        string clock_out "Clock-out ISO timestamp (optional)"
-        timestamp created_at "Record creation timestamp"
-    }
-
     %% Singleton document: settings/app_settings
     APP_SETTINGS {
         number delivery_fee "Default delivery fee in PHP"
@@ -137,9 +125,6 @@ erDiagram
     PROFILES ||--o{ FAVORITES : ""
     %% A profile (customer) creates many favorite collections
     PROFILES ||--o{ FAVORITE_COLLECTIONS : ""
-    %% A profile (staff) has many attendance records
-    PROFILES ||--o{ ATTENDANCE : ""
-
     %% An order contains many order items (embedded)
     ORDERS ||--|{ ORDER_ITEMS : ""
     %% A menu item appears in many order items
