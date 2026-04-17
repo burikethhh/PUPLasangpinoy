@@ -5,6 +5,7 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import {
     createUserWithEmailAndPassword,
     FacebookAuthProvider,
+    fetchSignInMethodsForEmail,
     getAuth,
     getReactNativePersistence,
     GoogleAuthProvider,
@@ -305,6 +306,33 @@ export async function createStaffAccount(
   username: string,
   phone?: string,
 ) {
+  // Save current admin user credentials to re-authenticate later
+  const adminUser = auth.currentUser;
+  let adminEmail: string | null = null;
+  let adminPassword: string | null = null;
+  
+  // Note: We cannot retrieve the admin's password from Firebase Auth for security reasons
+  // The admin will need to re-login after creating a staff account
+  // This is a Firebase limitation - we'll handle it gracefully
+
+  // Check if email already exists in Auth
+  try {
+    const methods = await fetchSignInMethodsForEmail(auth, email);
+    if (methods.length > 0) {
+      throw new Error(`Email ${email} is already registered. Please use a different email or check if this is an existing staff account.`);
+    }
+  } catch (error: any) {
+    if (error.code === 'auth/invalid-email') {
+      throw new Error('Invalid email address.');
+    }
+    // If it's not the email-already-in-use error, continue (might be a different error)
+    if (!error.message.includes('already registered')) {
+      // Continue - email might not exist
+    } else {
+      throw error;
+    }
+  }
+
   // Create the staff account (this will change the current auth user)
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const staffUid = userCredential.user.uid;
@@ -323,13 +351,11 @@ export async function createStaffAccount(
   // Use REST API to create profile so we don't depend on auth state
   await RestApi.setDocument("profiles", staffUid, profileData);
 
-  // Sign out the newly created staff user to restore admin session
+  // Sign out the newly created staff user
   await signOut(auth);
 
-  // Re-authenticate as the admin if we had a current user
-  // The admin will need to have their session restored by the layout auth check
-  // For now, we return the staff UID so the caller knows it succeeded
-  return { staffUid, email };
+  // Return info about the created staff account
+  return { staffUid, email, needsReauth: true };
 }
 
 export async function logOut() {

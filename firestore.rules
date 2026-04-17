@@ -8,15 +8,94 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.is_admin == true;
     }
+    function isStaff() {
+      return isSignedIn() && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'staff';
+    }
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
+    
+    // ==================== PROFILES ====================
     match /profiles/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isOwner(userId) && request.resource.data.is_admin == resource.data.is_admin || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
     }
+    
+    // ==================== MENU ITEMS (Admin only) ====================
+    match /menu_items/{itemId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // ==================== ORDERS ====================
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (resource.data.customer_id == request.auth.uid || isAdmin() || isStaff());
+      allow create: if isSignedIn() && request.resource.data.customer_id == request.auth.uid;
+      allow update: if isAdmin() || isStaff();
+      allow delete: if isAdmin();
+    }
+    
+    // ==================== MESSAGES ====================
+    match /messages/{messageId} {
+      allow read: if isSignedIn() && (resource.data.sender_id == request.auth.uid || isAdmin() || isStaff());
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+    
+    // ==================== REVIEWS ====================
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+    }
+    
+    // ==================== FAVORITES ====================
+    match /favorites/{favoriteId} {
+      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+    }
+    
+    // ==================== FAVORITE COLLECTIONS ====================
+    match /favorite_collections/{collectionId} {
+      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+    }
+    
+    // ==================== ATTENDANCE ====================
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn() && (resource.data.staff_id == request.auth.uid || isAdmin() || isStaff());
+      allow create: if isAdmin() || isStaff();
+      allow update: if isAdmin() || isStaff();
+      allow delete: if isAdmin();
+    }
+    
+    // ==================== APP SETTINGS (Admin only) ====================
+    match /settings/{settingsId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // ==================== MENU SUGGESTIONS ====================
+    match /menu_suggestions/{suggestionId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+    }
+    
+    // ==================== LEGACY COLLECTIONS (for backward compatibility) ====================
     match /recipes/{recipeId} {
       allow read: if true;
       allow create: if isAdmin();
@@ -59,6 +138,8 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource.data.user_id == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.user_id == request.auth.uid;
     }
+    
+    // ==================== CONNECTIVITY TEST ====================
     match /_connectivity_test/{docId} {
       allow read: if true;
     }

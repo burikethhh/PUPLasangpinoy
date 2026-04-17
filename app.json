@@ -2,22 +2,22 @@
   "expo": {
     "name": "LasangPinoy",
     "slug": "lasangpinoy",
-    "version": "2.2.1",
+    "version": "2.2.2",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./logo.jpg",
     "scheme": "lasangpinoy",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lasangpinoy.mobile",
-      "buildNumber": "5"
+      "buildNumber": "6"
     },
     "android": {
       "package": "com.lasangpinoy.mobile",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./logo.jpg",
         "backgroundColor": "#F5EDD9"
       },
       "edgeToEdgeEnabled": true,

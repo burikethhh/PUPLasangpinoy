@@ -82,8 +82,8 @@ export default function AdminMoreScreen() {
     }
     setCreatingStaff(true);
     try {
-      await createStaffAccount(staffForm.email.trim(), staffForm.password, staffForm.name.trim(), staffForm.phone.trim());
-      Alert.alert("Success", `Staff account created for ${staffForm.name.trim()}!`);
+      const result = await createStaffAccount(staffForm.email.trim(), staffForm.password, staffForm.name.trim(), staffForm.phone.trim());
+      Alert.alert("Success", `Staff account created for ${staffForm.name.trim()}!\n\nNote: You will need to log in again as admin.`);
       setStaffModal(false);
       setStaffForm({ name: "", email: "", password: "", phone: "" });
       loadAll();

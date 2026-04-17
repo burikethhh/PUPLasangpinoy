@@ -92,11 +92,77 @@ export default function ProfileScreen() {
     setScanResult(null);
     setScanModal(true);
     setScanning(true);
-    // Simulate AI scan (placeholder — hook to real AI API if available)
-    setTimeout(() => {
-      setScanResult("This looks like a delicious Filipino dish! Try browsing our menu to find something similar.");
+
+    try {
+      // Convert image to base64
+      const base64 = await fetch(uri).then(r => r.arrayBuffer()).then(buffer => {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+      });
+
+      // Call AI API to analyze the image
+      const analysis = await analyzeImageWithQwen(base64, "dish");
+
+      // Format the result for display
+      let resultText = "";
+      if (analysis.type === "dish") {
+        resultText = `🍽️ **${analysis.dishName}**\n\n`;
+        if (analysis.isFilipino) {
+          resultText += `✅ Filipino Dish\n`;
+        } else {
+          resultText += `❌ Not a Filipino dish\n`;
+        }
+        resultText += `\n${analysis.description}\n\n`;
+        if (analysis.ingredients && analysis.ingredients.length > 0) {
+          resultText += `**Ingredients:** ${analysis.ingredients.join(", ")}\n\n`;
+        }
+        if (analysis.funFact) {
+          resultText += `💡 **Fun Fact:** ${analysis.funFact}\n\n`;
+        }
+        if (analysis.nutrition) {
+          resultText += `**Nutrition (per serving):**\n`;
+          resultText += `• Calories: ${analysis.nutrition.calories}\n`;
+          resultText += `• Protein: ${analysis.nutrition.protein}\n`;
+          resultText += `• Carbs: ${analysis.nutrition.carbs}\n`;
+          resultText += `• Fat: ${analysis.nutrition.fat}\n`;
+          resultText += `• Fiber: ${analysis.nutrition.fiber}\n`;
+          resultText += `• Sodium: ${analysis.nutrition.sodium}\n\n`;
+        }
+        if (analysis.servingSize) {
+          resultText += `**Serving Size:** ${analysis.servingSize}\n\n`;
+        }
+        if (analysis.cookingTips) {
+          resultText += `**Tip:** ${analysis.cookingTips}\n\n`;
+        }
+        resultText += `Browse our menu to find similar dishes!`;
+      } else if (analysis.type === "ingredients") {
+        resultText = `🥗 **Ingredients Detected:** ${analysis.ingredients?.join(", ") || "None"}\n\n`;
+        if (analysis.suggestedRecipes && analysis.suggestedRecipes.length > 0) {
+          resultText += `**Suggested Filipino Recipes:**\n\n`;
+          analysis.suggestedRecipes.forEach((recipe: any, idx: number) => {
+            resultText += `${idx + 1}. **${recipe.name}**\n`;
+            resultText += `   ${recipe.description}\n`;
+            if (recipe.mainIngredients) {
+              resultText += `   Key: ${recipe.mainIngredients.join(", ")}\n`;
+            }
+            resultText += "\n";
+          });
+        }
+      } else {
+        resultText = "Unable to identify the food. Please try again with a clearer image.";
+      }
+
+      setScanResult(resultText);
+    } catch (error: any) {
+      console.error("AI Scan error:", error);
+      setScanResult("AI scan failed: " + (error.message || "Unknown error"));
+    } finally {
       setScanning(false);
-    }, 2000);
+    }
   }
 
   async function openIngredients() {
@@ -114,10 +180,52 @@ export default function ProfileScreen() {
     setSubmitModal(true);
   }
 
-  function submitMenuSuggestion() {
+  async function submitMenuSuggestion() {
     if (!submitForm.name.trim()) return Alert.alert("Error", "Please enter a dish name.");
-    Alert.alert("Submitted!", `Thank you for suggesting "${submitForm.name}"! Our team will review it.`);
-    setSubmitModal(false);
+    try {
+      const user = getCurrentUser();
+      if (!user) return Alert.alert("Error", "You must be logged in to submit suggestions.");
+
+      // Save to Firestore menu_suggestions collection
+      const suggestionData = {
+        name: submitForm.name.trim(),
+        description: submitForm.description.trim(),
+        category: submitForm.category,
+        user_id: user.uid,
+        user_email: user.email || "",
+        user_name: profile?.username || "Anonymous",
+        status: "pending",
+        created_at: new Date(),
+      };
+
+      // Use REST API to create the suggestion
+      await fetch(`https://firestore.googleapis.com/v1/projects/${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}/databases/(default)/documents/menu_suggestions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await user.getIdToken()}`,
+        },
+        body: JSON.stringify({
+          fields: {
+            name: { stringValue: suggestionData.name },
+            description: { stringValue: suggestionData.description },
+            category: { stringValue: suggestionData.category },
+            user_id: { stringValue: suggestionData.user_id },
+            user_email: { stringValue: suggestionData.user_email },
+            user_name: { stringValue: suggestionData.user_name },
+            status: { stringValue: suggestionData.status },
+            created_at: { timestampValue: new Date().toISOString() },
+          },
+        }),
+      });
+
+      Alert.alert("Submitted!", `Thank you for suggesting "${submitForm.name}"! Our team will review it.`);
+      setSubmitModal(false);
+      setSubmitForm({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
+    } catch (error: any) {
+      console.error("Submit menu suggestion error:", error);
+      Alert.alert("Error", "Failed to submit suggestion. Please try again.");
+    }
   }
 
   const user = getCurrentUser();
