@@ -5,7 +5,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -40,12 +40,14 @@ export default function WelcomeScreen() {
             <View style={styles.cardBtns}>
               <TouchableOpacity
                 style={styles.signInBtn}
-                onPress={() => router.push('/(auth)/login')}>
+                onPress={() => router.push('/(auth)/login')}
+              >
                 <Text style={styles.signInText}>Sign In</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.signUpBtn}
-                onPress={() => router.push('/(auth)/signup')}>
+                onPress={() => router.push('/(auth)/signup')}
+              >
                 <Text style={styles.signUpText}>Sign Up</Text>
               </TouchableOpacity>
             </View>
@@ -59,12 +61,13 @@ export default function WelcomeScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Staff Portal</Text>
-                <Text style={styles.cardSub}>View orders, mark prepared, attendance</Text>
+                <Text style={styles.cardSub}>View orders and mark prepared</Text>
               </View>
             </View>
             <TouchableOpacity
               style={[styles.signInBtn, { backgroundColor: '#3498DB' }]}
-                onPress={() => router.push('/(auth)/staff-login' as any)}>
+              onPress={() => router.push('/(auth)/staff-login' as any)}
+            >
               <Text style={styles.signInText}>Staff Sign In</Text>
             </TouchableOpacity>
           </View>
@@ -82,7 +85,8 @@ export default function WelcomeScreen() {
             </View>
             <TouchableOpacity
               style={[styles.signInBtn, { backgroundColor: '#2E1A06' }]}
-              onPress={() => router.push('/(auth)/admin-login')}>
+              onPress={() => router.push('/(auth)/admin-login')}
+            >
               <Text style={styles.signInText}>Admin Sign In</Text>
             </TouchableOpacity>
           </View>
@@ -100,9 +104,12 @@ const styles = StyleSheet.create({
   inner: { flexGrow: 1, justifyContent: 'space-between', padding: 24 },
   logoBox: { alignItems: 'center', marginTop: 20, marginBottom: 10 },
   logoCircle: {
-    width: 90, height: 90, borderRadius: 45,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: '#F25C05',
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 12,
     elevation: 6,
     // @ts-ignore - web shadow
@@ -113,29 +120,41 @@ const styles = StyleSheet.create({
   appSub: { fontSize: 13, color: '#C07A20', marginTop: 4 },
   cardsBox: { gap: 16 },
   card: {
-    backgroundColor: '#fff', borderRadius: 20,
-    padding: 20, gap: 16,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    gap: 16,
     elevation: 3,
     // @ts-ignore - web shadow
     boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.08)',
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   cardIcon: {
-    width: 50, height: 50, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#2E1A06' },
   cardSub: { fontSize: 11, color: '#888', marginTop: 2 },
   cardBtns: { flexDirection: 'row', gap: 10 },
   signInBtn: {
-    flex: 1, backgroundColor: '#F25C05',
-    borderRadius: 12, padding: 13, alignItems: 'center',
+    flex: 1,
+    backgroundColor: '#F25C05',
+    borderRadius: 12,
+    padding: 13,
+    alignItems: 'center',
   },
   signInText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   signUpBtn: {
-    flex: 1, backgroundColor: '#F9F0DC',
-    borderRadius: 12, padding: 13, alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#F25C05',
+    flex: 1,
+    backgroundColor: '#F9F0DC',
+    borderRadius: 12,
+    padding: 13,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#F25C05',
   },
   signUpText: { color: '#F25C05', fontWeight: 'bold', fontSize: 14 },
   footer: { textAlign: 'center', color: '#bbb', fontSize: 11, marginTop: 16 },

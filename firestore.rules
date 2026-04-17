@@ -71,14 +71,6 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
     }
     
-    // ==================== ATTENDANCE ====================
-    match /attendance/{attendanceId} {
-      allow read: if isSignedIn() && (resource.data.staff_id == request.auth.uid || isAdmin() || isStaff());
-      allow create: if isAdmin() || isStaff();
-      allow update: if isAdmin() || isStaff();
-      allow delete: if isAdmin();
-    }
-    
     // ==================== APP SETTINGS (Admin only) ====================
     match /settings/{settingsId} {
       allow read: if isSignedIn();

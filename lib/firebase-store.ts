@@ -13,7 +13,7 @@ import {
     updateDoc,
     where,
 } from "firebase/firestore";
-import type { OrderStatus, OrderType, PaymentMethod, StaffStatus } from "../constants/order";
+import type { OrderStatus, OrderType, PaymentMethod } from "../constants/order";
 import {
     db,
     handleSdkBlocked,
@@ -97,17 +97,6 @@ export interface Favorite {
   user_id: string;
   menu_item_id: string;
   collection_id?: string;
-  created_at: Timestamp | { seconds: number };
-}
-
-export interface AttendanceRecord {
-  id: string;
-  staff_id: string;
-  staff_name: string;
-  date: string;
-  status: StaffStatus;
-  clock_in?: string;
-  clock_out?: string;
   created_at: Timestamp | { seconds: number };
 }
 
@@ -593,115 +582,6 @@ export async function moveFavoriteToCollection(userId: string, menuItemId: strin
     async () => { await updateDoc(doc(db, "favorites", fav.id), { collection_id: collectionId || null }); },
     async () => { await RestApi.updateDocument("favorites", fav.id, { collection_id: collectionId || null }); },
   );
-}
-
-// ==================== ATTENDANCE ====================
-
-export async function clockIn(staffId: string, staffName: string): Promise<void> {
-  const today = new Date().toISOString().slice(0, 10);
-  const existing = await getAttendanceForDate(staffId, today);
-  if (existing) {
-    await firestoreOp(
-      async () => { await updateDoc(doc(db, "attendance", existing.id), { status: "on_duty", clock_in: new Date().toISOString() }); },
-      async () => { await RestApi.updateDocument("attendance", existing.id, { status: "on_duty", clock_in: new Date().toISOString() }); },
-    );
-  } else {
-    const payload = {
-      staff_id: staffId,
-      staff_name: staffName,
-      date: today,
-      status: "on_duty" as StaffStatus,
-      clock_in: new Date().toISOString(),
-      created_at: new Date(),
-    };
-    await firestoreOp(
-      async () => { await addDoc(collection(db, "attendance"), payload); },
-      async () => { await RestApi.createDocument("attendance", payload); },
-    );
-  }
-}
-
-export async function clockOut(staffId: string): Promise<void> {
-  const today = new Date().toISOString().slice(0, 10);
-  const existing = await getAttendanceForDate(staffId, today);
-  if (existing) {
-    await firestoreOp(
-      async () => { await updateDoc(doc(db, "attendance", existing.id), { status: "off_duty", clock_out: new Date().toISOString() }); },
-      async () => { await RestApi.updateDocument("attendance", existing.id, { status: "off_duty", clock_out: new Date().toISOString() }); },
-    );
-  }
-}
-
-async function getAttendanceForDate(staffId: string, date: string): Promise<AttendanceRecord | null> {
-  const records = await firestoreOp(
-    async () => {
-      const q = query(
-        collection(db, "attendance"),
-        where("staff_id", "==", staffId),
-        where("date", "==", date),
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as AttendanceRecord[];
-    },
-    async () => {
-      const data = await RestApi.queryCollection("attendance", "staff_id", "==", staffId);
-      return (data as AttendanceRecord[]).filter((r) => r.date === date);
-    },
-  );
-  return records[0] || null;
-}
-
-export async function getStaffStatus(staffId: string): Promise<StaffStatus> {
-  const today = new Date().toISOString().slice(0, 10);
-  const record = await getAttendanceForDate(staffId, today);
-  return record?.status === "on_duty" ? "on_duty" : "off_duty";
-}
-
-export async function getAllAttendance(date?: string): Promise<AttendanceRecord[]> {
-  const targetDate = date || new Date().toISOString().slice(0, 10);
-  return firestoreOp(
-    async () => {
-      const q = query(collection(db, "attendance"), orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      const records = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as AttendanceRecord[];
-      return date ? records.filter((r) => r.date === targetDate) : records;
-    },
-    async () => {
-      const data = await RestApi.getCollection("attendance", "created_at");
-      const records = data as AttendanceRecord[];
-      return date ? records.filter((r) => r.date === targetDate) : records;
-    },
-  );
-}
-
-export async function getStaffAttendanceSummary(): Promise<{ staff_id: string; staff_name: string; present: number; absent: number; status: StaffStatus }[]> {
-  const allRecords = await getAllAttendance();
-  const allProfiles = await firestoreOp(
-    async () => {
-      const q = query(collection(db, "profiles"), where("role", "==", "staff"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Profile[];
-    },
-    async () => {
-      const data = await RestApi.getCollection("profiles", "created_at");
-      return (data as Profile[]).filter((p) => p.role === "staff");
-    },
-  );
-
-  const today = new Date().toISOString().slice(0, 10);
-  return allProfiles.map((staff) => {
-    const staffRecords = allRecords.filter((r) => r.staff_id === staff.id);
-    const todayRecord = staffRecords.find((r) => r.date === today);
-    const present = staffRecords.filter((r) => r.status === "on_duty" || r.clock_in).length;
-    const uniqueDates = new Set(staffRecords.map((r) => r.date));
-    return {
-      staff_id: staff.id,
-      staff_name: staff.username,
-      present,
-      absent: Math.max(0, 30 - present),
-      status: todayRecord?.status === "on_duty" ? "on_duty" as StaffStatus : "off_duty" as StaffStatus,
-    };
-  });
 }
 
 // ==================== SETTINGS ====================

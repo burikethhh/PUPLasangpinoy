@@ -67,10 +67,6 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   customer: "Customer",
 };
 
-export const STAFF_STATUSES = ["on_duty", "off_duty"] as const;
-
-export type StaffStatus = (typeof STAFF_STATUSES)[number];
-
 export const LOW_STOCK_THRESHOLD = 10;
 
 export const MENU_CATEGORIES = [

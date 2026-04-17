@@ -10,15 +10,13 @@ import { createStaffAccount, getAllUsers, logOut, type Profile } from "../../lib
 import {
     getOrders,
     getSettings,
-    getStaffAttendanceSummary,
     updateSettings,
-    type AppSettings, type Order,
+    type Order,
 } from "../../lib/firebase-store";
 
 export default function AdminMoreScreen() {
   const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [staff, setStaff] = useState<{ staff_id: string; staff_name: string; present: number; status: string }[]>([]);
+  const [staff, setStaff] = useState<Profile[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [saving, setSaving] = useState(false);
@@ -34,14 +32,14 @@ export default function AdminMoreScreen() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [s, st, u, o] = await Promise.all([
-        getSettings(), getStaffAttendanceSummary(), getAllUsers(), getOrders(),
+      const [s, u, o] = await Promise.all([
+        getSettings(), getAllUsers(), getOrders(),
       ]);
-      setSettings(s);
       setDeliveryFee(s.delivery_fee.toString());
       setGcashEnabled(s.gcash_enabled);
       setGcashNumber(s.gcash_number || "");
-      setStaff(st);
+      const staffUsers = u.filter((x) => x.role === "staff");
+      setStaff(staffUsers);
       setUsers(u);
       setOrders(o);
     } catch (e) { console.error(e); }
@@ -82,7 +80,7 @@ export default function AdminMoreScreen() {
     }
     setCreatingStaff(true);
     try {
-      const result = await createStaffAccount(staffForm.email.trim(), staffForm.password, staffForm.name.trim(), staffForm.phone.trim());
+      await createStaffAccount(staffForm.email.trim(), staffForm.password, staffForm.name.trim(), staffForm.phone.trim());
       Alert.alert("Success", `Staff account created for ${staffForm.name.trim()}!\n\nNote: You will need to log in again as admin.`);
       setStaffModal(false);
       setStaffForm({ name: "", email: "", password: "", phone: "" });
@@ -145,10 +143,10 @@ export default function AdminMoreScreen() {
             <Text style={styles.emptyText}>No staff registered</Text>
           ) : (
             staff.map((s) => (
-              <View key={s.staff_id} style={styles.staffRow}>
-                <View style={[styles.statusDot, { backgroundColor: s.status === "on_duty" ? "#27AE60" : "#95A5A6" }]} />
-                <Text style={styles.staffName}>{s.staff_name}</Text>
-                <Text style={styles.staffInfo}>{s.present} days present</Text>
+              <View key={s.id} style={styles.staffRow}>
+                <View style={[styles.statusDot, { backgroundColor: "#3498DB" }]} />
+                <Text style={styles.staffName}>{s.username || s.email?.split("@")[0]}</Text>
+                <Text style={styles.staffInfo}>{s.phone || "staff"}</Text>
               </View>
             ))
           )}

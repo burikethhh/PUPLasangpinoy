@@ -10,7 +10,6 @@ import type { OrderStatus } from "../../constants/order";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "../../constants/order";
 import { logOut } from "../../lib/firebase";
 import {
-    getAllAttendance,
     getConversations,
     getMenuItems,
     getOrders,
@@ -21,7 +20,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalOrders: 0, pendingOrders: 0, todayOrders: 0,
-    menuItems: 0, unreadMessages: 0, staffOnDuty: 0,
+    menuItems: 0, unreadMessages: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [ordersByStatus, setOrdersByStatus] = useState<Record<string, number>>({});
@@ -31,8 +30,8 @@ export default function AdminDashboard() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [orders, menu, convos, attendance] = await Promise.all([
-        getOrders(), getMenuItems(), getConversations(), getAllAttendance(),
+      const [orders, menu, convos] = await Promise.all([
+        getOrders(), getMenuItems(), getConversations(),
       ]);
 
       const today = new Date().toISOString().slice(0, 10);
@@ -45,7 +44,6 @@ export default function AdminDashboard() {
       orders.forEach((o) => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
 
       const unread = convos.reduce((s, c) => s + (c.unread || 0), 0);
-      const onDuty = attendance.filter((a) => a.status === "on_duty").length;
 
       setStats({
         totalOrders: orders.length,
@@ -53,7 +51,6 @@ export default function AdminDashboard() {
         todayOrders: todayOrderCount,
         menuItems: menu.length,
         unreadMessages: unread,
-        staffOnDuty: onDuty,
       });
       setOrdersByStatus(statusCounts);
       setRecentOrders(orders.slice(0, 5));
@@ -108,10 +105,6 @@ export default function AdminDashboard() {
               <View style={styles.quickCard}>
                 <Ionicons name="chatbubbles" size={18} color="#3498DB" />
                 <Text style={styles.quickText}>{stats.unreadMessages} unread messages</Text>
-              </View>
-              <View style={styles.quickCard}>
-                <Ionicons name="people" size={18} color="#27AE60" />
-                <Text style={styles.quickText}>{stats.staffOnDuty} staff on duty</Text>
               </View>
             </View>
 

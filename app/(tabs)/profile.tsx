@@ -13,7 +13,6 @@ import {
     deleteMyAccount, getCurrentUser, getProfile as getFirebaseProfile,
     logOut, updateMyProfile, type Profile,
 } from "../../lib/firebase";
-import { getMenuItems, type MenuItem } from "../../lib/firebase-store";
 import { analyzeImageWithQwen } from "../../lib/qwen-ai";
 
 const FIRESTORE_DATABASE_ID =
@@ -27,9 +26,6 @@ export default function ProfileScreen() {
   const [scanImage, setScanImage] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [ingredientsModal, setIngredientsModal] = useState(false);
-  const [ingredientItems, setIngredientItems] = useState<MenuItem[]>([]);
-  const [ingredientLoading, setIngredientLoading] = useState(false);
   const [submitModal, setSubmitModal] = useState(false);
   const [submitForm, setSubmitForm] = useState({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
 
@@ -169,16 +165,6 @@ export default function ProfileScreen() {
     }
   }
 
-  async function openIngredients() {
-    setIngredientsModal(true);
-    setIngredientLoading(true);
-    try {
-      const items = await getMenuItems();
-      setIngredientItems(items);
-    } catch (e) { console.error(e); }
-    setIngredientLoading(false);
-  }
-
   function handleSubmitMenu() {
     setSubmitForm({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
     setSubmitModal(true);
@@ -292,16 +278,6 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.exploreRow} onPress={openIngredients}>
-            <View style={[styles.exploreIcon, { backgroundColor: "#27AE6022" }]}>
-              <Ionicons name="leaf" size={20} color="#27AE60" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.exploreName}>Ingredients</Text>
-              <Text style={styles.exploreSub}>Browse ingredients used in our dishes</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#ccc" />
-          </TouchableOpacity>
           <TouchableOpacity style={[styles.exploreRow, { borderBottomWidth: 0 }]} onPress={handleSubmitMenu}>
             <View style={[styles.exploreIcon, { backgroundColor: "#F39C1222" }]}>
               <Ionicons name="add-circle" size={20} color="#F39C12" />
@@ -325,7 +301,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.0.0</Text>
+        <Text style={styles.version}>Version 2.2.4</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
@@ -380,43 +356,6 @@ export default function ProfileScreen() {
               ) : scanResult ? (
                 <Text style={styles.scanResultText}>{scanResult}</Text>
               ) : null}
-            </View>
-          </View>
-        </Modal>
-
-        {/* Ingredients Modal */}
-        <Modal visible={ingredientsModal} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { maxHeight: "80%" }]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Ingredients</Text>
-                <TouchableOpacity onPress={() => setIngredientsModal(false)}>
-                  <Ionicons name="close" size={24} color="#888" />
-                </TouchableOpacity>
-              </View>
-              {ingredientLoading ? (
-                <ActivityIndicator size="large" color="#F25C05" style={{ marginVertical: 30 }} />
-              ) : (
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  {ingredientItems.map((item) => (
-                    <View key={item.id} style={styles.ingredientCard}>
-                      {item.image_url ? (
-                        <Image source={{ uri: item.image_url }} style={styles.ingredientImg} contentFit="cover" />
-                      ) : (
-                        <View style={[styles.ingredientImgPlaceholder, { backgroundColor: "#F25C0522" }]}>
-                          <Text style={{ fontSize: 18 }}>🍽️</Text>
-                        </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "bold", color: "#2E1A06" }}>{item.name}</Text>
-                        <Text style={{ fontSize: 11, color: "#888" }}>{item.category}</Text>
-                        {item.description ? <Text style={{ fontSize: 12, color: "#666", marginTop: 2 }} numberOfLines={2}>{item.description}</Text> : null}
-                      </View>
-                    </View>
-                  ))}
-                  {ingredientItems.length === 0 && <Text style={{ color: "#aaa", textAlign: "center", marginVertical: 20 }}>No menu items found.</Text>}
-                </ScrollView>
-              )}
             </View>
           </View>
         </Modal>
@@ -515,9 +454,6 @@ const styles = StyleSheet.create({
   exploreSub: { fontSize: 11, color: "#888", marginTop: 2 },
   scanImg: { width: "100%", height: 200, borderRadius: 12, marginBottom: 12 },
   scanResultText: { fontSize: 14, color: "#333", lineHeight: 20 },
-  ingredientCard: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
-  ingredientImg: { width: 44, height: 44, borderRadius: 10 },
-  ingredientImgPlaceholder: { width: 44, height: 44, borderRadius: 10, justifyContent: "center", alignItems: "center" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "#ddd", backgroundColor: "#fff" },
   chipActive: { borderColor: "#F25C05", backgroundColor: "#FEF3EC" },

@@ -49,19 +49,6 @@ export default function StaffLayout() {
         tabBarStyle: { backgroundColor: "#fff", borderTopColor: "#f0e8d0" },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Orders",
-          tabBarIcon: ({ color }) => <Ionicons name="receipt" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="attendance"
-        options={{
-          title: "Attendance",
-          tabBarIcon: ({ color }) => <Ionicons name="time" size={22} color={color} />,
-        }}
       />
       <Tabs.Screen
         name="profile"
