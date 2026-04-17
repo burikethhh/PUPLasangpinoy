@@ -10,6 +10,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MENU_CATEGORIES, MENU_CATEGORY_COLORS } from "../../constants/order";
 import {
+    addCategory as addCategoryDoc,
+    deleteCategory as deleteCategoryDoc,
+    getCategories as getCategoriesDoc,
+    updateCategory as updateCategoryDoc,
+    type Category,
+} from "../../lib/firebase";
+import {
     addMenuItem,
     deleteMenuItem,
     getMenuItems,
@@ -24,6 +31,7 @@ const EMPTY_FORM = {
 
 export default function AdminMenuScreen() {
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -32,12 +40,25 @@ export default function AdminMenuScreen() {
   const [saving, setSaving] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const [showCustomCat, setShowCustomCat] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryForm, setCategoryForm] = useState({ name: "", color: "#F25C05" });
+  const [savingCategory, setSavingCategory] = useState(false);
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
   async function load() {
     setLoading(true);
-    try { setItems(await getMenuItems()); } catch (e) { console.error(e); }
+    try {
+      const [menuItems, categoryDocs] = await Promise.all([
+        getMenuItems(),
+        getCategoriesDoc(),
+      ]);
+      setItems(menuItems);
+      setCategories(categoryDocs);
+    } catch (e) {
+      console.error(e);
+    }
     setLoading(false);
   }
 
@@ -87,13 +108,86 @@ export default function AdminMenuScreen() {
     ]);
   }
 
+  function openCategoryModal() {
+    setCategoryModalVisible(true);
+    setEditingCategory(null);
+    setCategoryForm({ name: "", color: "#F25C05" });
+  }
+
+  function startEditCategory(category: Category) {
+    setEditingCategory(category);
+    setCategoryForm({ name: category.name || "", color: category.color || "#F25C05" });
+  }
+
+  async function saveCategory() {
+    if (!categoryForm.name.trim()) {
+      Alert.alert("Error", "Category name is required.");
+      return;
+    }
+
+    setSavingCategory(true);
+    try {
+      if (editingCategory) {
+        await updateCategoryDoc(editingCategory.id, {
+          name: categoryForm.name.trim(),
+          color: categoryForm.color.trim() || "#F25C05",
+        });
+      } else {
+        await addCategoryDoc(
+          categoryForm.name.trim(),
+          categoryForm.color.trim() || "#F25C05",
+        );
+      }
+      setEditingCategory(null);
+      setCategoryForm({ name: "", color: "#F25C05" });
+      await load();
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to save category.");
+    }
+    setSavingCategory(false);
+  }
+
+  function removeCategory(category: Category) {
+    Alert.alert(
+      "Delete Category",
+      `Delete category "${category.name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteCategoryDoc(category.id);
+              await load();
+            } catch (e: any) {
+              Alert.alert("Error", e.message || "Failed to delete category.");
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  const categoryOptions = Array.from(
+    new Set([
+      ...MENU_CATEGORIES,
+      ...categories.map((c) => c.name).filter(Boolean),
+    ]),
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Menu Management</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
-          <Ionicons name="add" size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={[styles.addBtn, styles.categoryBtn]} onPress={openCategoryModal}>
+            <Ionicons name="pricetags" size={18} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
+            <Ionicons name="add" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -168,7 +262,7 @@ export default function AdminMenuScreen() {
                 placeholder="0.00" placeholderTextColor="#aaa" />
               <Text style={styles.label}>Category</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-                {MENU_CATEGORIES.map((c) => (
+                {categoryOptions.map((c) => (
                   <TouchableOpacity key={c}
                     style={[styles.chip, form.category === c && styles.chipActive]}
                     onPress={() => { setForm((f) => ({ ...f, category: c })); setShowCustomCat(false); }}>
@@ -229,6 +323,77 @@ export default function AdminMenuScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Category Manager Modal */}
+      <Modal visible={categoryModalVisible} animationType="slide" transparent>
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Category Manager</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setCategoryModalVisible(false);
+                    setEditingCategory(null);
+                    setCategoryForm({ name: "", color: "#F25C05" });
+                  }}>
+                  <Ionicons name="close" size={24} color="#888" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.label}>{editingCategory ? "Edit Category" : "New Category"}</Text>
+              <TextInput
+                style={styles.input}
+                value={categoryForm.name}
+                onChangeText={(v) => setCategoryForm((f) => ({ ...f, name: v }))}
+                placeholder="Category name"
+                placeholderTextColor="#aaa"
+              />
+
+              <Text style={styles.label}>Color (Hex)</Text>
+              <TextInput
+                style={styles.input}
+                value={categoryForm.color}
+                onChangeText={(v) => setCategoryForm((f) => ({ ...f, color: v }))}
+                placeholder="#F25C05"
+                placeholderTextColor="#aaa"
+                autoCapitalize="none"
+              />
+
+              <TouchableOpacity
+                style={[styles.saveBtn, savingCategory && { opacity: 0.6 }]}
+                onPress={saveCategory}
+                disabled={savingCategory}>
+                {savingCategory ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveBtnText}>{editingCategory ? "Update Category" : "Add Category"}</Text>
+                )}
+              </TouchableOpacity>
+
+              <Text style={styles.manageSectionTitle}>Existing Categories</Text>
+              {categories.length === 0 ? (
+                <Text style={styles.emptyText}>No categories yet</Text>
+              ) : (
+                categories.map((category) => (
+                  <View key={category.id} style={styles.categoryRow}>
+                    <View style={[styles.colorDot, { backgroundColor: category.color || "#F25C05" }]} />
+                    <Text style={styles.categoryName}>{category.name}</Text>
+                    <View style={styles.categoryActions}>
+                      <TouchableOpacity onPress={() => startEditCategory(category)} style={styles.iconBtn}>
+                        <Ionicons name="pencil" size={16} color="#3498DB" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => removeCategory(category)} style={styles.iconBtn}>
+                        <Ionicons name="trash" size={16} color="#E74C3C" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -237,7 +402,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, paddingBottom: 8 },
   title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06" },
+  headerActions: { flexDirection: "row", gap: 8 },
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#F25C05", justifyContent: "center", alignItems: "center" },
+  categoryBtn: { backgroundColor: "#3498DB" },
   card: { backgroundColor: "#fff", borderRadius: 16, padding: 14, marginBottom: 12, elevation: 2 },
   cardRow: { flexDirection: "row", alignItems: "center" },
   cardImg: { width: 56, height: 56, borderRadius: 12 },
@@ -265,6 +432,18 @@ const styles = StyleSheet.create({
   toggleText: { fontSize: 14, color: "#333" },
   saveBtn: { backgroundColor: "#F25C05", borderRadius: 12, padding: 14, alignItems: "center", marginTop: 16 },
   saveBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  manageSectionTitle: { fontSize: 14, fontWeight: "700", color: "#2E1A06", marginTop: 16, marginBottom: 8 },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f0e5",
+  },
+  colorDot: { width: 12, height: 12, borderRadius: 6 },
+  categoryName: { flex: 1, fontSize: 13, color: "#2E1A06", fontWeight: "600" },
+  categoryActions: { flexDirection: "row", gap: 8 },
   imagePickRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   galleryBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#3498DB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
   galleryBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },

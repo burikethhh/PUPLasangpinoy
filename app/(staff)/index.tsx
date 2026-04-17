@@ -2,12 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator, Alert, FlatList, RefreshControl,
-  StyleSheet, Text, TouchableOpacity, View,
+    ActivityIndicator, Alert, FlatList, RefreshControl,
+    StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_TYPE_LABELS } from "../../constants/order";
 import type { OrderStatus } from "../../constants/order";
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_TYPE_LABELS } from "../../constants/order";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
 import { getOrders, updateOrderStatus, type Order } from "../../lib/firebase-store";
 
@@ -158,11 +158,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
   filterRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 8 },
   filterPill: {
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22,
     backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd",
   },
   filterPillActive: { backgroundColor: "#3498DB", borderColor: "#3498DB" },
-  filterText: { fontSize: 13, color: "#666" },
+  filterText: { fontSize: 14, color: "#666", fontWeight: "600" },
   filterTextActive: { color: "#fff", fontWeight: "bold" },
   card: {
     backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12,

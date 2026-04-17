@@ -315,11 +315,6 @@ export async function createStaffAccount(
   username: string,
   phone?: string,
 ) {
-  // Save current admin user credentials to re-authenticate later
-  const adminUser = auth.currentUser;
-  let adminEmail: string | null = null;
-  let adminPassword: string | null = null;
-  
   // Note: We cannot retrieve the admin's password from Firebase Auth for security reasons
   // The admin will need to re-login after creating a staff account
   // This is a Firebase limitation - we'll handle it gracefully
@@ -346,6 +341,11 @@ export async function createStaffAccount(
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const staffUid = userCredential.user.uid;
 
+  // Refresh REST auth token to the newly-created staff user context
+  // so profile creation works consistently across SDK/REST fallback paths.
+  const token = await userCredential.user.getIdToken(true);
+  RestApi.setAuthToken(token);
+
   // Create staff profile
   const profileData = {
     email,
@@ -357,11 +357,19 @@ export async function createStaffAccount(
     created_at: new Date(),
   };
 
-  // Use REST API to create profile so we don't depend on auth state
-  await RestApi.setDocument("profiles", staffUid, profileData);
+  try {
+    await setDoc(doc(db, "profiles", staffUid), {
+      ...profileData,
+      created_at: createTimestamp(),
+    });
+  } catch (error) {
+    markSdkBlocked(error);
+    await RestApi.setDocument("profiles", staffUid, profileData);
+  }
 
   // Sign out the newly created staff user
   await signOut(auth);
+  RestApi.setAuthToken(null);
 
   // Return info about the created staff account
   return { staffUid, email, needsReauth: true };
@@ -1219,6 +1227,23 @@ export async function setUserAdmin(userId: string, isAdminValue: boolean) {
     return RestApi.updateDocument("profiles", userId, {
       is_admin: isAdminValue,
     });
+  }
+}
+
+export async function updateUserByAdmin(
+  userId: string,
+  data: Partial<Pick<Profile, "username" | "phone" | "address" | "role" | "is_admin">>,
+) {
+  if (useRestApi) {
+    return RestApi.updateDocument("profiles", userId, data);
+  }
+
+  try {
+    const docRef = doc(db, "profiles", userId);
+    return updateDoc(docRef, data as any);
+  } catch (error) {
+    markSdkBlocked(error);
+    return RestApi.updateDocument("profiles", userId, data);
   }
 }
 

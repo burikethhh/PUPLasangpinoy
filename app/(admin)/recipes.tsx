@@ -23,16 +23,16 @@ export default function AdminOrders() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  useFocusEffect(useCallback(() => { fetchOrders(); }, []));
-
-  async function fetchOrders() {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getOrders(filter === "all" ? undefined : { status: filter });
       setOrders(data);
     } catch (e) { console.error(e); }
     setLoading(false);
-  }
+  }, [filter]);
+
+  useFocusEffect(useCallback(() => { fetchOrders(); }, [fetchOrders]));
 
   async function onRefresh() {
     setRefreshing(true);
@@ -192,10 +192,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
   filterRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
   filterChip: {
-    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 22,
     borderWidth: 1, borderColor: "#ddd", backgroundColor: "#fff",
   },
-  filterText: { fontSize: 12, color: "#888" },
+  filterText: { fontSize: 13, color: "#888", fontWeight: "600" },
   card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12, elevation: 2 },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   orderNum: { fontSize: 16, fontWeight: "bold", color: "#2E1A06" },

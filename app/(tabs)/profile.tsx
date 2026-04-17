@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
@@ -94,14 +95,9 @@ export default function ProfileScreen() {
     setScanning(true);
 
     try {
-      // Convert image to base64
-      const base64 = await fetch(uri).then(r => r.arrayBuffer()).then(buffer => {
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        return btoa(binary);
+      // Convert image to base64 (native implementation is faster and avoids UI lockups)
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: "base64" as any,
       });
 
       // Call AI API to analyze the image
@@ -354,7 +350,9 @@ export default function ProfileScreen() {
                   <Text style={{ color: "#888", marginTop: 10 }}>Analyzing image...</Text>
                 </View>
               ) : scanResult ? (
-                <Text style={styles.scanResultText}>{scanResult}</Text>
+                <ScrollView style={styles.scanResultScroll} showsVerticalScrollIndicator>
+                  <Text style={styles.scanResultText}>{scanResult}</Text>
+                </ScrollView>
               ) : null}
             </View>
           </View>
@@ -453,6 +451,7 @@ const styles = StyleSheet.create({
   exploreName: { fontSize: 14, fontWeight: "bold", color: "#2E1A06" },
   exploreSub: { fontSize: 11, color: "#888", marginTop: 2 },
   scanImg: { width: "100%", height: 200, borderRadius: 12, marginBottom: 12 },
+  scanResultScroll: { maxHeight: 280 },
   scanResultText: { fontSize: 14, color: "#333", lineHeight: 20 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "#ddd", backgroundColor: "#fff" },

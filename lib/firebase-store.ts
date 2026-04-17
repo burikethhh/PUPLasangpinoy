@@ -593,7 +593,7 @@ export async function getSettings(): Promise<AppSettings> {
     delivery_fee: 50,
     gcash_enabled: false,
     gcash_number: "",
-    store_name: "LasangPinoy",
+    store_name: "FOODFIX",
     store_address: "",
     store_phone: "",
   };

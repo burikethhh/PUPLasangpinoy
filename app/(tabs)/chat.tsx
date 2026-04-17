@@ -96,7 +96,7 @@ export default function ChatScreen() {
             <Ionicons name="storefront" size={22} color="#F25C05" />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Lasang Pinoy</Text>
+              <Text style={styles.headerTitle}>FOODFIX</Text>
             <Text style={styles.headerSub}>Message the store</Text>
           </View>
         </View>

@@ -19,7 +19,7 @@ export default function WelcomeScreen() {
           <View style={styles.logoCircle}>
             <Text style={styles.logoEmoji}>🍽️</Text>
           </View>
-          <Text style={styles.appName}>Lasang Pinoy</Text>
+          <Text style={styles.appName}>FOODFIX</Text>
           <Text style={styles.appSub}>Filipino Food Ordering System</Text>
         </View>
 
@@ -93,7 +93,7 @@ export default function WelcomeScreen() {
 
         </View>
 
-        <Text style={styles.footer}>Lasang Pinoy  2026</Text>
+        <Text style={styles.footer}>FOODFIX  2026</Text>
       </ScrollView>
     </SafeAreaView>
   );

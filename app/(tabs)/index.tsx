@@ -37,15 +37,17 @@ export default function MenuScreen() {
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => { fetchMenu(); }, []));
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchMenu(); }, [activeCategory]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => fetchMenu(), 400);
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
-  }, [search]);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchMenu() {
     setLoading(true);
@@ -53,7 +55,7 @@ export default function MenuScreen() {
       const data = await getMenuItems({
         category: activeCategory || undefined,
         search: search || undefined,
-        availableOnly: true,
+        availableOnly: false,
       });
       setItems(data);
     } catch (error) {
@@ -101,7 +103,7 @@ export default function MenuScreen() {
         {/* TOP BAR */}
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.appTitle}>Lasang Pinoy</Text>
+            <Text style={styles.appTitle}>FOODFIX</Text>
             <Text style={styles.appSub}>Filipino Food Ordering</Text>
           </View>
         </View>
@@ -148,6 +150,7 @@ export default function MenuScreen() {
           <View style={styles.grid}>
             {items.map((item) => {
               const color = MENU_CATEGORY_COLORS[item.category] || "#F25C05";
+              const unavailable = !item.available || item.stock_quantity <= 0;
               return (
                 <View key={item.id} style={styles.menuCard}>
                   {item.image_url ? (
@@ -164,6 +167,12 @@ export default function MenuScreen() {
                     <Text style={styles.catTagText}>{item.category}</Text>
                   </View>
 
+                  {!item.available && (
+                    <View style={styles.unavailableBadge}>
+                      <Text style={styles.unavailableBadgeText}>Unavailable</Text>
+                    </View>
+                  )}
+
                   {/* Favorite button */}
                   <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
                     <Ionicons name={favIds.has(item.id) ? "heart" : "heart-outline"}
@@ -177,14 +186,21 @@ export default function MenuScreen() {
                     ) : null}
                     <View style={styles.priceRow}>
                       <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
-                      <Text style={styles.stock}>
-                        {item.stock_quantity > 0 ? `${item.stock_quantity} left` : "Sold out"}
+                      <Text style={[styles.stock, unavailable && styles.stockUnavailable]}>
+                        {!item.available
+                          ? "Unavailable"
+                          : item.stock_quantity > 0
+                            ? `${item.stock_quantity} left`
+                            : "Sold out"}
                       </Text>
                     </View>
-                    <TouchableOpacity style={styles.addBtn} onPress={() => addToCart(item)}
-                      disabled={item.stock_quantity <= 0}>
+                    <TouchableOpacity
+                      style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
+                      onPress={() => addToCart(item)}
+                      disabled={unavailable}
+                    >
                       <Ionicons name="cart-outline" size={14} color="#fff" />
-                      <Text style={styles.addBtnText}>Add to Cart</Text>
+                      <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -235,6 +251,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
   },
   catTagText: { fontSize: 9, color: "#fff", fontWeight: "bold" },
+  unavailableBadge: {
+    position: "absolute",
+    top: 8,
+    right: 40,
+    backgroundColor: "#E74C3C",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  unavailableBadgeText: { fontSize: 9, color: "#fff", fontWeight: "bold" },
   favBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "#fff", borderRadius: 14, padding: 4 },
   cardBottom: { padding: 10 },
   itemName: { fontSize: 13, fontWeight: "bold", color: "#2E1A06", marginBottom: 2 },
@@ -242,10 +268,12 @@ const styles = StyleSheet.create({
   priceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   price: { fontSize: 15, fontWeight: "bold", color: "#F25C05" },
   stock: { fontSize: 10, color: "#888" },
+  stockUnavailable: { color: "#E74C3C", fontWeight: "600" },
   addBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4,
     backgroundColor: "#F25C05", borderRadius: 10, paddingVertical: 8,
   },
+  addBtnDisabled: { backgroundColor: "#BDBDBD" },
   addBtnText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
   noResults: { textAlign: "center", color: "#aaa", marginTop: 8 },
 });

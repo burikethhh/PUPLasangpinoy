@@ -74,7 +74,7 @@ export default function PoliciesScreen() {
         <View style={styles.introCard}>
           <Ionicons name="shield-checkmark" size={18} color="#4A8FE7" />
           <Text style={styles.introText}>
-            These policies define how the Lasang Pinoy system should be used and managed.
+            These policies define how the FOODFIX system should be used and managed.
           </Text>
         </View>
 

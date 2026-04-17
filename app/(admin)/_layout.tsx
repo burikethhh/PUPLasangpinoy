@@ -52,13 +52,16 @@ export default function AdminLayout() {
         title: "Messages",
         tabBarIcon: ({ color }) => <Ionicons name="chatbubbles" size={22} color={color} />,
       }} />
+      <Tabs.Screen name="submissions" options={{
+        title: "Suggestions",
+        tabBarIcon: ({ color }) => <Ionicons name="bulb" size={22} color={color} />,
+      }} />
       <Tabs.Screen name="users" options={{
         title: "More",
         tabBarIcon: ({ color }) => <Ionicons name="ellipsis-horizontal" size={22} color={color} />,
       }} />
       {/* Hide old screens from tab bar */}
       <Tabs.Screen name="regions" options={{ href: null }} />
-      <Tabs.Screen name="submissions" options={{ href: null }} />
       <Tabs.Screen name="nutrition" options={{ href: null }} />
     </Tabs>
   );

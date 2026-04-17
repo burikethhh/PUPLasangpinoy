@@ -18,7 +18,7 @@ service cloud.firestore {
     // ==================== PROFILES ====================
     match /profiles/{userId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow update: if isOwner(userId) && request.resource.data.is_admin == resource.data.is_admin || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
     }
@@ -41,9 +41,14 @@ service cloud.firestore {
     
     // ==================== MESSAGES ====================
     match /messages/{messageId} {
-      allow read: if isSignedIn() && (resource.data.sender_id == request.auth.uid || isAdmin() || isStaff());
-      allow create: if isSignedIn();
-      allow update: if false;
+      allow read: if isSignedIn() && (resource.data.conversation_id == request.auth.uid || isAdmin() || isStaff());
+      allow create: if isSignedIn()
+        && request.resource.data.sender_id == request.auth.uid
+        && request.resource.data.conversation_id is string
+        && request.resource.data.content is string;
+      allow update: if isSignedIn()
+        && (resource.data.conversation_id == request.auth.uid || isAdmin() || isStaff())
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read']);
       allow delete: if isAdmin();
     }
     

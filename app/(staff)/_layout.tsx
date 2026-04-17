@@ -1,14 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, router } from "expo-router";
 import { useEffect, useState } from "react";
-import { View, ActivityIndicator } from "react-native";
-import { onAuthChange, getProfile } from "../../lib/firebase";
+import { ActivityIndicator, View } from "react-native";
+import { getProfile, onAuthChange } from "../../lib/firebase";
 
 export default function StaffLayout() {
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const unsubscribe = onAuthChange(async (user) => {
       try {
         if (!user) {
@@ -16,20 +17,22 @@ export default function StaffLayout() {
           return;
         }
         const profile = await getProfile(user.uid);
-        if (profile?.role !== "staff") {
+        if (profile?.role !== "staff" && profile?.role !== "admin") {
           router.replace("/(auth)/welcome");
           return;
         }
-        setAuthorized(true);
+        if (mounted) setAuthorized(true);
       } catch (error) {
         console.error("Staff check failed:", error);
         router.replace("/(auth)/welcome");
       } finally {
-        setChecking(false);
-        unsubscribe();
+        if (mounted) setChecking(false);
       }
     });
-    return () => unsubscribe();
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   if (checking || !authorized) {
@@ -49,6 +52,12 @@ export default function StaffLayout() {
         tabBarStyle: { backgroundColor: "#fff", borderTopColor: "#f0e8d0" },
       }}
     >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Orders",
+          tabBarIcon: ({ color }) => <Ionicons name="receipt" size={22} color={color} />,
+        }}
       />
       <Tabs.Screen
         name="profile"
@@ -57,6 +66,7 @@ export default function StaffLayout() {
           tabBarIcon: ({ color }) => <Ionicons name="person" size={22} color={color} />,
         }}
       />
+      <Tabs.Screen name="attendance" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -4,16 +4,19 @@ import { Image } from "expo-image";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator, Alert, FlatList, Modal, RefreshControl,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+    ActivityIndicator, Alert, FlatList, Modal, RefreshControl,
+    StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MENU_CATEGORY_COLORS } from "../../constants/order";
 import { getCurrentUser } from "../../lib/firebase";
 import {
-  getFavorites, getMenuItem, removeFavorite,
-  getFavoriteCollections, createFavoriteCollection, moveFavoriteToCollection,
-  type MenuItem,
+    createFavoriteCollection,
+    getFavoriteCollections,
+    getFavorites, getMenuItem,
+    moveFavoriteToCollection,
+    removeFavorite,
+    type MenuItem,
 } from "../../lib/firebase-store";
 
 const CART_KEY = "@lasangpinoy_cart";
@@ -129,13 +132,14 @@ export default function FavoritesScreen() {
         contentContainerStyle={styles.tabsRow}
         renderItem={({ item: col }) => {
           const active = activeCollection === col.id;
+          const isAll = !col.id;
           return (
             <TouchableOpacity
-              style={[styles.tabBtn, active && styles.tabBtnActive]}
+              style={[styles.tabBtn, isAll && styles.tabBtnAll, active && styles.tabBtnActive]}
               onPress={() => setActiveCollection(col.id)}>
               <Ionicons name={col.id ? "folder" : "heart"} size={14}
                 color={active ? "#fff" : "#888"} />
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>
+              <Text style={[styles.tabText, isAll && styles.tabTextAll, active && styles.tabTextActive]}>
                 {col.name} ({col.count})
               </Text>
             </TouchableOpacity>
@@ -252,8 +256,10 @@ const styles = StyleSheet.create({
   addFolderText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
   tabsRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   tabBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd" },
+  tabBtnAll: { paddingHorizontal: 10, paddingVertical: 6 },
   tabBtnActive: { backgroundColor: "#F25C05", borderColor: "#F25C05" },
   tabText: { fontSize: 12, color: "#888" },
+  tabTextAll: { fontSize: 11 },
   tabTextActive: { color: "#fff", fontWeight: "bold" },
   card: { backgroundColor: "#fff", borderRadius: 16, padding: 14, marginBottom: 12, elevation: 2 },
   cardRow: { flexDirection: "row", alignItems: "center" },

@@ -1,33 +1,33 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
-    getRedirectResult,
-    signInWithPopup,
-    signInWithRedirect,
+  getRedirectResult,
+  signInWithPopup,
+  signInWithRedirect,
 } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-    auth,
-    facebookProvider,
-    getProfile,
-    googleProvider,
-    resetPassword,
-    setRestTokenFromUser,
-    signIn,
+  auth,
+  facebookProvider,
+  getProfile,
+  googleProvider,
+  resetPassword,
+  setRestTokenFromUser,
+  signIn,
 } from "../../lib/firebase";
 
 export default function LoginScreen() {
@@ -46,12 +46,18 @@ export default function LoginScreen() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
 
-  // Check for redirect result on mount (for OAuth)
-  useEffect(() => {
-    checkRedirectResult();
+  const handleAuthSuccess = useCallback(async (userId: string) => {
+    const profile = await getProfile(userId);
+    if (profile?.is_admin) {
+      router.replace("/(admin)");
+    } else if (profile?.role === "staff") {
+      router.replace("/(staff)" as any);
+    } else {
+      router.replace("/(tabs)");
+    }
   }, []);
 
-  async function checkRedirectResult() {
+  const checkRedirectResult = useCallback(async () => {
     try {
       const result = await getRedirectResult(auth);
       if (result?.user) {
@@ -62,18 +68,12 @@ export default function LoginScreen() {
     } catch (error: any) {
       console.error("Redirect result error:", error);
     }
-  }
+  }, [handleAuthSuccess]);
 
-  async function handleAuthSuccess(userId: string) {
-    const profile = await getProfile(userId);
-    if (profile?.is_admin) {
-      router.replace("/(admin)");
-    } else if (profile?.role === "staff") {
-      router.replace("/(staff)" as any);
-    } else {
-      router.replace("/(tabs)");
-    }
-  }
+  // Check for redirect result on mount (for OAuth)
+  useEffect(() => {
+    checkRedirectResult();
+  }, [checkRedirectResult]);
 
   function validate() {
     const newErrors: { email?: string; password?: string } = {};

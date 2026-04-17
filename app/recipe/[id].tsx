@@ -93,7 +93,7 @@ export default function RecipeDetail() {
     fetchRecipeData();
     fetchFeedbackData(); // load reviews for everyone, auth or not
     checkUser();
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function checkUser() {
     const user = getCurrentUser();
@@ -289,7 +289,7 @@ export default function RecipeDetail() {
                 try {
                   await Share.share({
                     title: recipe.title,
-                    message: `🍽️ ${recipe.title}\n\n📍 ${recipe.region || "Filipino Cuisine"}\n📂 ${recipe.category}\n\n🧾 Ingredients:\n${recipe.ingredients}\n\nShared from LasangPinoy 🇵🇭`,
+                    message: `🍽️ ${recipe.title}\n\n📍 ${recipe.region || "Filipino Cuisine"}\n📂 ${recipe.category}\n\n🧾 Ingredients:\n${recipe.ingredients}\n\nShared from FOODFIX 🇵🇭`,
                   });
                 } catch {
                   /* user cancelled */

@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { onAuthChange, updateProfile } from '../lib/firebase';
 import {
-    addNotificationReceivedListener,
-    addNotificationResponseListener,
-    registerForPushNotificationsAsync,
+  addNotificationReceivedListener,
+  addNotificationResponseListener,
+  registerForPushNotificationsAsync,
 } from '../lib/notifications';
 
 export default function RootLayout() {
@@ -28,7 +28,7 @@ export default function RootLayout() {
             signal: controller.signal,
           });
           clearTimeout(timeoutId);
-        } catch (error) {
+        } catch {
           console.warn('[App] Firebase connectivity check failed - ad blocker may be active');
           setShowWebWarning(true);
           setTimeout(() => setShowWebWarning(false), 5000);

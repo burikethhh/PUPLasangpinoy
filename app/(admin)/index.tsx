@@ -71,7 +71,7 @@ export default function AdminDashboard() {
         <View style={styles.header}>
           <View>
             <Text style={styles.headerSub}>Owner Dashboard</Text>
-            <Text style={styles.headerTitle}>Lasang Pinoy</Text>
+            <Text style={styles.headerTitle}>FOODFIX</Text>
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color="#F25C05" />

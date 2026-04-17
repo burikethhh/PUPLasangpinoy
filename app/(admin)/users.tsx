@@ -6,7 +6,12 @@ import {
     Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createStaffAccount, getAllUsers, logOut, type Profile } from "../../lib/firebase";
+import {
+    createStaffAccount,
+    getAllUsers,
+    logOut,
+    type Profile
+} from "../../lib/firebase";
 import {
     getOrders,
     getSettings,
@@ -26,6 +31,15 @@ export default function AdminMoreScreen() {
   const [staffModal, setStaffModal] = useState(false);
   const [staffForm, setStaffForm] = useState({ name: "", email: "", password: "", phone: "" });
   const [creatingStaff, setCreatingStaff] = useState(false);
+  const [userModal, setUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [savingUser, setSavingUser] = useState(false);
+  const [userForm, setUserForm] = useState({
+    username: "",
+    phone: "",
+    address: "",
+    role: "customer" as Profile["role"],
+  });
 
   useFocusEffect(useCallback(() => { loadAll(); }, []));
 
@@ -81,14 +95,82 @@ export default function AdminMoreScreen() {
     setCreatingStaff(true);
     try {
       await createStaffAccount(staffForm.email.trim(), staffForm.password, staffForm.name.trim(), staffForm.phone.trim());
-      Alert.alert("Success", `Staff account created for ${staffForm.name.trim()}!\n\nNote: You will need to log in again as admin.`);
+      Alert.alert(
+        "Success",
+        `Staff account created for ${staffForm.name.trim()}!\n\nPlease log in again as admin to continue.`,
+        [{ text: "OK", onPress: () => router.replace("/(auth)/admin-login") }],
+      );
       setStaffModal(false);
       setStaffForm({ name: "", email: "", password: "", phone: "" });
-      loadAll();
     } catch (e: any) {
       Alert.alert("Error", e.message);
     }
     setCreatingStaff(false);
+  }
+
+  function openEditUser(user: Profile) {
+    setEditingUser(user);
+    setUserForm({
+      username: user.username || "",
+      phone: user.phone || "",
+      address: user.address || "",
+      role: user.role || "customer",
+    });
+    setUserModal(true);
+  }
+
+  async function handleSaveUser() {
+    if (!editingUser) return;
+    if (!userForm.username.trim()) {
+      Alert.alert("Error", "Name is required.");
+      return;
+    }
+
+    setSavingUser(true);
+    try {
+      await updateUserByAdmin(editingUser.id, {
+        username: userForm.username.trim(),
+        phone: userForm.phone.trim(),
+        address: userForm.address.trim(),
+        role: userForm.role,
+        is_admin: userForm.role === "admin",
+      });
+      Alert.alert("Saved", "User updated successfully.");
+      setUserModal(false);
+      setEditingUser(null);
+      await loadAll();
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to update user.");
+    }
+    setSavingUser(false);
+  }
+
+  function handleDeleteUser(user: Profile) {
+    const current = getCurrentUser();
+    if (current?.uid === user.id) {
+      Alert.alert("Not allowed", "You cannot delete your currently logged-in admin account.");
+      return;
+    }
+
+    Alert.alert(
+      "Delete Account",
+      `Delete ${user.username || user.email}? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteUser(user.id);
+              await loadAll();
+            } catch (e: any) {
+              Alert.alert("Error", e.message || "Failed to delete user.");
+            }
+          },
+        },
+      ],
+    );
   }
 
   if (loading) {
@@ -152,17 +234,64 @@ export default function AdminMoreScreen() {
           )}
         </View>
 
-        {/* Users Overview */}
+        <Text style={styles.sectionTitle}>Quick Access</Text>
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.quickRow}
+            onPress={() => router.push("/(staff)" as any)}
+          >
+            <View style={[styles.quickIcon, { backgroundColor: "#3498DB22" }]}>
+              <Ionicons name="construct" size={18} color="#3498DB" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.quickTitle}>Open Staff Dashboard (Test)</Text>
+              <Text style={styles.quickSub}>Preview staff order workflow as admin</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#bbb" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickRow, { borderBottomWidth: 0 }]}
+            onPress={() => router.push("/(admin)/submissions" as any)}
+          >
+            <View style={[styles.quickIcon, { backgroundColor: "#F39C1222" }]}>
+              <Ionicons name="bulb" size={18} color="#F39C12" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.quickTitle}>Review Dish Suggestions</Text>
+              <Text style={styles.quickSub}>Approve or reject customer suggested dishes</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#bbb" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Users Management */}
         <Text style={styles.sectionTitle}>Users ({users.length})</Text>
         <View style={styles.card}>
-          {users.slice(0, 10).map((u) => (
-            <View key={u.id} style={styles.staffRow}>
-              <View style={[styles.statusDot, { backgroundColor: u.role === "admin" ? "#F25C05" : u.role === "staff" ? "#3498DB" : "#27AE60" }]} />
-              <Text style={styles.staffName}>{u.username || u.email?.split("@")[0]}</Text>
-              <Text style={styles.staffInfo}>{u.role}</Text>
-            </View>
-          ))}
-          {users.length > 10 && <Text style={styles.moreText}>+{users.length - 10} more</Text>}
+          {users.length === 0 ? (
+            <Text style={styles.emptyText}>No users found</Text>
+          ) : (
+            users.map((u) => (
+              <View key={u.id} style={styles.userRow}>
+                <View style={[styles.statusDot, { backgroundColor: u.role === "admin" ? "#F25C05" : u.role === "staff" ? "#3498DB" : "#27AE60" }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.staffName}>{u.username || u.email?.split("@")[0]}</Text>
+                  <Text style={styles.userEmail}>{u.email}</Text>
+                </View>
+                <View style={styles.userMeta}>
+                  <Text style={styles.staffInfo}>{u.role}</Text>
+                  <View style={styles.userActions}>
+                    <TouchableOpacity style={styles.iconActionBtn} onPress={() => openEditUser(u)}>
+                      <Ionicons name="create-outline" size={16} color="#3498DB" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.iconActionBtn} onPress={() => handleDeleteUser(u)}>
+                      <Ionicons name="trash-outline" size={16} color="#E74C3C" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
         </View>
 
         {/* App Settings */}
@@ -235,6 +364,71 @@ export default function AdminMoreScreen() {
           </View>
         </View>
       )}
+
+      {/* Edit User Modal */}
+      {userModal && editingUser && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit User</Text>
+            <Text style={styles.label}>Display Name *</Text>
+            <TextInput
+              style={styles.input}
+              value={userForm.username}
+              onChangeText={(v) => setUserForm((f) => ({ ...f, username: v }))}
+              placeholder="User name"
+              placeholderTextColor="#aaa"
+            />
+
+            <Text style={styles.label}>Phone</Text>
+            <TextInput
+              style={styles.input}
+              value={userForm.phone}
+              onChangeText={(v) => setUserForm((f) => ({ ...f, phone: v }))}
+              placeholder="09XX XXX XXXX"
+              placeholderTextColor="#aaa"
+              keyboardType="phone-pad"
+            />
+
+            <Text style={styles.label}>Address</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 60 }]}
+              value={userForm.address}
+              onChangeText={(v) => setUserForm((f) => ({ ...f, address: v }))}
+              placeholder="Address"
+              placeholderTextColor="#aaa"
+              multiline
+            />
+
+            <Text style={styles.label}>Role</Text>
+            <View style={styles.roleRow}>
+              {(["customer", "staff", "admin"] as Profile["role"][]).map((role) => {
+                const active = userForm.role === role;
+                return (
+                  <TouchableOpacity
+                    key={role}
+                    style={[styles.roleBtn, active && styles.roleBtnActive]}
+                    onPress={() => setUserForm((f) => ({ ...f, role }))}
+                  >
+                    <Text style={[styles.roleBtnText, active && styles.roleBtnTextActive]}>
+                      {role}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setUserModal(false)}>
+                <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveBtn, savingUser && { opacity: 0.6 }]}
+                onPress={handleSaveUser} disabled={savingUser}>
+                {savingUser ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -250,9 +444,38 @@ const styles = StyleSheet.create({
   salesLabel: { fontSize: 11, color: "#888", marginTop: 2 },
   salesDiv: { width: 1, height: 36, backgroundColor: "#f0e8d0" },
   staffRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
+  userRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   staffName: { flex: 1, fontSize: 13, color: "#2E1A06", fontWeight: "600" },
   staffInfo: { fontSize: 11, color: "#888" },
+  userEmail: { fontSize: 11, color: "#999", marginTop: 2 },
+  userMeta: { alignItems: "flex-end", gap: 4 },
+  userActions: { flexDirection: "row", gap: 6 },
+  iconActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#F9F5EF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  quickRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f0e5",
+  },
+  quickIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  quickTitle: { fontSize: 13, fontWeight: "700", color: "#2E1A06" },
+  quickSub: { fontSize: 11, color: "#888", marginTop: 2 },
   moreText: { textAlign: "center", color: "#F25C05", fontSize: 12, marginTop: 8, fontWeight: "600" },
   emptyText: { textAlign: "center", color: "#aaa", fontSize: 13 },
   label: { fontSize: 12, color: "#888", marginBottom: 4, marginTop: 10, fontWeight: "600" },
@@ -274,4 +497,17 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06", marginBottom: 4 },
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
   modalCancel: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#eee" },
+  roleRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  roleBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  roleBtnActive: { borderColor: "#F25C05", backgroundColor: "#FEF3EC" },
+  roleBtnText: { fontSize: 12, color: "#888", fontWeight: "600" },
+  roleBtnTextActive: { color: "#F25C05", fontWeight: "700" },
 });
