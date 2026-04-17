@@ -14,6 +14,10 @@ import {
     logOut, updateMyProfile, type Profile,
 } from "../../lib/firebase";
 import { getMenuItems, type MenuItem } from "../../lib/firebase-store";
+import { analyzeImageWithQwen } from "../../lib/qwen-ai";
+
+const FIRESTORE_DATABASE_ID =
+  process.env.EXPO_PUBLIC_FIREBASE_DATABASE_ID || "default";
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -185,6 +189,9 @@ export default function ProfileScreen() {
     try {
       const user = getCurrentUser();
       if (!user) return Alert.alert("Error", "You must be logged in to submit suggestions.");
+      const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
+      if (!projectId) throw new Error("Missing EXPO_PUBLIC_FIREBASE_PROJECT_ID");
+      const token = await user.getIdToken();
 
       // Save to Firestore menu_suggestions collection
       const suggestionData = {
@@ -199,11 +206,11 @@ export default function ProfileScreen() {
       };
 
       // Use REST API to create the suggestion
-      await fetch(`https://firestore.googleapis.com/v1/projects/${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}/databases/(default)/documents/menu_suggestions`, {
+      const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DATABASE_ID}/documents/menu_suggestions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await user.getIdToken()}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           fields: {
@@ -218,6 +225,13 @@ export default function ProfileScreen() {
           },
         }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to submit suggestion (${response.status}): ${errorText}`,
+        );
+      }
 
       Alert.alert("Submitted!", `Thank you for suggesting "${submitForm.name}"! Our team will review it.`);
       setSubmitModal(false);

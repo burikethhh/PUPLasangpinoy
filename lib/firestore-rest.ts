@@ -5,11 +5,12 @@ import { getAuth } from 'firebase/auth';
 import { Platform } from 'react-native';
 
 // Firebase configuration
-const PROJECT_ID = 'lasangpinoy-mobile';
+const PROJECT_ID = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'lasangpinoy-mobile';
+const FIRESTORE_DATABASE_ID = process.env.EXPO_PUBLIC_FIREBASE_DATABASE_ID || 'default';
 const API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '';
 
-// REST API base URL - using the alternate endpoint that ad blockers might not block
-const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents`;
+// REST API base URL - database id is configurable via EXPO_PUBLIC_FIREBASE_DATABASE_ID
+const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents`;
 
 // Types for Firestore REST API responses
 interface FirestoreValue {

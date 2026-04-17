@@ -2,12 +2,12 @@
 // With REST API fallback for web browsers with ad blockers
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApp, getApps, initializeApp } from "firebase/app";
+import * as FirebaseAuth from "firebase/auth";
 import {
     createUserWithEmailAndPassword,
     FacebookAuthProvider,
     fetchSignInMethodsForEmail,
     getAuth,
-    getReactNativePersistence,
     GoogleAuthProvider,
     initializeAuth,
     onAuthStateChanged,
@@ -141,6 +141,9 @@ const firebaseConfig = {
     process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "",
 };
 
+const FIRESTORE_DATABASE_ID =
+  process.env.EXPO_PUBLIC_FIREBASE_DATABASE_ID || "default";
+
 // Track if SDK is blocked (for automatic REST fallback)
 let sdkBlocked = false;
 let useRestApi = Platform.OS === "web"; // Always try REST first on web
@@ -169,23 +172,29 @@ if (Platform.OS === 'web') {
   auth = getAuth(app);
 } else {
   try {
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
+    const getReactNativePersistence = (FirebaseAuth as any)
+      .getReactNativePersistence;
+    if (typeof getReactNativePersistence === "function") {
+      auth = initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+    } else {
+      auth = initializeAuth(app);
+    }
   } catch (error: any) {
     // If auth was already initialized (e.g. hot reload), fall back to getAuth
     auth = getAuth(app);
   }
 }
 
-// Initialize Firestore - targeting the 'default' named database (not the standard '(default)')
+// Initialize Firestore for the configured database id.
 let db: ReturnType<typeof getFirestore>;
 try {
-  db = getFirestore(app, 'default');
+  db = getFirestore(app, FIRESTORE_DATABASE_ID);
   log.info("Firestore initialized");
 } catch (error) {
   log.error("Firestore initialization error", error);
-  db = getFirestore(app, 'default');
+  db = getFirestore(app, FIRESTORE_DATABASE_ID);
 }
 
 // Auth providers

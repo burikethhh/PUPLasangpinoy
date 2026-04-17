@@ -69,7 +69,7 @@ export default function LoginScreen() {
     if (profile?.is_admin) {
       router.replace("/(admin)");
     } else if (profile?.role === "staff") {
-      router.replace("/(staff)");
+      router.replace("/(staff)" as any);
     } else {
       router.replace("/(tabs)");
     }

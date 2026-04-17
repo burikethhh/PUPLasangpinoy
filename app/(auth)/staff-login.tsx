@@ -52,7 +52,7 @@ export default function StaffLoginScreen() {
       const profile = await getProfile(uid);
 
       if (profile?.role === "staff") {
-        router.replace("/(staff)");
+        router.replace("/(staff)" as any);
       } else if (profile?.is_admin) {
         router.replace("/(admin)");
       } else {

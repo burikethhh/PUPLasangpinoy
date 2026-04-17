@@ -19,6 +19,9 @@ interface MenuSuggestion {
   created_at: { seconds: number } | string;
 }
 
+const FIRESTORE_DATABASE_ID =
+  process.env.EXPO_PUBLIC_FIREBASE_DATABASE_ID || "default";
+
 export default function SubmissionsScreen() {
   const [loading, setLoading] = useState(true);
   const [suggestions, setSuggestions] = useState<MenuSuggestion[]>([]);
@@ -28,27 +31,41 @@ export default function SubmissionsScreen() {
     setLoading(true);
     try {
       const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Not authenticated");
+
       const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
+      if (!projectId) throw new Error("Missing EXPO_PUBLIC_FIREBASE_PROJECT_ID");
+
       const response = await fetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/menu_suggestions`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DATABASE_ID}/documents/menu_suggestions`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch suggestions (${response.status}): ${errorText}`,
+        );
+      }
+
       const data = await response.json();
       if (data.documents) {
         const parsed = data.documents.map((doc: any) => ({
           id: doc.name.split("/").pop(),
-          name: doc.fields.name.stringValue,
-          description: doc.fields.description.stringValue,
-          category: doc.fields.category.stringValue,
-          user_id: doc.fields.user_id.stringValue,
-          user_email: doc.fields.user_email.stringValue,
-          user_name: doc.fields.user_name.stringValue,
-          status: doc.fields.status.stringValue,
-          created_at: doc.fields.created_at.timestampValue,
+          name: doc.fields?.name?.stringValue || "",
+          description: doc.fields?.description?.stringValue || "",
+          category: doc.fields?.category?.stringValue || "",
+          user_id: doc.fields?.user_id?.stringValue || "",
+          user_email: doc.fields?.user_email?.stringValue || "",
+          user_name: doc.fields?.user_name?.stringValue || "",
+          status: doc.fields?.status?.stringValue || "pending",
+          created_at: doc.fields?.created_at?.timestampValue || "",
         }));
         setSuggestions(parsed);
+      } else {
+        setSuggestions([]);
       }
     } catch (error) {
       console.error("Fetch suggestions error:", error);
@@ -62,9 +79,13 @@ export default function SubmissionsScreen() {
   const updateSuggestionStatus = async (suggestionId: string, status: "approved" | "rejected") => {
     try {
       const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Not authenticated");
+
       const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
-      await fetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/menu_suggestions/${suggestionId}`,
+      if (!projectId) throw new Error("Missing EXPO_PUBLIC_FIREBASE_PROJECT_ID");
+
+      const response = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DATABASE_ID}/documents/menu_suggestions/${suggestionId}`,
         {
           method: "PATCH",
           headers: {
@@ -76,9 +97,18 @@ export default function SubmissionsScreen() {
           }),
         },
       );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to update suggestion (${response.status}): ${errorText}`,
+        );
+      }
+
       Alert.alert("Success", `Suggestion ${status}`);
       fetchSuggestions();
     } catch (error) {
+      console.error("Update suggestion status error:", error);
       Alert.alert("Error", "Failed to update suggestion");
     }
   };
