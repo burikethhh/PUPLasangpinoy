@@ -1,34 +1,34 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState, useEffect } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    getRedirectResult,
+    signInWithPopup,
+    signInWithRedirect,
+} from "firebase/auth";
+import { useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  signIn,
-  resetPassword,
-  getProfile,
-  auth,
-  googleProvider,
-  facebookProvider,
-  setRestTokenFromUser,
+    auth,
+    facebookProvider,
+    getProfile,
+    googleProvider,
+    resetPassword,
+    setRestTokenFromUser,
+    signIn,
 } from "../../lib/firebase";
-import {
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-} from "firebase/auth";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -68,6 +68,8 @@ export default function LoginScreen() {
     const profile = await getProfile(userId);
     if (profile?.is_admin) {
       router.replace("/(admin)");
+    } else if (profile?.role === "staff") {
+      router.replace("/(staff)");
     } else {
       router.replace("/(tabs)");
     }

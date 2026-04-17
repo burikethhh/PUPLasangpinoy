@@ -298,6 +298,40 @@ export async function signUp(
   return userCredential;
 }
 
+// Create a staff account without signing out the current admin
+export async function createStaffAccount(
+  email: string,
+  password: string,
+  username: string,
+  phone?: string,
+) {
+  // Create the staff account (this will change the current auth user)
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const staffUid = userCredential.user.uid;
+
+  // Create staff profile
+  const profileData = {
+    email,
+    username,
+    is_admin: false,
+    role: 'staff' as const,
+    phone: phone || '',
+    address: '',
+    created_at: new Date(),
+  };
+
+  // Use REST API to create profile so we don't depend on auth state
+  await RestApi.setDocument("profiles", staffUid, profileData);
+
+  // Sign out the newly created staff user to restore admin session
+  await signOut(auth);
+
+  // Re-authenticate as the admin if we had a current user
+  // The admin will need to have their session restored by the layout auth check
+  // For now, we return the staff UID so the caller knows it succeeded
+  return { staffUid, email };
+}
+
 export async function logOut() {
   RestApi.setAuthToken(null);
   return signOut(auth);

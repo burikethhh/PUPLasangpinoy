@@ -6,7 +6,7 @@ import {
     Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getAllUsers, logOut, signUp, type Profile } from "../../lib/firebase";
+import { createStaffAccount, getAllUsers, logOut, type Profile } from "../../lib/firebase";
 import {
     getOrders,
     getSettings,
@@ -74,12 +74,15 @@ export default function AdminMoreScreen() {
     if (!staffForm.name.trim() || !staffForm.email.trim() || !staffForm.password.trim()) {
       Alert.alert("Error", "Name, email and password are required."); return;
     }
+    if (!/\S+@\S+\.\S+/.test(staffForm.email.trim())) {
+      Alert.alert("Error", "Please enter a valid email address."); return;
+    }
     if (staffForm.password.length < 6) {
       Alert.alert("Error", "Password must be at least 6 characters."); return;
     }
     setCreatingStaff(true);
     try {
-      await signUp(staffForm.email.trim(), staffForm.password, staffForm.name.trim(), "staff", staffForm.phone.trim());
+      await createStaffAccount(staffForm.email.trim(), staffForm.password, staffForm.name.trim(), staffForm.phone.trim());
       Alert.alert("Success", `Staff account created for ${staffForm.name.trim()}!`);
       setStaffModal(false);
       setStaffForm({ name: "", email: "", password: "", phone: "" });

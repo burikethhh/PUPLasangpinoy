@@ -1,93 +1,156 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '24px', 'fontFamily': 'arial'}}}%%
 erDiagram
+    %% ============================================================
+    %% LasangPinoy Food Ordering System — Firebase Firestore Schema
+    %% Collection: profiles (Document ID = Firebase Auth UID)
+    %% ============================================================
+
     PROFILES {
         string id PK "Document ID (Firebase Auth UID)"
         string email "User email (unique)"
         string username "Display name"
         boolean is_admin "Admin access flag"
+        string role "admin | staff | customer"
+        string phone "Contact number (optional)"
+        string address "Delivery address (optional)"
         timestamp created_at "Account creation date"
     }
 
-    RECIPES {
+    %% Collection: menu_items
+    MENU_ITEMS {
         string id PK "Auto-generated document ID"
-        string title "Recipe name"
-        string category "Food category (FK to categories.name)"
-        string region "Philippine region (FK to regions.name)"
-        string ingredients "Comma-separated ingredients"
-        string instructions "Step-by-step cooking guide"
-        string nutrition "Nutritional information"
-        string health_notes "Health benefits and dietary info"
-        string history "Cultural and historical background"
-        string fun_fact "Interesting trivia"
-        string image_url "Cloudinary image URL"
-        string user_id "Creator user ID (FK to profiles.id)"
+        string name "Dish / item name"
+        string description "Item description"
+        number price "Price in PHP"
+        string category "Menu category (e.g. Main Dish, Soup)"
+        string image_url "Image URL (Cloudinary or device URI)"
+        number stock_quantity "Available stock count"
+        boolean available "Whether item can be ordered"
         timestamp created_at "Creation timestamp"
     }
 
-    CATEGORIES {
+    %% Collection: orders
+    ORDERS {
         string id PK "Auto-generated document ID"
-        string name "Category name (unique)"
-        string color "Hex color code for UI display"
-        timestamp created_at "Creation timestamp"
+        string order_number "Formatted order number (LP-YYYYMMDD-XXXX)"
+        string customer_id FK "FK to profiles.id"
+        string customer_name "Customer display name"
+        string customer_phone "Customer contact number"
+        string customer_address "Delivery address"
+        array items "Array of OrderItem (embedded)"
+        number subtotal "Sum of item prices"
+        number delivery_fee "Delivery charge"
+        number total "subtotal + delivery_fee"
+        string status "pending | accepted | preparing | out_for_delivery | delivered | rejected | cancelled"
+        string order_type "delivery_now | delivery_later | dine_in | pick_up"
+        string payment_method "cod | gcash"
+        string scheduled_date "Scheduled delivery date (optional)"
+        string scheduled_time "Scheduled delivery time (optional)"
+        string reject_reason "Reason if rejected (optional)"
+        string prepared_by "Staff UID who prepared (optional)"
+        timestamp created_at "Order placement timestamp"
+        timestamp updated_at "Last status update (optional)"
     }
 
-    REGIONS {
-        string id PK "Auto-generated document ID"
-        string name "Region name (unique)"
-        string description "Regional cuisine description"
-        timestamp created_at "Creation timestamp"
+    %% Embedded sub-document inside orders.items[]
+    ORDER_ITEMS {
+        string menu_item_id FK "FK to menu_items.id"
+        string name "Item name snapshot"
+        number price "Item price snapshot"
+        number quantity "Quantity ordered"
+        string image_url "Item image URL (optional)"
     }
 
-    BOOKMARKS {
+    %% Collection: messages
+    MESSAGES {
         string id PK "Auto-generated document ID"
-        string user_id "FK to profiles.id"
-        string recipe_id "FK to recipes.id"
-        timestamp created_at "Bookmark timestamp"
+        string conversation_id "Chat thread ID (customer UID)"
+        string sender_id FK "FK to profiles.id"
+        string sender_name "Sender display name"
+        string sender_role "admin | staff | customer"
+        string content "Message text"
+        boolean read "Read receipt flag"
+        timestamp created_at "Message timestamp"
     }
 
-    FEEDBACK {
+    %% Collection: reviews
+    REVIEWS {
         string id PK "Auto-generated document ID"
-        string user_id "FK to profiles.id"
-        string recipe_id "FK to recipes.id"
+        string user_id FK "FK to profiles.id"
+        string username "Reviewer display name"
+        string order_id FK "FK to orders.id"
+        string menu_item_id FK "FK to menu_items.id"
+        string menu_item_name "Item name snapshot"
         number rating "Star rating 1-5"
-        string comment "User feedback text"
-        timestamp created_at "Feedback timestamp"
+        string comment "Review text"
+        timestamp created_at "Review timestamp"
     }
 
-    RECIPE_SUBMISSIONS {
+    %% Collection: favorites
+    FAVORITES {
         string id PK "Auto-generated document ID"
-        string user_id "FK to profiles.id"
-        string title "Submitted recipe name"
-        string category "Food category"
-        string region "Philippine region"
-        string ingredients "Comma-separated ingredients"
-        string instructions "Cooking instructions"
-        string image_url "Uploaded image URL"
-        string status "pending | approved | rejected"
-        timestamp created_at "Submission timestamp"
+        string user_id FK "FK to profiles.id"
+        string menu_item_id FK "FK to menu_items.id"
+        string collection_id FK "FK to favorite_collections.id (optional)"
+        timestamp created_at "Favorited timestamp"
     }
 
-    COLLECTIONS {
+    %% Collection: favorite_collections
+    FAVORITE_COLLECTIONS {
         string id PK "Auto-generated document ID"
-        string user_id "FK to profiles.id"
-        string name "Collection name"
-        string description "Collection description"
-        array recipe_ids "Array of recipe document IDs"
+        string user_id FK "FK to profiles.id"
+        string name "Folder / collection name"
         timestamp created_at "Creation timestamp"
-        timestamp updated_at "Last update timestamp"
     }
 
-    %% Relationships
-    PROFILES ||--o{ RECIPES : ""
-    PROFILES ||--o{ BOOKMARKS : ""
-    PROFILES ||--o{ FEEDBACK : ""
-    PROFILES ||--o{ RECIPE_SUBMISSIONS : ""
-    PROFILES ||--o{ COLLECTIONS : ""
+    %% Collection: attendance
+    ATTENDANCE {
+        string id PK "Auto-generated document ID"
+        string staff_id FK "FK to profiles.id (staff)"
+        string staff_name "Staff display name"
+        string date "Date string (YYYY-MM-DD)"
+        string status "on_duty | off_duty"
+        string clock_in "Clock-in ISO timestamp (optional)"
+        string clock_out "Clock-out ISO timestamp (optional)"
+        timestamp created_at "Record creation timestamp"
+    }
 
-    RECIPES ||--o{ BOOKMARKS : ""
-    RECIPES ||--o{ FEEDBACK : ""
+    %% Singleton document: settings/app_settings
+    APP_SETTINGS {
+        number delivery_fee "Default delivery fee in PHP"
+        boolean gcash_enabled "Whether GCash payments are accepted"
+        string gcash_number "GCash account number (optional)"
+        string store_name "Store display name"
+        string store_address "Store physical address"
+        string store_phone "Store contact number"
+    }
 
-    CATEGORIES ||--o{ RECIPES : ""
-    REGIONS ||--o{ RECIPES : ""
+    %% ==================== Relationships ====================
 
-    COLLECTIONS }o--o{ RECIPES : ""
-    RECIPE_SUBMISSIONS }o--|| CATEGORIES : ""
+    %% A profile (customer) places many orders
+    PROFILES ||--o{ ORDERS : ""
+    %% A profile (customer) sends/receives many messages
+    PROFILES ||--o{ MESSAGES : ""
+    %% A profile (customer) writes many reviews
+    PROFILES ||--o{ REVIEWS : ""
+    %% A profile (customer) has many favorites
+    PROFILES ||--o{ FAVORITES : ""
+    %% A profile (customer) creates many favorite collections
+    PROFILES ||--o{ FAVORITE_COLLECTIONS : ""
+    %% A profile (staff) has many attendance records
+    PROFILES ||--o{ ATTENDANCE : ""
+
+    %% An order contains many order items (embedded)
+    ORDERS ||--|{ ORDER_ITEMS : ""
+    %% A menu item appears in many order items
+    MENU_ITEMS ||--o{ ORDER_ITEMS : ""
+    %% A menu item can be reviewed many times
+    MENU_ITEMS ||--o{ REVIEWS : ""
+    %% A menu item can be favorited many times
+    MENU_ITEMS ||--o{ FAVORITES : ""
+
+    %% An order can have many reviews (one per item)
+    ORDERS ||--o{ REVIEWS : ""
+
+    %% A favorite optionally belongs to a collection
+    FAVORITE_COLLECTIONS ||--o{ FAVORITES : ""

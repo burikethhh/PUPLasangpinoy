@@ -64,7 +64,7 @@ export default function WelcomeScreen() {
             </View>
             <TouchableOpacity
               style={[styles.signInBtn, { backgroundColor: '#3498DB' }]}
-              onPress={() => router.push('/(auth)/login')}>
+              onPress={() => router.push('/(auth)/staff-login')}>
               <Text style={styles.signInText}>Staff Sign In</Text>
             </TouchableOpacity>
           </View>

@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getProfile, logOut, signIn } from "../../lib/firebase";
 
-export default function AdminLoginScreen() {
+export default function StaffLoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -48,13 +48,18 @@ export default function AdminLoginScreen() {
     try {
       const userCredential = await signIn(email, password);
       const uid = userCredential.user.uid;
-      const profile = await getProfile(uid);
-      const adminStatus = profile?.is_admin === true;
 
-      if (adminStatus) {
+      const profile = await getProfile(uid);
+
+      if (profile?.role === "staff") {
+        router.replace("/(staff)");
+      } else if (profile?.is_admin) {
         router.replace("/(admin)");
       } else {
-        Alert.alert("Access Denied", "This account does not have admin access.");
+        Alert.alert(
+          "Access Denied",
+          "This account is not registered as staff. Please contact your admin to create a staff account for you.",
+        );
         await logOut();
       }
     } catch (error: any) {
@@ -65,6 +70,8 @@ export default function AdminLoginScreen() {
         message = "Incorrect password.";
       } else if (error.code === "auth/invalid-credential") {
         message = "Invalid email or password.";
+      } else if (error.code === "auth/too-many-requests") {
+        message = "Too many failed attempts. Please try again later.";
       }
       Alert.alert("Sign In Failed", message);
     }
@@ -94,12 +101,13 @@ export default function AdminLoginScreen() {
 
             {/* ICON */}
             <View style={styles.iconBox}>
-              <Ionicons name="settings" size={32} color="#2E1A06" />
+              <Ionicons name="restaurant" size={32} color="#3498DB" />
             </View>
 
-            <Text style={styles.title}>Admin Portal</Text>
+            <Text style={styles.title}>Staff Portal</Text>
             <Text style={styles.subtitle}>
-              Sign in with your admin credentials
+              Sign in with your staff credentials{"\n"}
+              Contact your admin if you don{"'"}t have an account
             </Text>
 
             {/* EMAIL */}
@@ -115,7 +123,7 @@ export default function AdminLoginScreen() {
               />
               <TextInput
                 style={styles.input}
-                placeholder="admin@email.com"
+                placeholder="staff@email.com"
                 placeholderTextColor="#aaa"
                 value={email}
                 onChangeText={(v) => {
@@ -181,9 +189,15 @@ export default function AdminLoginScreen() {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.signInText}>Sign In as Admin</Text>
+                <Text style={styles.signInText}>Sign In as Staff</Text>
               )}
             </TouchableOpacity>
+
+            {/* NO SIGNUP — admin creates staff accounts */}
+            <Text style={styles.notice}>
+              Staff accounts are created by the admin.{"\n"}
+              If you need access, contact your manager.
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -213,7 +227,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 20,
-    backgroundColor: "#2E1A0615",
+    backgroundColor: "#3498DB15",
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "center",
@@ -231,6 +245,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 4,
     marginBottom: 24,
+    lineHeight: 18,
   },
   label: { fontSize: 13, color: "#555", marginBottom: 6, marginTop: 4 },
   inputBox: {
@@ -263,11 +278,18 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   signInBtn: {
-    backgroundColor: "#2E1A06",
+    backgroundColor: "#3498DB",
     borderRadius: 30,
     height: 52,
     justifyContent: "center",
     alignItems: "center",
   },
   signInText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  notice: {
+    fontSize: 11,
+    color: "#aaa",
+    textAlign: "center",
+    marginTop: 16,
+    lineHeight: 16,
+  },
 });
