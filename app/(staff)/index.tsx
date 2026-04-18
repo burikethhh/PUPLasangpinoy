@@ -29,8 +29,15 @@ export default function StaffOrdersScreen() {
 
   useFocusEffect(useCallback(() => { fetchOrders(); }, []));
 
-  async function fetchOrders() {
-    setLoading(true);
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchOrders(true);
+    }, 8000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  async function fetchOrders(silent = false) {
+    if (!silent) setLoading(true);
     try {
       // Staff sees accepted and preparing orders
       const all = await getOrders();
@@ -38,12 +45,12 @@ export default function StaffOrdersScreen() {
     } catch (e) {
       console.error("Error fetching orders:", e);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   async function onRefresh() {
     setRefreshing(true);
-    await fetchOrders();
+    await fetchOrders(true);
     setRefreshing(false);
   }
 
@@ -56,7 +63,7 @@ export default function StaffOrdersScreen() {
           try {
             await updateOrderStatus(order.id, "out_for_delivery", { prepared_by: staffName });
             Alert.alert("Done", "Order marked as prepared and out for delivery!");
-            fetchOrders();
+            fetchOrders(true);
           } catch (e: any) {
             Alert.alert("Error", e.message);
           }

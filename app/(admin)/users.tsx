@@ -8,8 +8,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
     createStaffAccount,
+    deleteUser,
     getAllUsers,
+    getCurrentUser,
     logOut,
+    updateUserByAdmin,
     type Profile
 } from "../../lib/firebase";
 import {

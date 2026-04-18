@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator, Alert, FlatList, Modal, RefreshControl,
     ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -44,11 +44,21 @@ export default function AdminMenuScreen() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryForm, setCategoryForm] = useState({ name: "", color: "#F25C05" });
   const [savingCategory, setSavingCategory] = useState(false);
+  const [assignFromCategory, setAssignFromCategory] = useState("");
+  const [assignToCategory, setAssignToCategory] = useState("");
+  const [assigningCategory, setAssigningCategory] = useState(false);
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
-  async function load() {
-    setLoading(true);
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      load(true);
+    }, 8000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const [menuItems, categoryDocs] = await Promise.all([
         getMenuItems(),
@@ -59,7 +69,7 @@ export default function AdminMenuScreen() {
     } catch (e) {
       console.error(e);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   async function onRefresh() { setRefreshing(true); await load(); setRefreshing(false); }
@@ -112,6 +122,14 @@ export default function AdminMenuScreen() {
     setCategoryModalVisible(true);
     setEditingCategory(null);
     setCategoryForm({ name: "", color: "#F25C05" });
+    const options = Array.from(
+      new Set([
+        ...MENU_CATEGORIES,
+        ...categories.map((c) => c.name).filter(Boolean),
+      ]),
+    );
+    setAssignFromCategory(options[0] || "");
+    setAssignToCategory(options[0] || "");
   }
 
   function startEditCategory(category: Category) {
@@ -125,22 +143,43 @@ export default function AdminMenuScreen() {
       return;
     }
 
+    const oldCategoryName = editingCategory?.name?.trim() || "";
+    const newCategoryName = categoryForm.name.trim();
+
     setSavingCategory(true);
     try {
       if (editingCategory) {
         await updateCategoryDoc(editingCategory.id, {
-          name: categoryForm.name.trim(),
+          name: newCategoryName,
           color: categoryForm.color.trim() || "#F25C05",
         });
       } else {
         await addCategoryDoc(
-          categoryForm.name.trim(),
+          newCategoryName,
           categoryForm.color.trim() || "#F25C05",
         );
       }
       setEditingCategory(null);
       setCategoryForm({ name: "", color: "#F25C05" });
       await load();
+
+      if (oldCategoryName && oldCategoryName !== newCategoryName) {
+        setAssignFromCategory(oldCategoryName);
+        setAssignToCategory(newCategoryName);
+        Alert.alert(
+          "Category Renamed",
+          `Assign existing dishes from "${oldCategoryName}" to "${newCategoryName}"?`,
+          [
+            { text: "Not now", style: "cancel" },
+            {
+              text: "Assign",
+              onPress: () => {
+                assignCategoryToItems(oldCategoryName, newCategoryName);
+              },
+            },
+          ],
+        );
+      }
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to save category.");
     }
@@ -167,6 +206,53 @@ export default function AdminMenuScreen() {
         },
       ],
     );
+  }
+
+  async function assignCategoryToItems(
+    fromCategoryParam?: string,
+    toCategoryParam?: string,
+  ) {
+    const fromCategory = (fromCategoryParam ?? assignFromCategory).trim();
+    const toCategory = (toCategoryParam ?? assignToCategory).trim();
+
+    if (!fromCategory || !toCategory) {
+      Alert.alert("Error", "Please select both source and target categories.");
+      return;
+    }
+
+    if (fromCategory === toCategory) {
+      Alert.alert("Error", "Source and target categories must be different.");
+      return;
+    }
+
+    setAssigningCategory(true);
+    try {
+      const menuItems = await getMenuItems();
+      const matched = menuItems.filter((item) => item.category === fromCategory);
+
+      if (matched.length === 0) {
+        Alert.alert("Nothing to assign", `No dishes found under "${fromCategory}".`);
+        return;
+      }
+
+      await Promise.all(
+        matched.map((item) =>
+          updateMenuItem(item.id, {
+            category: toCategory,
+          }),
+        ),
+      );
+
+      Alert.alert(
+        "Assigned",
+        `Updated ${matched.length} dish(es) from "${fromCategory}" to "${toCategory}".`,
+      );
+      await load();
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to assign category.");
+    } finally {
+      setAssigningCategory(false);
+    }
   }
 
   const categoryOptions = Array.from(
@@ -371,6 +457,44 @@ export default function AdminMenuScreen() {
                 )}
               </TouchableOpacity>
 
+              <Text style={styles.manageSectionTitle}>Assign Category to Dishes</Text>
+              <Text style={styles.assignHint}>Move dishes from one category to another in one tap.</Text>
+
+              <Text style={styles.label}>From Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
+                {categoryOptions.map((option) => (
+                  <TouchableOpacity
+                    key={`from-${option}`}
+                    style={[styles.chip, assignFromCategory === option && styles.chipActive]}
+                    onPress={() => setAssignFromCategory(option)}>
+                    <Text style={[styles.chipText, assignFromCategory === option && styles.chipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <Text style={styles.label}>To Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
+                {categoryOptions.map((option) => (
+                  <TouchableOpacity
+                    key={`to-${option}`}
+                    style={[styles.chip, assignToCategory === option && styles.chipActive]}
+                    onPress={() => setAssignToCategory(option)}>
+                    <Text style={[styles.chipText, assignToCategory === option && styles.chipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.assignBtn, assigningCategory && { opacity: 0.6 }]}
+                onPress={() => assignCategoryToItems()}
+                disabled={assigningCategory}>
+                {assigningCategory ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.assignBtnText}>Assign Category</Text>
+                )}
+              </TouchableOpacity>
+
               <Text style={styles.manageSectionTitle}>Existing Categories</Text>
               {categories.length === 0 ? (
                 <Text style={styles.emptyText}>No categories yet</Text>
@@ -432,6 +556,9 @@ const styles = StyleSheet.create({
   toggleText: { fontSize: 14, color: "#333" },
   saveBtn: { backgroundColor: "#F25C05", borderRadius: 12, padding: 14, alignItems: "center", marginTop: 16 },
   saveBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  assignHint: { fontSize: 12, color: "#888", marginBottom: 6 },
+  assignBtn: { backgroundColor: "#3498DB", borderRadius: 12, padding: 14, alignItems: "center", marginTop: 10 },
+  assignBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
   manageSectionTitle: { fontSize: 14, fontWeight: "700", color: "#2E1A06", marginTop: 16, marginBottom: 8 },
   categoryRow: {
     flexDirection: "row",

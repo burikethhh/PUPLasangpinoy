@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
     TouchableOpacity, View,
@@ -27,8 +27,15 @@ export default function AdminDashboard() {
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
 
-  async function fetchData() {
-    setLoading(true);
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchData(true);
+    }, 8000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  async function fetchData(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const [orders, menu, convos] = await Promise.all([
         getOrders(), getMenuItems(), getConversations(),
@@ -55,7 +62,7 @@ export default function AdminDashboard() {
       setOrdersByStatus(statusCounts);
       setRecentOrders(orders.slice(0, 5));
     } catch (e) { console.error(e); }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   async function handleLogout() {

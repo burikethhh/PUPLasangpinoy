@@ -16,10 +16,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MENU_CATEGORIES, MENU_CATEGORY_COLORS } from "../../constants/order";
-import { getCurrentUser } from "../../lib/firebase";
+import { getCategories, getCurrentUser } from "../../lib/firebase";
 import { addFavorite, getMenuItems, removeFavorite, type MenuItem } from "../../lib/firebase-store";
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   { label: "All", value: "", color: "#F25C05" },
   ...MENU_CATEGORIES.map((c) => ({ label: c, value: c, color: MENU_CATEGORY_COLORS[c] || "#F25C05" })),
 ];
@@ -34,6 +34,7 @@ export default function MenuScreen() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("");
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
+  const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORIES);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,24 +45,63 @@ export default function MenuScreen() {
   useEffect(() => { fetchMenu(); }, [activeCategory]);
 
   useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchMenu(true);
+    }, 8000);
+    return () => clearInterval(intervalId);
+  }, [activeCategory, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => fetchMenu(), 400);
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function fetchMenu() {
-    setLoading(true);
+  async function fetchMenu(silent = false) {
+    if (!silent) setLoading(true);
     try {
-      const data = await getMenuItems({
-        category: activeCategory || undefined,
-        search: search || undefined,
-        availableOnly: false,
+      const [data, dynamicCategories] = await Promise.all([
+        getMenuItems({
+          category: activeCategory || undefined,
+          search: search || undefined,
+          availableOnly: false,
+        }),
+        getCategories(),
+      ]);
+
+      const categoryNames = Array.from(
+        new Set([
+          ...MENU_CATEGORIES,
+          ...dynamicCategories.map((c) => c.name).filter(Boolean),
+          ...data.map((item) => item.category).filter(Boolean),
+        ]),
+      );
+
+      const categoryColorMap = new Map<string, string>();
+      dynamicCategories.forEach((c) => {
+        if (c.name) {
+          categoryColorMap.set(c.name, c.color || MENU_CATEGORY_COLORS[c.name] || "#F25C05");
+        }
       });
+
+      setCategoryOptions([
+        { label: "All", value: "", color: "#F25C05" },
+        ...categoryNames.map((name) => ({
+          label: name,
+          value: name,
+          color: categoryColorMap.get(name) || MENU_CATEGORY_COLORS[name] || "#F25C05",
+        })),
+      ]);
+
+      if (activeCategory && !categoryNames.includes(activeCategory)) {
+        setActiveCategory("");
+      }
+
       setItems(data);
     } catch (error) {
       console.error("Error fetching menu:", error);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   async function addToCart(item: MenuItem) {
@@ -122,7 +162,7 @@ export default function MenuScreen() {
 
         {/* CATEGORY FILTER */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
-          {CATEGORIES.map((cat) => {
+          {categoryOptions.map((cat) => {
             const isActive = activeCategory === cat.value;
             return (
               <TouchableOpacity key={cat.value}

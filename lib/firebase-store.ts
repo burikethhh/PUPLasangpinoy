@@ -311,19 +311,29 @@ export async function updateOrderStatus(
 }
 
 export async function getOrdersByUser(userId: string): Promise<Order[]> {
+  const toSeconds = (value: any): number => {
+    if (!value) return 0;
+    if (typeof value?.seconds === "number") return value.seconds;
+    const ms = new Date(value).getTime();
+    return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
+  };
+
+  const sortNewestFirst = (rows: Order[]) => {
+    return [...rows].sort((a, b) => toSeconds(b.created_at) - toSeconds(a.created_at));
+  };
+
   return firestoreOp(
     async () => {
       const q = query(
         collection(db, "orders"),
         where("customer_id", "==", userId),
-        orderBy("created_at", "desc"),
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Order[];
+      return sortNewestFirst(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Order[]);
     },
     async () => {
       const data = await RestApi.queryCollection("orders", "customer_id", "==", userId);
-      return data as Order[];
+      return sortNewestFirst(data as Order[]);
     },
   );
 }

@@ -11,8 +11,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MENU_CATEGORIES } from "../../constants/order";
 import {
-    deleteMyAccount, getCurrentUser, getProfile as getFirebaseProfile,
-    logOut, updateMyProfile, type Profile,
+    deleteMyAccount,
+    getCategories as getCategoriesDoc,
+    getCurrentUser, getProfile as getFirebaseProfile,
+    logOut, updateMyProfile, type Category, type Profile,
 } from "../../lib/firebase";
 import { analyzeImageWithQwen } from "../../lib/qwen-ai";
 
@@ -28,6 +30,7 @@ export default function ProfileScreen() {
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [submitModal, setSubmitModal] = useState(false);
+  const [suggestionCategories, setSuggestionCategories] = useState<string[]>([...MENU_CATEGORIES]);
   const [submitForm, setSubmitForm] = useState({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
 
   useFocusEffect(useCallback(() => { loadProfile(); }, []));
@@ -35,10 +38,24 @@ export default function ProfileScreen() {
   async function loadProfile() {
     const user = getCurrentUser();
     if (!user) return;
-    const p = await getFirebaseProfile(user.uid);
+    const [p, categoryDocs] = await Promise.all([
+      getFirebaseProfile(user.uid),
+      getCategoriesDoc().catch(() => []),
+    ]);
+
     if (p) {
       setProfile(p);
       setEditFields({ username: p.username, phone: p.phone || "", address: p.address || "" });
+    }
+
+    const categoryNames = Array.from(
+      new Set([
+        ...MENU_CATEGORIES,
+        ...(categoryDocs as Category[]).map((c) => c.name).filter(Boolean),
+      ]),
+    );
+    if (categoryNames.length > 0) {
+      setSuggestionCategories(categoryNames);
     }
   }
 
@@ -162,7 +179,11 @@ export default function ProfileScreen() {
   }
 
   function handleSubmitMenu() {
-    setSubmitForm({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
+    setSubmitForm({
+      name: "",
+      description: "",
+      category: suggestionCategories[0] || (MENU_CATEGORIES[0] as string),
+    });
     setSubmitModal(true);
   }
 
@@ -217,7 +238,11 @@ export default function ProfileScreen() {
 
       Alert.alert("Submitted!", `Thank you for suggesting "${submitForm.name}"! Our team will review it.`);
       setSubmitModal(false);
-      setSubmitForm({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
+      setSubmitForm({
+        name: "",
+        description: "",
+        category: suggestionCategories[0] || (MENU_CATEGORIES[0] as string),
+      });
     } catch (error: any) {
       console.error("Submit menu suggestion error:", error);
       Alert.alert("Error", "Failed to submit suggestion. Please try again.");
@@ -297,7 +322,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.2.5</Text>
+        <Text style={styles.version}>Version 2.2.6</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
@@ -374,7 +399,7 @@ export default function ProfileScreen() {
                 placeholder="e.g. Chicken Adobo" placeholderTextColor="#aaa" />
               <Text style={styles.inputLabel}>Category</Text>
               <View style={styles.chipRow}>
-                {MENU_CATEGORIES.map((c) => (
+                {suggestionCategories.map((c) => (
                   <TouchableOpacity key={c}
                     style={[styles.chip, submitForm.category === c && styles.chipActive]}
                     onPress={() => setSubmitForm((f) => ({ ...f, category: c }))}>

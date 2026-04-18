@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View,
 } from "react-native";
@@ -16,19 +16,29 @@ export default function OrdersScreen() {
 
   useFocusEffect(useCallback(() => { fetchOrders(); }, []));
 
-  async function fetchOrders() {
-    setLoading(true);
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchOrders(true);
+    }, 8000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  async function fetchOrders(silent = false) {
+    if (!silent) setLoading(true);
     const user = getCurrentUser();
-    if (!user) { setLoading(false); return; }
+    if (!user) {
+      if (!silent) setLoading(false);
+      return;
+    }
     try {
       setOrders(await getOrdersByUser(user.uid));
     } catch (e) { console.error(e); }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   async function onRefresh() {
     setRefreshing(true);
-    await fetchOrders();
+    await fetchOrders(true);
     setRefreshing(false);
   }
 

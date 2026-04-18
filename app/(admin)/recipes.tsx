@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView,
     StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -23,20 +23,27 @@ export default function AdminOrders() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
+  const fetchOrders = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await getOrders(filter === "all" ? undefined : { status: filter });
       setOrders(data);
     } catch (e) { console.error(e); }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [filter]);
 
   useFocusEffect(useCallback(() => { fetchOrders(); }, [fetchOrders]));
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchOrders(true);
+    }, 8000);
+    return () => clearInterval(intervalId);
+  }, [fetchOrders]);
+
   async function onRefresh() {
     setRefreshing(true);
-    await fetchOrders();
+    await fetchOrders(true);
     setRefreshing(false);
   }
 
@@ -48,7 +55,7 @@ export default function AdminOrders() {
       {
         text: "Confirm", onPress: async () => {
           await updateOrderStatus(order.id, next);
-          fetchOrders();
+          fetchOrders(true);
         },
       },
     ]);
@@ -63,7 +70,7 @@ export default function AdminOrders() {
     if (!rejectId) return;
     await updateOrderStatus(rejectId, "rejected", { reject_reason: rejectReason || "Rejected by admin" });
     setRejectId(null);
-    fetchOrders();
+    fetchOrders(true);
   }
 
   const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
