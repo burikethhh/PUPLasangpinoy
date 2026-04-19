@@ -205,17 +205,17 @@ export default function CartScreen() {
 
             {/* Order Type */}
             <Text style={styles.sectionLabel}>Order Type</Text>
-            <View style={styles.optionsRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionsRow}>
               {(["delivery_now", "delivery_later", "dine_in", "pick_up"] as OrderType[]).map((t) => (
                 <TouchableOpacity key={t}
                   style={[styles.optionBtn, orderType === t && styles.optionBtnActive]}
                   onPress={() => setOrderType(t)}>
-                  <Text style={[styles.optionText, orderType === t && styles.optionTextActive]}>
+                  <Text style={[styles.optionText, orderType === t && styles.optionTextActive]} numberOfLines={1}>
                     {ORDER_TYPE_LABELS[t]}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
 
             {/* Scheduled date/time for later delivery — auto-suggested, non-editable */}
             {orderType === "delivery_later" && (
@@ -239,7 +239,7 @@ export default function CartScreen() {
 
             {/* Payment Method */}
             <Text style={styles.sectionLabel}>Payment Method</Text>
-            <View style={styles.optionsRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionsRow}>
               {(["cod", "gcash"] as PaymentMethod[]).map((m) => (
                 <TouchableOpacity key={m}
                   style={[styles.optionBtn, paymentMethod === m && styles.optionBtnActive,
@@ -248,12 +248,12 @@ export default function CartScreen() {
                   disabled={m === "gcash" && !settings?.gcash_enabled}>
                   <Ionicons name={m === "cod" ? "cash-outline" : "phone-portrait-outline"} size={16}
                     color={paymentMethod === m ? "#fff" : "#666"} />
-                  <Text style={[styles.optionText, paymentMethod === m && styles.optionTextActive]}>
+                  <Text style={[styles.optionText, paymentMethod === m && styles.optionTextActive]} numberOfLines={1}>
                     {PAYMENT_METHOD_LABELS[m]}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
 
             {/* Address & Phone */}
             {(orderType === "delivery_now" || orderType === "delivery_later") && (
@@ -347,11 +347,11 @@ const styles = StyleSheet.create({
     fontSize: 15, fontWeight: "bold", color: "#2E1A06",
     marginHorizontal: 16, marginTop: 16, marginBottom: 8,
   },
-  optionsRow: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 8 },
+  optionsRow: { paddingHorizontal: 16, gap: 8 },
   optionBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd",
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E8D8A0",
   },
   optionBtnActive: { backgroundColor: "#F25C05", borderColor: "#F25C05" },
   optionText: { fontSize: 12, color: "#666" },

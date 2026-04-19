@@ -459,8 +459,8 @@ export default function AdminMoreScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
   title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 4 },
-  sectionTitle: { fontSize: 15, fontWeight: "bold", color: "#2E1A06", marginHorizontal: 16, marginTop: 12, marginBottom: 8 },
-  card: { backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 16, padding: 16, marginBottom: 4, elevation: 2 },
+  sectionTitle: { fontSize: 14, fontWeight: "bold", color: "#2E1A06", marginHorizontal: 16, marginTop: 16, marginBottom: 8 },
+  card: { backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 16, padding: 16, marginBottom: 12, elevation: 2 },
   salesRow: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
   salesItem: { alignItems: "center" },
   salesValue: { fontSize: 20, fontWeight: "bold", color: "#F25C05" },

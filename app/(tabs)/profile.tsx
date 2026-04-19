@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
@@ -110,20 +109,16 @@ export default function ProfileScreen() {
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], allowsEditing: true, quality: 0.7, base64: false });
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], allowsEditing: true, quality: 0.7, base64: true });
     if (result.canceled) return;
     const uri = result.assets[0].uri;
+    const base64 = result.assets[0].base64 || "";
     setScanImage(uri);
     setScanResult(null);
     setScanModal(true);
     setScanning(true);
 
     try {
-      // Convert image to base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: "base64" as any,
-      });
-
       // Call AI API to analyze the image
       const analysis = await analyzeImageWithQwen(base64, "dish");
 
@@ -265,7 +260,7 @@ export default function ProfileScreen() {
         <Text style={styles.title}>Profile</Text>
 
         {/* Profile Card */}
-        <View style={styles.card}>
+        <View style={styles.profileCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initial}</Text>
           </View>
@@ -284,17 +279,17 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Contact Info</Text>
           <View style={styles.infoRow}>
-            <Ionicons name="call-outline" size={18} color="#F25C05" />
+            <Ionicons name="call-outline" size={16} color="#F25C05" />
             <Text style={styles.infoText}>{profile?.phone || "Not set"}</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={18} color="#F25C05" />
+          <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+            <Ionicons name="location-outline" size={16} color="#F25C05" />
             <Text style={styles.infoText}>{profile?.address || "Not set"}</Text>
           </View>
         </View>
 
         {/* Explore / Engagement */}
-        <View style={styles.card}>
+        <View style={styles.card} >
           <Text style={styles.sectionTitle}>Explore</Text>
           <TouchableOpacity style={styles.exploreRow} onPress={handleScanFood}>
             <View style={[styles.exploreIcon, { backgroundColor: "#E91E8C22" }]}>
@@ -437,13 +432,17 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
   title: { fontSize: 24, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
-  card: {
-    backgroundColor: "#fff", borderRadius: 20, marginHorizontal: 16, marginBottom: 14,
+  profileCard: {
+    backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 16, marginBottom: 12,
     padding: 20, alignItems: "center", elevation: 2,
   },
+  card: {
+    backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 16, marginBottom: 12,
+    padding: 14, elevation: 2,
+  },
   avatar: {
-    width: 80, height: 80, borderRadius: 40, backgroundColor: "#F25C05",
-    justifyContent: "center", alignItems: "center", marginBottom: 12,
+    width: 72, height: 72, borderRadius: 36, backgroundColor: "#F25C05",
+    justifyContent: "center", alignItems: "center", marginBottom: 10,
   },
   avatarText: { color: "#fff", fontWeight: "bold", fontSize: 30 },
   name: { fontSize: 20, fontWeight: "bold", color: "#2E1A06", marginBottom: 4 },
@@ -455,9 +454,9 @@ const styles = StyleSheet.create({
     borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
   },
   editBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
-  sectionTitle: { fontSize: 15, fontWeight: "bold", color: "#2E1A06", alignSelf: "flex-start", marginBottom: 12 },
-  infoRow: { flexDirection: "row", alignItems: "center", gap: 12, width: "100%", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
-  infoText: { fontSize: 14, color: "#555", flex: 1 },
+  sectionTitle: { fontSize: 14, fontWeight: "bold", color: "#2E1A06", marginBottom: 10 },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
+  infoText: { fontSize: 13, color: "#555", flex: 1 },
   logoutBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     backgroundColor: "#FFE8E5", marginHorizontal: 16, borderRadius: 14, padding: 16,
@@ -478,9 +477,9 @@ const styles = StyleSheet.create({
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
   cancelBtn: { flex: 1, borderRadius: 12, padding: 14, alignItems: "center", backgroundColor: "#eee" },
   saveBtn: { flex: 1, backgroundColor: "#F25C05", borderRadius: 12, padding: 14, alignItems: "center" },
-  exploreRow: { flexDirection: "row", alignItems: "center", gap: 12, width: "100%", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
-  exploreIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-  exploreName: { fontSize: 14, fontWeight: "bold", color: "#2E1A06" },
+  exploreRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
+  exploreIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  exploreName: { fontSize: 13, fontWeight: "bold", color: "#2E1A06" },
   exploreSub: { fontSize: 11, color: "#888", marginTop: 2 },
   scanImg: { width: "100%", height: 200, borderRadius: 12, marginBottom: 12 },
   scanResultScroll: { maxHeight: 280 },
