@@ -1,9 +1,0 @@
-apply plugin: "com.android.application"
-android {
-    namespace 'com.foodfix.mobile'
-    defaultConfig {
-        applicationId 'com.foodfix.mobile'
-        versionCode 7
-        versionName "2.2.3"
-    }
-}
