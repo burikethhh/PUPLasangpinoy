@@ -36,8 +36,22 @@ export default function CartScreen() {
   const [phone, setPhone] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
-  useFocusEffect(useCallback(() => { loadCart(); loadSettings(); loadProfile(); }, []));
+  useFocusEffect(useCallback(() => {
+    loadCart();
+    loadSettings();
+    loadProfile();
+    // Auto-fill scheduled date/time with nearest next hour
+    const now = new Date();
+    now.setHours(now.getHours() + 1, 0, 0, 0);
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const hh = String(now.getHours()).padStart(2, "0");
+    setScheduledDate(`${yyyy}-${mm}-${dd}`);
+    setScheduledTime(`${hh}:00`);
+  }, []));
 
   async function loadCart() {
     setLoading(true);
@@ -97,6 +111,7 @@ export default function CartScreen() {
     if ((orderType === "delivery_now" || orderType === "delivery_later") && !address.trim())
       return Alert.alert("Address Required", "Please enter your delivery address.");
     if (!phone.trim()) return Alert.alert("Phone Required", "Please enter your contact number.");
+    if (!/^09\d{9}$/.test(phone.replace(/\s/g, ""))) return Alert.alert("Invalid Phone", "Contact number must be exactly 11 digits starting with 09 (e.g. 09XX XXX XXXX).");
     if (orderType === "delivery_later" && (!scheduledDate || !scheduledTime))
       return Alert.alert("Schedule Required", "Please set date and time for later delivery.");
 
@@ -202,18 +217,22 @@ export default function CartScreen() {
               ))}
             </View>
 
-            {/* Scheduled date/time for later delivery */}
+            {/* Scheduled date/time for later delivery — auto-suggested, non-editable */}
             {orderType === "delivery_later" && (
               <View style={styles.scheduleRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>Date (YYYY-MM-DD)</Text>
-                  <TextInput style={styles.input} placeholder="2025-01-15" value={scheduledDate}
-                    onChangeText={setScheduledDate} placeholderTextColor="#aaa" />
+                  <Text style={styles.inputLabel}>Date</Text>
+                  <View style={[styles.input, styles.inputReadonly]}>
+                    <Ionicons name="calendar-outline" size={15} color="#F25C05" style={{ marginRight: 6 }} />
+                    <Text style={styles.readonlyText}>{scheduledDate}</Text>
+                  </View>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>Time (HH:MM)</Text>
-                  <TextInput style={styles.input} placeholder="14:30" value={scheduledTime}
-                    onChangeText={setScheduledTime} placeholderTextColor="#aaa" />
+                  <Text style={styles.inputLabel}>Time</Text>
+                  <View style={[styles.input, styles.inputReadonly]}>
+                    <Ionicons name="time-outline" size={15} color="#F25C05" style={{ marginRight: 6 }} />
+                    <Text style={styles.readonlyText}>{scheduledTime}</Text>
+                  </View>
                 </View>
               </View>
             )}
@@ -240,13 +259,25 @@ export default function CartScreen() {
             {(orderType === "delivery_now" || orderType === "delivery_later") && (
               <>
                 <Text style={styles.inputLabel}>Delivery Address</Text>
-                <TextInput style={styles.input} placeholder="Enter your full address"
-                  value={address} onChangeText={setAddress} placeholderTextColor="#aaa" multiline />
+                <View style={[styles.input, styles.inputReadonly]}>
+                  <Ionicons name="location-outline" size={15} color="#F25C05" style={{ marginRight: 6 }} />
+                  <Text style={[styles.readonlyText, { flex: 1 }]} numberOfLines={2}>
+                    {address || "No address saved — update in Profile"}
+                  </Text>
+                </View>
               </>
             )}
             <Text style={styles.inputLabel}>Contact Number</Text>
-            <TextInput style={styles.input} placeholder="09XX XXX XXXX"
-              value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholderTextColor="#aaa" />
+            <TextInput
+              style={[styles.input, phoneError ? { borderColor: "#E74C3C" } : null]}
+              placeholder="09XX XXX XXXX"
+              value={phone}
+              onChangeText={(v) => { setPhone(v); setPhoneError(""); }}
+              keyboardType="phone-pad"
+              placeholderTextColor="#aaa"
+              maxLength={13}
+            />
+            {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
 
             {/* Summary */}
             <View style={styles.summaryCard}>
@@ -342,4 +373,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F25C05", marginHorizontal: 16, padding: 16, borderRadius: 16,
   },
   checkoutText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  inputReadonly: {
+    flexDirection: "row", alignItems: "center", backgroundColor: "#F5F0E8",
+    borderColor: "#E8D8A0", opacity: 0.9,
+  },
+  readonlyText: { fontSize: 14, color: "#555" },
+  phoneError: { color: "#E74C3C", fontSize: 12, marginHorizontal: 16, marginTop: 2 },
 });

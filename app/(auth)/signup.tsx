@@ -34,6 +34,7 @@ export default function SignUpScreen() {
     else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Please enter a valid email.';
 
     if (!phone.trim()) newErrors.phone = 'Contact number is required.';
+    else if (!/^09\d{9}$/.test(phone.replace(/\s/g, ''))) newErrors.phone = 'Phone must be 11 digits starting with 09.';
 
     if (!password.trim()) newErrors.password = 'Password is required.';
     else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters.';
@@ -113,7 +114,7 @@ export default function SignUpScreen() {
               <Ionicons name="call-outline" size={18} color="#aaa" style={styles.inputIcon} />
               <TextInput style={styles.input} placeholder="09XX XXX XXXX" placeholderTextColor="#aaa"
                 value={phone} onChangeText={(v) => { setPhone(v); clearError('phone'); }}
-                keyboardType="phone-pad" />
+                keyboardType="phone-pad" maxLength={13} />
             </View>
             {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
 

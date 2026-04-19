@@ -103,7 +103,14 @@ export default function ProfileScreen() {
   }
 
   async function handleScanFood() {
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], allowsEditing: true, quality: 0.7 });
+    // Request camera permission explicitly
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Camera Permission", "Camera access is required to use the AI Food Scanner. Please enable it in your device settings.");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], allowsEditing: true, quality: 0.7, base64: false });
     if (result.canceled) return;
     const uri = result.assets[0].uri;
     setScanImage(uri);
@@ -112,7 +119,7 @@ export default function ProfileScreen() {
     setScanning(true);
 
     try {
-      // Convert image to base64 (native implementation is faster and avoids UI lockups)
+      // Convert image to base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: "base64" as any,
       });

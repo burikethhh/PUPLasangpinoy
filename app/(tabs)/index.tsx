@@ -194,8 +194,14 @@ export default function MenuScreen() {
               return (
                 <View key={item.id} style={styles.menuCard}>
                   {item.image_url ? (
-                    <Image source={{ uri: item.image_url }} style={styles.menuImage}
-                      contentFit="cover" transition={300} cachePolicy="memory-disk" />
+                    <Image
+                      source={{ uri: item.image_url }}
+                      style={styles.menuImage}
+                      contentFit="cover"
+                      transition={300}
+                      cachePolicy="none"
+                      recyclingKey={item.id}
+                    />
                   ) : (
                     <View style={[styles.imagePlaceholder, { backgroundColor: color + "22" }]}>
                       <Text style={{ fontSize: 36 }}>🍽️</Text>

@@ -14,11 +14,11 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: "Pending",
-  accepted: "Accepted",
+  accepted: "Processing",
   preparing: "Preparing",
   out_for_delivery: "Out for Delivery",
   delivered: "Delivered",
-  rejected: "Rejected",
+  rejected: "Cancelled",
   cancelled: "Cancelled",
 };
 

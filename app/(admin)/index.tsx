@@ -22,7 +22,8 @@ export default function AdminDashboard() {
     totalOrders: 0, pendingOrders: 0, todayOrders: 0,
     menuItems: 0, unreadMessages: 0,
   });
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [finishedOrders, setFinishedOrders] = useState<Order[]>([]);
   const [ordersByStatus, setOrdersByStatus] = useState<Record<string, number>>({});
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
@@ -60,7 +61,9 @@ export default function AdminDashboard() {
         unreadMessages: unread,
       });
       setOrdersByStatus(statusCounts);
-      setRecentOrders(orders.slice(0, 5));
+      const ACTIVE = ["pending", "accepted", "preparing", "out_for_delivery"];
+      setActiveOrders(orders.filter((o) => ACTIVE.includes(o.status)).slice(0, 8));
+      setFinishedOrders(orders.filter((o) => !["pending", "accepted", "preparing", "out_for_delivery"].includes(o.status)).slice(0, 5));
     } catch (e) { console.error(e); }
     if (!silent) setLoading(false);
   }
@@ -132,14 +135,14 @@ export default function AdminDashboard() {
               })}
             </View>
 
-            {/* Recent Orders */}
-            <Text style={styles.sectionTitle}>Recent Orders</Text>
+            {/* Active / In-progress Orders */}
+            <Text style={styles.sectionTitle}>Active Orders</Text>
             <View style={styles.card}>
-              {recentOrders.length === 0 ? (
-                <Text style={styles.emptyText}>No orders yet.</Text>
+              {activeOrders.length === 0 ? (
+                <Text style={styles.emptyText}>No active orders.</Text>
               ) : (
-                recentOrders.map((o) => {
-                  const color = ORDER_STATUS_COLORS[o.status] || "#888";
+                activeOrders.map((o: Order) => {
+                  const color = ORDER_STATUS_COLORS[o.status as keyof typeof ORDER_STATUS_COLORS] || "#888";
                   return (
                     <View key={o.id} style={styles.orderRow}>
                       <View style={{ flex: 1 }}>
@@ -147,7 +150,7 @@ export default function AdminDashboard() {
                         <Text style={styles.orderCustomer}>{o.customer_name}</Text>
                       </View>
                       <View style={[styles.orderBadge, { backgroundColor: color + "22" }]}>
-                        <Text style={[styles.orderBadgeText, { color }]}>{ORDER_STATUS_LABELS[o.status]}</Text>
+                        <Text style={[styles.orderBadgeText, { color }]}>{ORDER_STATUS_LABELS[o.status as keyof typeof ORDER_STATUS_LABELS]}</Text>
                       </View>
                       <Text style={styles.orderTotal}>P{o.total?.toFixed(0)}</Text>
                     </View>
@@ -155,6 +158,30 @@ export default function AdminDashboard() {
                 })
               )}
             </View>
+
+            {/* Finished Orders */}
+            {finishedOrders.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Completed / Cancelled</Text>
+                <View style={[styles.card, { opacity: 0.85 }]}>
+                  {finishedOrders.map((o: Order) => {
+                    const color = ORDER_STATUS_COLORS[o.status as keyof typeof ORDER_STATUS_COLORS] || "#888";
+                    return (
+                      <View key={o.id} style={styles.orderRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.orderNum}>{o.order_number}</Text>
+                          <Text style={styles.orderCustomer}>{o.customer_name}</Text>
+                        </View>
+                        <View style={[styles.orderBadge, { backgroundColor: color + "22" }]}>
+                          <Text style={[styles.orderBadgeText, { color }]}>{ORDER_STATUS_LABELS[o.status as keyof typeof ORDER_STATUS_LABELS]}</Text>
+                        </View>
+                        <Text style={styles.orderTotal}>P{o.total?.toFixed(0)}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </>
         )}
       </ScrollView>
