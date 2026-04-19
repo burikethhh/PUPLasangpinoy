@@ -2,22 +2,22 @@
   "expo": {
     "name": "FOODFIX",
     "slug": "foodfix",
-    "version": "2.2.6",
+    "version": "2.2.3",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./logo.jpg",
     "scheme": "foodfix",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.foodfix.mobile",
-      "buildNumber": "10"
+      "buildNumber": "7"
     },
     "android": {
       "package": "com.foodfix.mobile",
-      "versionCode": 10,
+      "versionCode": 7,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./logo.jpg",
         "backgroundColor": "#F5EDD9"
       },
       "edgeToEdgeEnabled": true,
