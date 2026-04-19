@@ -129,17 +129,17 @@ export default function FavoritesScreen() {
         horizontal showsHorizontalScrollIndicator={false}
         data={[{ id: null, name: "All", count: items.length }, ...collections] as any[]}
         keyExtractor={(i) => i.id || "all"}
+        style={{ flexGrow: 0 }}
         contentContainerStyle={styles.tabsRow}
         renderItem={({ item: col }) => {
           const active = activeCollection === col.id;
-          const isAll = !col.id;
           return (
             <TouchableOpacity
-              style={[styles.tabBtn, isAll && styles.tabBtnAll, active && styles.tabBtnActive]}
+              style={[styles.tabBtn, active && styles.tabBtnActive]}
               onPress={() => setActiveCollection(col.id)}>
               <Ionicons name={col.id ? "folder" : "heart"} size={14}
                 color={active ? "#fff" : "#888"} />
-              <Text style={[styles.tabText, isAll && styles.tabTextAll, active && styles.tabTextActive]}>
+              <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
                 {col.name} ({col.count})
               </Text>
             </TouchableOpacity>
@@ -255,11 +255,9 @@ const styles = StyleSheet.create({
   addFolderBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F25C05", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   addFolderText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
   tabsRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
-  tabBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd" },
-  tabBtnAll: { paddingHorizontal: 10, paddingVertical: 6 },
+  tabBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E8D8A0" },
   tabBtnActive: { backgroundColor: "#F25C05", borderColor: "#F25C05" },
   tabText: { fontSize: 12, color: "#888" },
-  tabTextAll: { fontSize: 11 },
   tabTextActive: { color: "#fff", fontWeight: "bold" },
   card: { backgroundColor: "#fff", borderRadius: 16, padding: 14, marginBottom: 12, elevation: 2 },
   cardRow: { flexDirection: "row", alignItems: "center" },

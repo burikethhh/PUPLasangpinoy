@@ -347,12 +347,12 @@ export default function AdminMenuScreen() {
                 onChangeText={(v) => setForm((f) => ({ ...f, price: v }))}
                 placeholder="0.00" placeholderTextColor="#aaa" />
               <Text style={styles.label}>Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 8 }}>
                 {categoryOptions.map((c) => (
                   <TouchableOpacity key={c}
                     style={[styles.chip, form.category === c && styles.chipActive]}
                     onPress={() => { setForm((f) => ({ ...f, category: c })); setShowCustomCat(false); }}>
-                    <Text style={[styles.chipText, form.category === c && styles.chipTextActive]}>{c}</Text>
+                    <Text style={[styles.chipText, form.category === c && styles.chipTextActive]} numberOfLines={1}>{c}</Text>
                   </TouchableOpacity>
                 ))}
                 <TouchableOpacity
@@ -461,25 +461,25 @@ export default function AdminMenuScreen() {
               <Text style={styles.assignHint}>Move dishes from one category to another in one tap.</Text>
 
               <Text style={styles.label}>From Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 6 }}>
                 {categoryOptions.map((option) => (
                   <TouchableOpacity
                     key={`from-${option}`}
                     style={[styles.chip, assignFromCategory === option && styles.chipActive]}
                     onPress={() => setAssignFromCategory(option)}>
-                    <Text style={[styles.chipText, assignFromCategory === option && styles.chipTextActive]}>{option}</Text>
+                    <Text style={[styles.chipText, assignFromCategory === option && styles.chipTextActive]} numberOfLines={1}>{option}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
 
               <Text style={styles.label}>To Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 6 }}>
                 {categoryOptions.map((option) => (
                   <TouchableOpacity
                     key={`to-${option}`}
                     style={[styles.chip, assignToCategory === option && styles.chipActive]}
                     onPress={() => setAssignToCategory(option)}>
-                    <Text style={[styles.chipText, assignToCategory === option && styles.chipTextActive]}>{option}</Text>
+                    <Text style={[styles.chipText, assignToCategory === option && styles.chipTextActive]} numberOfLines={1}>{option}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>

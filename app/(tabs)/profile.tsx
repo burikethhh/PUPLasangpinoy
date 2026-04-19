@@ -411,7 +411,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.3.0</Text>
+        <Text style={styles.version}>Version 2.3.1</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
@@ -487,15 +487,15 @@ export default function ProfileScreen() {
                 onChangeText={(v) => setSubmitForm((f) => ({ ...f, name: v }))}
                 placeholder="e.g. Chicken Adobo" placeholderTextColor="#aaa" />
               <Text style={styles.inputLabel}>Category</Text>
-              <View style={styles.chipRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.chipRow}>
                 {suggestionCategories.map((c) => (
                   <TouchableOpacity key={c}
                     style={[styles.chip, submitForm.category === c && styles.chipActive]}
                     onPress={() => setSubmitForm((f) => ({ ...f, category: c }))}>
-                    <Text style={[styles.chipText, submitForm.category === c && styles.chipTextActive]}>{c}</Text>
+                    <Text style={[styles.chipText, submitForm.category === c && styles.chipTextActive]} numberOfLines={1}>{c}</Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
               <Text style={styles.inputLabel}>Description / Notes</Text>
               <TextInput style={[styles.input, { minHeight: 60 }]} value={submitForm.description}
                 onChangeText={(v) => setSubmitForm((f) => ({ ...f, description: v }))}
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   scanImg: { width: "100%", height: 200, borderRadius: 12, marginBottom: 12 },
   scanResultScroll: { maxHeight: 280 },
   scanResultText: { fontSize: 14, color: "#333", lineHeight: 20 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  chipRow: { gap: 8, marginBottom: 8, paddingVertical: 2 },
   chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "#ddd", backgroundColor: "#fff" },
   chipActive: { borderColor: "#F25C05", backgroundColor: "#FEF3EC" },
   chipText: { fontSize: 12, color: "#888" },
