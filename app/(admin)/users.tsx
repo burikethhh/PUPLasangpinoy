@@ -237,22 +237,42 @@ export default function AdminMoreScreen() {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>Quick Access</Text>
-        <View style={styles.card}>
+        {/* Role Previews */}
+        <Text style={styles.sectionTitle}>Role Previews</Text>
+        <View style={styles.previewRow}>
           <TouchableOpacity
-            style={styles.quickRow}
-            onPress={() => router.push("/(staff)" as any)}
+            style={[styles.previewCard, { borderTopColor: "#F25C05" }]}
+            onPress={() => router.push("/(tabs)" as any)}
+            activeOpacity={0.85}
           >
-            <View style={[styles.quickIcon, { backgroundColor: "#3498DB22" }]}>
-              <Ionicons name="construct" size={18} color="#3498DB" />
+            <View style={[styles.previewIcon, { backgroundColor: "#F25C0518" }]}>
+              <Ionicons name="person" size={22} color="#F25C05" />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.quickTitle}>Open Staff Dashboard (Test)</Text>
-              <Text style={styles.quickSub}>Preview staff order workflow as admin</Text>
+            <Text style={[styles.previewTitle, { color: "#F25C05" }]}>Customer</Text>
+            <Text style={styles.previewSub}>{"Browse menu, cart\n& orders"}</Text>
+            <View style={[styles.previewBadge, { backgroundColor: "#F25C0518" }]}>
+              <Text style={[styles.previewBadgeText, { color: "#F25C05" }]}>Preview</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#bbb" />
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={[styles.previewCard, { borderTopColor: "#3498DB" }]}
+            onPress={() => router.push("/(staff)" as any)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.previewIcon, { backgroundColor: "#3498DB18" }]}>
+              <Ionicons name="construct" size={22} color="#3498DB" />
+            </View>
+            <Text style={[styles.previewTitle, { color: "#3498DB" }]}>Staff</Text>
+            <Text style={styles.previewSub}>{"Order queue\n& fulfillment"}</Text>
+            <View style={[styles.previewBadge, { backgroundColor: "#3498DB18" }]}>
+              <Text style={[styles.previewBadgeText, { color: "#3498DB" }]}>Preview</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.sectionTitle}>Quick Access</Text>
+        <View style={styles.card}>
           <TouchableOpacity
             style={[styles.quickRow, { borderBottomWidth: 0 }]}
             onPress={() => router.push("/(admin)/submissions" as any)}
@@ -493,6 +513,16 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: "#D92614", fontWeight: "bold", fontSize: 15 },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginHorizontal: 16, marginTop: 12, marginBottom: 8 },
+  previewRow: { flexDirection: "row", marginHorizontal: 16, marginBottom: 4, gap: 12 },
+  previewCard: {
+    flex: 1, backgroundColor: "#fff", borderRadius: 16, padding: 14,
+    alignItems: "center", elevation: 2, borderTopWidth: 3,
+  },
+  previewIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  previewTitle: { fontSize: 15, fontWeight: "bold", marginBottom: 4 },
+  previewSub: { fontSize: 11, color: "#888", textAlign: "center", lineHeight: 16, marginBottom: 10 },
+  previewBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+  previewBadgeText: { fontSize: 11, fontWeight: "bold" },
   addStaffBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#3498DB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   addStaffText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
   modalOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },

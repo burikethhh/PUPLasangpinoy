@@ -84,13 +84,14 @@ export default function AdminOrders() {
         contentContainerStyle={styles.filterRow}>
         {FILTER_OPTIONS.map((f) => {
           const active = filter === f;
-          const color = f === "all" ? "#2E1A06" : ORDER_STATUS_COLORS[f];
+          const color = f === "all" ? "#F25C05" : ORDER_STATUS_COLORS[f];
+          const label = f === "all" ? "All" : f === "out_for_delivery" ? "Delivering" : ORDER_STATUS_LABELS[f];
           return (
             <TouchableOpacity key={f}
               style={[styles.filterChip, active && { backgroundColor: color + "22", borderColor: color }]}
-              onPress={() => { setFilter(f); }}>
-              <Text style={[styles.filterText, active && { color, fontWeight: "bold" }]}>
-                {f === "all" ? "All" : ORDER_STATUS_LABELS[f]}
+              onPress={() => setFilter(f)}>
+              <Text style={[styles.filterText, active && { color, fontWeight: "bold" }]} numberOfLines={1}>
+                {label}
               </Text>
             </TouchableOpacity>
           );
@@ -199,8 +200,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
   filterRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
   filterChip: {
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 22,
-    borderWidth: 1, borderColor: "#ddd", backgroundColor: "#fff",
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    borderWidth: 1.5, borderColor: "#E8D8A0", backgroundColor: "#fff",
   },
   filterText: { fontSize: 13, color: "#888", fontWeight: "600" },
   card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12, elevation: 2 },

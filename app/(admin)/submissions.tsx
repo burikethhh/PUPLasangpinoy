@@ -128,19 +128,19 @@ export default function SubmissionsScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Menu Suggestions</Text>
 
-        <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           {(["all", "pending", "approved", "rejected"] as const).map((f) => (
             <TouchableOpacity
               key={f}
-              style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
+              style={[styles.filterPill, filter === f && styles.filterPillActive]}
               onPress={() => setFilter(f)}
             >
-              <Text style={[styles.filterBtnText, filter === f && styles.filterBtnTextActive]}>
+              <Text style={[styles.filterPillText, filter === f && styles.filterPillTextActive]} numberOfLines={1}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
         {filtered.length === 0 ? (
           <Text style={styles.emptyText}>No suggestions found</Text>
@@ -189,17 +189,14 @@ export default function SubmissionsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#1A1A2E" },
   title: { fontSize: 28, fontWeight: "bold", color: "#fff", margin: 20 },
-  filterRow: { flexDirection: "row", marginHorizontal: 20, marginBottom: 20, gap: 8 },
-  filterBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#2A2A4E",
+  filterRow: { paddingHorizontal: 20, paddingBottom: 14, gap: 8 },
+  filterPill: {
+    paddingVertical: 7, paddingHorizontal: 16, borderRadius: 20,
+    backgroundColor: "#2A2A4E", borderWidth: 1, borderColor: "#3A3A5E",
   },
-  filterBtnActive: { backgroundColor: "#F25C05" },
-  filterBtnText: { color: "#888", fontSize: 12, fontWeight: "600", textAlign: "center" },
-  filterBtnTextActive: { color: "#fff" },
+  filterPillActive: { backgroundColor: "#F25C05", borderColor: "#F25C05" },
+  filterPillText: { color: "#888", fontSize: 13, fontWeight: "600" },
+  filterPillTextActive: { color: "#fff", fontWeight: "bold" },
   emptyText: { color: "#888", textAlign: "center", marginTop: 40 },
   card: { backgroundColor: "#2A2A4E", marginHorizontal: 20, marginBottom: 16, borderRadius: 12, padding: 16 },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },

@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   },
   catRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
   catBtn: {
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
     backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E8D8A0",
   },
   catText: { fontSize: 13, fontWeight: "600", color: "#888" },
