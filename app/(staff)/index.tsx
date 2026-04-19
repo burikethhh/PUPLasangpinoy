@@ -131,6 +131,7 @@ export default function StaffOrdersScreen() {
         showsHorizontalScrollIndicator={false}
         data={filters}
         keyExtractor={(i) => i}
+        style={{ flexGrow: 0 }}
         contentContainerStyle={styles.filterRow}
         renderItem={({ item: f }) => (
           <TouchableOpacity

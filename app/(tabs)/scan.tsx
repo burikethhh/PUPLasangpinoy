@@ -205,7 +205,7 @@ export default function CartScreen() {
 
             {/* Order Type */}
             <Text style={styles.sectionLabel}>Order Type</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionsRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.optionsRow}>
               {(["delivery_now", "delivery_later", "dine_in", "pick_up"] as OrderType[]).map((t) => (
                 <TouchableOpacity key={t}
                   style={[styles.optionBtn, orderType === t && styles.optionBtnActive]}
@@ -239,7 +239,7 @@ export default function CartScreen() {
 
             {/* Payment Method */}
             <Text style={styles.sectionLabel}>Payment Method</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionsRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.optionsRow}>
               {(["cod", "gcash"] as PaymentMethod[]).map((m) => (
                 <TouchableOpacity key={m}
                   style={[styles.optionBtn, paymentMethod === m && styles.optionBtnActive,

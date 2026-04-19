@@ -161,7 +161,7 @@ export default function MenuScreen() {
         </View>
 
         {/* CATEGORY FILTER */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.catRow}>
           {categoryOptions.map((cat) => {
             const isActive = activeCategory === cat.value;
             return (

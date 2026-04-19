@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+    ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../lib/firebase";
@@ -128,7 +128,7 @@ export default function SubmissionsScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Menu Suggestions</Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.filterRow}>
           {(["all", "pending", "approved", "rejected"] as const).map((f) => (
             <TouchableOpacity
               key={f}
@@ -145,11 +145,9 @@ export default function SubmissionsScreen() {
         {filtered.length === 0 ? (
           <Text style={styles.emptyText}>No suggestions found</Text>
         ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.card}>
+          <View style={{ paddingHorizontal: 0 }}>
+            {filtered.map((item) => (
+              <View key={item.id} style={styles.card}>
                 <View style={styles.cardHeader}>
                   <Text style={styles.cardTitle}>{item.name}</Text>
                   <View style={[styles.statusBadge, { backgroundColor: item.status === "pending" ? "#FFA500" : item.status === "approved" ? "#4CAF50" : "#F44336" }]}>
@@ -178,8 +176,8 @@ export default function SubmissionsScreen() {
                   </View>
                 )}
               </View>
-            )}
-          />
+            ))}
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>

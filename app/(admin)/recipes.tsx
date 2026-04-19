@@ -81,7 +81,7 @@ export default function AdminOrders() {
 
       {/* Filter Chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}>
+        style={{ flexGrow: 0 }} contentContainerStyle={styles.filterRow}>
         {FILTER_OPTIONS.map((f) => {
           const active = filter === f;
           const color = f === "all" ? "#F25C05" : ORDER_STATUS_COLORS[f];
