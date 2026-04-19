@@ -31,8 +31,10 @@ export default function ProfileScreen() {
   const [submitModal, setSubmitModal] = useState(false);
   const [suggestionCategories, setSuggestionCategories] = useState<string[]>([...MENU_CATEGORIES]);
   const [submitForm, setSubmitForm] = useState({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
+  const [mySuggestions, setMySuggestions] = useState<{ id: string; name: string; category: string; description: string; status: string; created_at: string }[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
-  useFocusEffect(useCallback(() => { loadProfile(); }, []));
+  useFocusEffect(useCallback(() => { loadProfile(); loadMySuggestions(); }, []));
 
   async function loadProfile() {
     const user = getCurrentUser();
@@ -189,6 +191,50 @@ export default function ProfileScreen() {
     setSubmitModal(true);
   }
 
+  async function loadMySuggestions() {
+    const user = getCurrentUser();
+    if (!user) return;
+    setLoadingSuggestions(true);
+    try {
+      const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
+      if (!projectId) return;
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            structuredQuery: {
+              from: [{ collectionId: "menu_suggestions" }],
+              where: {
+                fieldFilter: {
+                  field: { fieldPath: "user_id" },
+                  op: "EQUAL",
+                  value: { stringValue: user.uid },
+                },
+              },
+              orderBy: [{ field: { fieldPath: "created_at" }, direction: "DESCENDING" }],
+            },
+          }),
+        }
+      );
+      const rows = await res.json();
+      const parsed = (Array.isArray(rows) ? rows : [])
+        .filter((r: any) => r.document)
+        .map((r: any) => ({
+          id: r.document.name.split("/").pop(),
+          name: r.document.fields?.name?.stringValue || "",
+          category: r.document.fields?.category?.stringValue || "",
+          description: r.document.fields?.description?.stringValue || "",
+          status: r.document.fields?.status?.stringValue || "pending",
+          created_at: r.document.fields?.created_at?.timestampValue || "",
+        }));
+      setMySuggestions(parsed);
+    } catch (e) { console.error("loadMySuggestions", e); }
+    setLoadingSuggestions(false);
+  }
+
   async function submitMenuSuggestion() {
     if (!submitForm.name.trim()) return Alert.alert("Error", "Please enter a dish name.");
     try {
@@ -245,6 +291,7 @@ export default function ProfileScreen() {
         description: "",
         category: suggestionCategories[0] || (MENU_CATEGORIES[0] as string),
       });
+      loadMySuggestions();
     } catch (error: any) {
       console.error("Submit menu suggestion error:", error);
       Alert.alert("Error", "Failed to submit suggestion. Please try again.");
@@ -311,6 +358,46 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
+        </View>
+
+        {/* My Submissions */}
+        <View style={styles.card}>
+          <View style={styles.suggestionHeader}>
+            <Text style={styles.sectionTitle}>My Submissions</Text>
+            <TouchableOpacity onPress={handleSubmitMenu} style={styles.newSuggestionBtn}>
+              <Ionicons name="add" size={14} color="#F39C12" />
+              <Text style={styles.newSuggestionText}>New</Text>
+            </TouchableOpacity>
+          </View>
+          {loadingSuggestions ? (
+            <ActivityIndicator size="small" color="#F39C12" style={{ marginVertical: 12 }} />
+          ) : mySuggestions.length === 0 ? (
+            <View style={styles.suggestionEmpty}>
+              <Ionicons name="bulb-outline" size={32} color="#ddd" />
+              <Text style={styles.suggestionEmptyText}>No submissions yet</Text>
+              <Text style={styles.suggestionEmptySub}>Tap "New" to suggest a dish!</Text>
+            </View>
+          ) : (
+            mySuggestions.map((s, idx) => {
+              const statusColor = s.status === "approved" ? "#27AE60" : s.status === "rejected" ? "#E74C3C" : "#F39C12";
+              const statusLabel = s.status === "approved" ? "Approved" : s.status === "rejected" ? "Rejected" : "Pending";
+              const isLast = idx === mySuggestions.length - 1;
+              return (
+                <View key={s.id} style={[styles.suggestionRow, isLast && { borderBottomWidth: 0 }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.suggestionName} numberOfLines={1}>{s.name}</Text>
+                    <Text style={styles.suggestionCategory}>{s.category}</Text>
+                    {s.description ? (
+                      <Text style={styles.suggestionDesc} numberOfLines={2}>{s.description}</Text>
+                    ) : null}
+                  </View>
+                  <View style={[styles.suggestionBadge, { backgroundColor: statusColor + "18" }]}>
+                    <Text style={[styles.suggestionBadgeText, { color: statusColor }]}>{statusLabel}</Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
         {/* Actions */}
@@ -489,4 +576,23 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: "#F25C05", backgroundColor: "#FEF3EC" },
   chipText: { fontSize: 12, color: "#888" },
   chipTextActive: { color: "#F25C05", fontWeight: "bold" },
+  suggestionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  newSuggestionBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "#F39C1218", borderRadius: 12,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  newSuggestionText: { fontSize: 12, color: "#F39C12", fontWeight: "700" },
+  suggestionEmpty: { alignItems: "center", paddingVertical: 18 },
+  suggestionEmptyText: { fontSize: 13, color: "#bbb", fontWeight: "600", marginTop: 8 },
+  suggestionEmptySub: { fontSize: 11, color: "#ccc", marginTop: 3 },
+  suggestionRow: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f5f0e5",
+  },
+  suggestionName: { fontSize: 13, fontWeight: "bold", color: "#2E1A06" },
+  suggestionCategory: { fontSize: 11, color: "#F25C05", fontWeight: "600", marginTop: 2 },
+  suggestionDesc: { fontSize: 11, color: "#888", marginTop: 3, lineHeight: 15 },
+  suggestionBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: "flex-start", marginTop: 2 },
+  suggestionBadgeText: { fontSize: 11, fontWeight: "bold" },
 });
