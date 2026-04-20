@@ -1,13 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import * as ExpoLocation from "expo-location";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
-    ActivityIndicator, Alert,
+    ActivityIndicator, Alert, Modal, Platform,
     ScrollView, StyleSheet,
-    Text, TextInput, TouchableOpacity, View
+    Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 import type { OrderType, PaymentMethod } from "../../constants/order";
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
@@ -37,6 +40,17 @@ export default function CartScreen() {
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [phoneError, setPhoneError] = useState("");
+
+  // Date/time picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
+
+  // Location picker state
+  const [mapModal, setMapModal] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const webViewRef = useRef<WebView>(null);
 
   useFocusEffect(useCallback(() => {
     loadCart();
@@ -75,6 +89,117 @@ export default function CartScreen() {
         if (p.phone) setPhone(p.phone);
       }
     }
+  }
+
+  function onDateChange(_: any, selected?: Date) {
+    setShowDatePicker(Platform.OS === "ios");
+    if (selected) {
+      setPickerDate(selected);
+      const yyyy = selected.getFullYear();
+      const mm = String(selected.getMonth() + 1).padStart(2, "0");
+      const dd = String(selected.getDate()).padStart(2, "0");
+      setScheduledDate(`${yyyy}-${mm}-${dd}`);
+    }
+  }
+
+  function onTimeChange(_: any, selected?: Date) {
+    setShowTimePicker(Platform.OS === "ios");
+    if (selected) {
+      setPickerDate(selected);
+      const hh = String(selected.getHours()).padStart(2, "0");
+      const min = String(selected.getMinutes()).padStart(2, "0");
+      setScheduledTime(`${hh}:${min}`);
+    }
+  }
+
+  async function useMyLocation() {
+    setLocating(true);
+    try {
+      const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Enable location access in device settings to use this feature.");
+        return;
+      }
+      const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+      const { latitude, longitude } = loc.coords;
+      setCoords({ lat: latitude, lng: longitude });
+
+      // Reverse geocode with Nominatim (OSM)
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
+        { headers: { "User-Agent": "FOODFIX-App/2.3" } }
+      );
+      const data = await res.json();
+      if (data.display_name) {
+        setAddress(data.display_name);
+      }
+    } catch (e: any) {
+      Alert.alert("Location Error", e.message || "Could not get location.");
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  function handleMapMessage(event: any) {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.lat && data.lng) {
+        setCoords({ lat: data.lat, lng: data.lng });
+        if (data.address) setAddress(data.address);
+        setMapModal(false);
+      }
+    } catch {}
+  }
+
+  function getMapHtml(lat = 14.5995, lng = 120.9842) {
+    return `<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>html,body,#map{margin:0;padding:0;height:100%;width:100%}
+.info{position:fixed;bottom:10px;left:10px;right:10px;z-index:999;background:#fff;padding:12px 16px;
+border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.15);font-family:sans-serif;font-size:13px;color:#333}
+.info b{color:#F25C05}
+.btn{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:999;background:#F25C05;
+color:#fff;border:none;padding:14px 32px;border-radius:14px;font-size:15px;font-weight:bold;cursor:pointer;
+box-shadow:0 2px 10px rgba(242,92,5,0.4)}
+</style></head><body>
+<div id="map"></div>
+<div class="info" id="addr">Tap the map to pick a location</div>
+<button class="btn" id="confirm" style="display:none" onclick="confirmLocation()">Confirm Location</button>
+<script>
+var map=L.map('map').setView([${lat},${lng}],15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'&copy; OSM contributors',maxZoom:19}).addTo(map);
+var marker=null,selectedLat=null,selectedLng=null,selectedAddr='';
+map.on('click',function(e){
+  selectedLat=e.latlng.lat;selectedLng=e.latlng.lng;
+  if(marker)map.removeLayer(marker);
+  marker=L.marker([selectedLat,selectedLng],{draggable:true}).addTo(map);
+  marker.on('dragend',function(ev){
+    var p=ev.target.getLatLng();selectedLat=p.lat;selectedLng=p.lng;reverseGeocode(p.lat,p.lng);
+  });
+  reverseGeocode(selectedLat,selectedLng);
+});
+function reverseGeocode(lat,lng){
+  document.getElementById('addr').innerHTML='<b>Loading address...</b>';
+  fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&addressdetails=1',
+    {headers:{'User-Agent':'FOODFIX-App/2.3'}})
+  .then(r=>r.json()).then(d=>{
+    selectedAddr=d.display_name||(''+lat.toFixed(5)+', '+lng.toFixed(5));
+    document.getElementById('addr').innerHTML='<b>📍 </b>'+selectedAddr;
+    document.getElementById('confirm').style.display='block';
+  }).catch(()=>{
+    selectedAddr=lat.toFixed(5)+', '+lng.toFixed(5);
+    document.getElementById('addr').innerHTML='<b>📍 </b>'+selectedAddr;
+    document.getElementById('confirm').style.display='block';
+  });
+}
+function confirmLocation(){
+  window.ReactNativeWebView.postMessage(JSON.stringify({lat:selectedLat,lng:selectedLng,address:selectedAddr}));
+}
+</script></body></html>`;
   }
 
   async function saveCart(items: CartItem[]) {
@@ -217,24 +342,32 @@ export default function CartScreen() {
               ))}
             </ScrollView>
 
-            {/* Scheduled date/time for later delivery — auto-suggested, non-editable */}
+            {/* Scheduled date/time for later delivery */}
             {orderType === "delivery_later" && (
               <View style={styles.scheduleRow}>
-                <View style={{ flex: 1 }}>
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowDatePicker(true)}>
                   <Text style={styles.inputLabel}>Date</Text>
-                  <View style={[styles.input, styles.inputReadonly]}>
+                  <View style={[styles.input, styles.pickerField]}>
                     <Ionicons name="calendar-outline" size={15} color="#F25C05" style={{ marginRight: 6 }} />
-                    <Text style={styles.readonlyText}>{scheduledDate}</Text>
+                    <Text style={styles.pickerFieldText}>{scheduledDate || "Select date"}</Text>
                   </View>
-                </View>
-                <View style={{ flex: 1 }}>
+                </TouchableOpacity>
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowTimePicker(true)}>
                   <Text style={styles.inputLabel}>Time</Text>
-                  <View style={[styles.input, styles.inputReadonly]}>
+                  <View style={[styles.input, styles.pickerField]}>
                     <Ionicons name="time-outline" size={15} color="#F25C05" style={{ marginRight: 6 }} />
-                    <Text style={styles.readonlyText}>{scheduledTime}</Text>
+                    <Text style={styles.pickerFieldText}>{scheduledTime || "Select time"}</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               </View>
+            )}
+            {showDatePicker && (
+              <DateTimePicker value={pickerDate} mode="date"
+                minimumDate={new Date()} onChange={onDateChange} />
+            )}
+            {showTimePicker && (
+              <DateTimePicker value={pickerDate} mode="time"
+                is24Hour minuteInterval={15} onChange={onTimeChange} />
             )}
 
             {/* Payment Method */}
@@ -259,11 +392,24 @@ export default function CartScreen() {
             {(orderType === "delivery_now" || orderType === "delivery_later") && (
               <>
                 <Text style={styles.inputLabel}>Delivery Address</Text>
-                <View style={[styles.input, styles.inputReadonly]}>
-                  <Ionicons name="location-outline" size={15} color="#F25C05" style={{ marginRight: 6 }} />
-                  <Text style={[styles.readonlyText, { flex: 1 }]} numberOfLines={2}>
-                    {address || "No address saved — update in Profile"}
-                  </Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your delivery address"
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholderTextColor="#aaa"
+                  multiline
+                />
+                <View style={styles.locationBtns}>
+                  <TouchableOpacity style={styles.locationBtn} onPress={useMyLocation} disabled={locating}>
+                    {locating ? <ActivityIndicator size="small" color="#F25C05" /> :
+                      <Ionicons name="navigate" size={15} color="#F25C05" />}
+                    <Text style={styles.locationBtnText}>{locating ? "Locating..." : "Use My Location"}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.locationBtn} onPress={() => setMapModal(true)}>
+                    <Ionicons name="map" size={15} color="#F25C05" />
+                    <Text style={styles.locationBtnText}>Pick on Map</Text>
+                  </TouchableOpacity>
                 </View>
               </>
             )}
@@ -312,6 +458,27 @@ export default function CartScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Map Picker Modal (OSM + Leaflet) */}
+      <Modal visible={mapModal} animationType="slide" onRequestClose={() => setMapModal(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F9F0DC" }}>
+          <View style={styles.mapHeader}>
+            <Text style={styles.mapHeaderTitle}>Pick Location</Text>
+            <TouchableOpacity onPress={() => setMapModal(false)} style={{ padding: 4 }}>
+              <Ionicons name="close" size={24} color="#888" />
+            </TouchableOpacity>
+          </View>
+          <WebView
+            ref={webViewRef}
+            originWhitelist={["*"]}
+            source={{ html: getMapHtml(coords?.lat ?? 14.5995, coords?.lng ?? 120.9842) }}
+            onMessage={handleMapMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            style={{ flex: 1 }}
+          />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -373,10 +540,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#F25C05", marginHorizontal: 16, padding: 16, borderRadius: 16,
   },
   checkoutText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  inputReadonly: {
-    flexDirection: "row", alignItems: "center", backgroundColor: "#F5F0E8",
-    borderColor: "#E8D8A0", opacity: 0.9,
+  pickerField: {
+    flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
+    borderColor: "#F25C05", borderWidth: 1.5,
   },
-  readonlyText: { fontSize: 14, color: "#555" },
+  pickerFieldText: { fontSize: 14, color: "#2E1A06", fontWeight: "500" },
+  locationBtns: {
+    flexDirection: "row", gap: 10, marginHorizontal: 16, marginTop: 8,
+  },
+  locationBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#FFF5EE", borderRadius: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: "#F25C0544",
+  },
+  locationBtnText: { fontSize: 12, color: "#F25C05", fontWeight: "600" },
+  mapHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    padding: 16, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#E8D8A0",
+  },
+  mapHeaderTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06" },
   phoneError: { color: "#E74C3C", fontSize: 12, marginHorizontal: 16, marginTop: 2 },
 });

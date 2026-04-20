@@ -17,6 +17,7 @@ export default function StaffOrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
   const [staffName, setStaffName] = useState("");
+  const [archived, setArchived] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -72,7 +73,18 @@ export default function StaffOrdersScreen() {
     ]);
   }
 
-  const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
+  const visible = orders.filter((o) => !archived.has(o.id));
+  const filtered = filter === "all" ? visible : visible.filter((o) => o.status === filter);
+
+  function handleArchive(orderId: string) {
+    Alert.alert("Archive Order", "Hide this order from the list?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Archive", style: "destructive",
+        onPress: () => setArchived((prev) => new Set([...prev, orderId])) },
+    ]);
+  }
+
+  const FINISHED = ["delivered", "rejected", "cancelled"];
   const filters: (OrderStatus | "all")[] = ["all", "accepted", "preparing", "out_for_delivery", "delivered"];
   const filterLabel = (f: OrderStatus | "all") => {
     if (f === "all") return "All";
@@ -115,6 +127,12 @@ export default function StaffOrdersScreen() {
           >
             <Ionicons name="checkmark-circle" size={18} color="#fff" />
             <Text style={styles.preparedBtnText}>Mark as Prepared</Text>
+          </TouchableOpacity>
+        )}
+        {FINISHED.includes(item.status) && (
+          <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(item.id)}>
+            <Ionicons name="archive-outline" size={14} color="#888" />
+            <Text style={styles.archiveBtnText}>Archive</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -195,6 +213,8 @@ const styles = StyleSheet.create({
     gap: 6, backgroundColor: "#27AE60", borderRadius: 12, padding: 12,
   },
   preparedBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
+  archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 8, padding: 4 },
+  archiveBtnText: { fontSize: 11, color: "#888" },
   empty: { alignItems: "center", marginTop: 60 },
   emptyText: { color: "#aaa", fontSize: 14, marginTop: 8 },
 });
