@@ -15,7 +15,7 @@ export default function StaffOrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<OrderStatus | "all">("all");
+  const [filter, setFilter] = useState<OrderStatus | "all" | "archived">("all");
   const [staffName, setStaffName] = useState("");
   const [archived, setArchived] = useState<Set<string>>(new Set());
 
@@ -73,8 +73,10 @@ export default function StaffOrdersScreen() {
     ]);
   }
 
-  const visible = orders.filter((o) => !archived.has(o.id));
-  const filtered = filter === "all" ? visible : visible.filter((o) => o.status === filter);
+  const visible = filter === "archived"
+    ? orders.filter((o) => archived.has(o.id))
+    : orders.filter((o) => !archived.has(o.id));
+  const filtered = filter === "all" ? visible : filter === "archived" ? visible : visible.filter((o) => o.status === filter);
 
   function handleArchive(orderId: string) {
     Alert.alert("Archive Order", "Hide this order from the list?", [
@@ -84,10 +86,19 @@ export default function StaffOrdersScreen() {
     ]);
   }
 
+  function handleUnarchive(orderId: string) {
+    Alert.alert("Unarchive Order", "Move this order back to the main list?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unarchive",
+        onPress: () => setArchived((prev) => { const next = new Set(prev); next.delete(orderId); return next; }) },
+    ]);
+  }
+
   const FINISHED = ["delivered", "rejected", "cancelled"];
-  const filters: (OrderStatus | "all")[] = ["all", "accepted", "preparing", "out_for_delivery", "delivered"];
-  const filterLabel = (f: OrderStatus | "all") => {
+  const filters: (OrderStatus | "all" | "archived")[] = ["all", "accepted", "preparing", "out_for_delivery", "delivered", "archived"];
+  const filterLabel = (f: OrderStatus | "all" | "archived") => {
     if (f === "all") return "All";
+    if (f === "archived") return `Archived (${archived.size})`;
     if (f === "out_for_delivery") return "Delivering";
     return ORDER_STATUS_LABELS[f] || f;
   };
@@ -129,10 +140,16 @@ export default function StaffOrdersScreen() {
             <Text style={styles.preparedBtnText}>Mark as Prepared</Text>
           </TouchableOpacity>
         )}
-        {FINISHED.includes(item.status) && (
+        {FINISHED.includes(item.status) && filter !== "archived" && (
           <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(item.id)}>
             <Ionicons name="archive-outline" size={14} color="#888" />
             <Text style={styles.archiveBtnText}>Archive</Text>
+          </TouchableOpacity>
+        )}
+        {filter === "archived" && (
+          <TouchableOpacity style={[styles.archiveBtn, { marginTop: 10 }]} onPress={() => handleUnarchive(item.id)}>
+            <Ionicons name="arrow-undo-outline" size={14} color="#3498DB" />
+            <Text style={[styles.archiveBtnText, { color: "#3498DB" }]}>Unarchive</Text>
           </TouchableOpacity>
         )}
       </View>

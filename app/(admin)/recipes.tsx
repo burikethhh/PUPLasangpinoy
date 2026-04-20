@@ -10,14 +10,14 @@ import type { OrderStatus } from "../../constants/order";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUSES } from "../../constants/order";
 import { getOrders, updateOrderStatus, type Order } from "../../lib/firebase-store";
 
-const FILTER_OPTIONS: (OrderStatus | "all")[] = ["all", ...ORDER_STATUSES];
+const FILTER_OPTIONS: (OrderStatus | "all" | "archived")[] = ["all", ...ORDER_STATUSES, "archived"];
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   pending: "accepted", accepted: "preparing", preparing: "out_for_delivery", out_for_delivery: "delivered",
 };
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filter, setFilter] = useState<OrderStatus | "all">("all");
+  const [filter, setFilter] = useState<OrderStatus | "all" | "archived">("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [rejectId, setRejectId] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export default function AdminOrders() {
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await getOrders(filter === "all" ? undefined : { status: filter });
+      const data = await getOrders(filter === "all" || filter === "archived" ? undefined : { status: filter });
       setOrders(data);
     } catch (e) { console.error(e); }
     if (!silent) setLoading(false);
@@ -74,14 +74,24 @@ export default function AdminOrders() {
     fetchOrders(true);
   }
 
-  const visible = orders.filter((o) => !archived.has(o.id));
-  const filtered = filter === "all" ? visible : visible.filter((o) => o.status === filter);
+  const visible = filter === "archived"
+    ? orders.filter((o) => archived.has(o.id))
+    : orders.filter((o) => !archived.has(o.id));
+  const filtered = filter === "all" ? visible : filter === "archived" ? visible : visible.filter((o) => o.status === filter);
 
   function handleArchive(orderId: string) {
     Alert.alert("Archive Order", "Hide this order from the list?", [
       { text: "Cancel", style: "cancel" },
       { text: "Archive", style: "destructive",
         onPress: () => setArchived((prev) => new Set([...prev, orderId])) },
+    ]);
+  }
+
+  function handleUnarchive(orderId: string) {
+    Alert.alert("Unarchive Order", "Move this order back to the main list?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unarchive",
+        onPress: () => setArchived((prev) => { const next = new Set(prev); next.delete(orderId); return next; }) },
     ]);
   }
 
@@ -96,8 +106,8 @@ export default function AdminOrders() {
         style={{ flexGrow: 0 }} contentContainerStyle={styles.filterRow}>
         {FILTER_OPTIONS.map((f) => {
           const active = filter === f;
-          const color = f === "all" ? "#F25C05" : ORDER_STATUS_COLORS[f];
-          const label = f === "all" ? "All" : f === "out_for_delivery" ? "Delivering" : ORDER_STATUS_LABELS[f];
+          const color = f === "all" ? "#F25C05" : f === "archived" ? "#888" : ORDER_STATUS_COLORS[f];
+          const label = f === "all" ? "All" : f === "archived" ? `Archived (${archived.size})` : f === "out_for_delivery" ? "Delivering" : ORDER_STATUS_LABELS[f];
           return (
             <TouchableOpacity key={f}
               style={[styles.filterChip, active && { backgroundColor: color + "22", borderColor: color }]}
@@ -173,10 +183,16 @@ export default function AdminOrders() {
                     )}
                   </View>
                 )}
-                {FINISHED.includes(item.status) && (
+                {FINISHED.includes(item.status) && filter !== "archived" && (
                   <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(item.id)}>
                     <Ionicons name="archive-outline" size={14} color="#888" />
                     <Text style={styles.archiveBtnText}>Archive</Text>
+                  </TouchableOpacity>
+                )}
+                {filter === "archived" && (
+                  <TouchableOpacity style={[styles.archiveBtn, { marginTop: 10 }]} onPress={() => handleUnarchive(item.id)}>
+                    <Ionicons name="arrow-undo-outline" size={14} color="#F25C05" />
+                    <Text style={[styles.archiveBtnText, { color: "#F25C05" }]}>Unarchive</Text>
                   </TouchableOpacity>
                 )}
               </View>
