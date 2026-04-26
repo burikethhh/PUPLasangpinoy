@@ -43,6 +43,8 @@ export default function AdminMoreScreen() {
     address: "",
     role: "customer" as Profile["role"],
   });
+  const [staffExpanded, setStaffExpanded] = useState(false);
+  const [usersExpanded, setUsersExpanded] = useState(false);
 
   useFocusEffect(useCallback(() => { loadAll(); }, []));
 
@@ -217,25 +219,30 @@ export default function AdminMoreScreen() {
 
         {/* Staff Overview */}
         <View style={styles.sectionRow}>
-          <Text style={[styles.sectionTitle, { marginHorizontal: 0, marginTop: 0, marginBottom: 0 }]}>Staff ({staff.length})</Text>
+          <TouchableOpacity style={styles.collapseHeader} onPress={() => setStaffExpanded((v) => !v)}>
+            <Ionicons name={staffExpanded ? "chevron-down" : "chevron-forward"} size={16} color="#2E1A06" />
+            <Text style={[styles.sectionTitle, { marginHorizontal: 0, marginTop: 0, marginBottom: 0 }]}>Staff ({staff.length})</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.addStaffBtn} onPress={() => setStaffModal(true)}>
             <Ionicons name="person-add" size={16} color="#fff" />
             <Text style={styles.addStaffText}>Add Staff</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.card}>
-          {staff.length === 0 ? (
-            <Text style={styles.emptyText}>No staff registered</Text>
-          ) : (
-            staff.map((s) => (
-              <View key={s.id} style={styles.staffRow}>
-                <View style={[styles.statusDot, { backgroundColor: "#3498DB" }]} />
-                <Text style={styles.staffName}>{s.username || s.email?.split("@")[0]}</Text>
-                <Text style={styles.staffInfo}>{s.phone || "staff"}</Text>
-              </View>
-            ))
-          )}
-        </View>
+        {staffExpanded && (
+          <View style={styles.card}>
+            {staff.length === 0 ? (
+              <Text style={styles.emptyText}>No staff registered</Text>
+            ) : (
+              staff.map((s) => (
+                <View key={s.id} style={styles.staffRow}>
+                  <View style={[styles.statusDot, { backgroundColor: "#3498DB" }]} />
+                  <Text style={styles.staffName}>{s.username || s.email?.split("@")[0]}</Text>
+                  <Text style={styles.staffInfo}>{s.phone || "staff"}</Text>
+                </View>
+              ))
+            )}
+          </View>
+        )}
 
         {/* Role Previews */}
         <Text style={styles.sectionTitle}>Role Previews</Text>
@@ -289,33 +296,38 @@ export default function AdminMoreScreen() {
         </View>
 
         {/* Users Management */}
-        <Text style={styles.sectionTitle}>Users ({users.length})</Text>
-        <View style={styles.card}>
-          {users.length === 0 ? (
-            <Text style={styles.emptyText}>No users found</Text>
-          ) : (
-            users.map((u) => (
-              <View key={u.id} style={styles.userRow}>
-                <View style={[styles.statusDot, { backgroundColor: u.role === "admin" ? "#F25C05" : u.role === "staff" ? "#3498DB" : "#27AE60" }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.staffName}>{u.username || u.email?.split("@")[0]}</Text>
-                  <Text style={styles.userEmail}>{u.email}</Text>
-                </View>
-                <View style={styles.userMeta}>
-                  <Text style={styles.staffInfo}>{u.role}</Text>
-                  <View style={styles.userActions}>
-                    <TouchableOpacity style={styles.iconActionBtn} onPress={() => openEditUser(u)}>
-                      <Ionicons name="create-outline" size={16} color="#3498DB" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconActionBtn} onPress={() => handleDeleteUser(u)}>
-                      <Ionicons name="trash-outline" size={16} color="#E74C3C" />
-                    </TouchableOpacity>
+        <TouchableOpacity style={[styles.collapseHeader, { marginHorizontal: 16, marginTop: 12, marginBottom: 8 }]} onPress={() => setUsersExpanded((v) => !v)}>
+          <Ionicons name={usersExpanded ? "chevron-down" : "chevron-forward"} size={16} color="#2E1A06" />
+          <Text style={[styles.sectionTitle, { marginHorizontal: 0, marginTop: 0, marginBottom: 0 }]}>Users ({users.length})</Text>
+        </TouchableOpacity>
+        {usersExpanded && (
+          <View style={styles.card}>
+            {users.length === 0 ? (
+              <Text style={styles.emptyText}>No users found</Text>
+            ) : (
+              users.map((u) => (
+                <View key={u.id} style={styles.userRow}>
+                  <View style={[styles.statusDot, { backgroundColor: u.role === "admin" ? "#F25C05" : u.role === "staff" ? "#3498DB" : "#27AE60" }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.staffName}>{u.username || u.email?.split("@")[0]}</Text>
+                    <Text style={styles.userEmail}>{u.email}</Text>
+                  </View>
+                  <View style={styles.userMeta}>
+                    <Text style={styles.staffInfo}>{u.role}</Text>
+                    <View style={styles.userActions}>
+                      <TouchableOpacity style={styles.iconActionBtn} onPress={() => openEditUser(u)}>
+                        <Ionicons name="create-outline" size={16} color="#3498DB" />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.iconActionBtn} onPress={() => handleDeleteUser(u)}>
+                        <Ionicons name="trash-outline" size={16} color="#E74C3C" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))
-          )}
-        </View>
+              ))
+            )}
+          </View>
+        )}
 
         {/* App Settings */}
         <Text style={styles.sectionTitle}>App Settings</Text>
@@ -513,6 +525,7 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: "#D92614", fontWeight: "bold", fontSize: 15 },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginHorizontal: 16, marginTop: 12, marginBottom: 8 },
+  collapseHeader: { flexDirection: "row", alignItems: "center", gap: 4 },
   previewRow: { flexDirection: "row", marginHorizontal: 16, marginBottom: 4, gap: 12 },
   previewCard: {
     flex: 1, backgroundColor: "#fff", borderRadius: 16, padding: 14,

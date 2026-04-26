@@ -17,6 +17,7 @@ export default function OrdersScreen() {
   const [archived, setArchived] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   useFocusEffect(useCallback(() => { fetchOrders(); }, []));
 
@@ -49,14 +50,25 @@ export default function OrdersScreen() {
     ]);
   }
 
+  function handleUnarchive(orderId: string) {
+    Alert.alert("Unarchive Order", "Move this order back to your history?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unarchive",
+        onPress: () => setArchived((prev) => { const next = new Set(prev); next.delete(orderId); return next; }) },
+    ]);
+  }
+
+  const archivedOrders = orders.filter((o) => archived.has(o.id));
   const visible = orders.filter((o) => !archived.has(o.id));
   const active = visible.filter((o) => !FINISHED_STATUSES.includes(o.status));
   const finished = visible.filter((o) => FINISHED_STATUSES.includes(o.status));
 
-  const sections = [
-    ...(active.length > 0 ? [{ title: "Active Orders", data: active }] : []),
-    ...(finished.length > 0 ? [{ title: "Order History", data: finished }] : []),
-  ];
+  const sections = showArchived
+    ? (archivedOrders.length > 0 ? [{ title: `Archived (${archivedOrders.length})`, data: archivedOrders }] : [])
+    : [
+        ...(active.length > 0 ? [{ title: "Active Orders", data: active }] : []),
+        ...(finished.length > 0 ? [{ title: "Order History", data: finished }] : []),
+      ];
 
   function renderOrder({ item }: { item: Order }) {
     const color = ORDER_STATUS_COLORS[item.status] || "#888";
@@ -66,9 +78,12 @@ export default function OrdersScreen() {
 
     return (
       <View style={[styles.card, isFinished && styles.cardFinished]}>
-        {/* Single compact header row */}
+        {/* Header: name on top, order number below */}
         <View style={styles.headerRow}>
-          <Text style={styles.orderNum} numberOfLines={1}>{item.order_number}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.customerName} numberOfLines={1}>{item.customer_name || "Customer"}</Text>
+            <Text style={styles.orderNum} numberOfLines={1}>{item.order_number}</Text>
+          </View>
           <Text style={styles.typeChip} numberOfLines={1}>{ORDER_TYPE_LABELS[item.order_type]}</Text>
           <View style={[styles.badge, { backgroundColor: color + "22" }]}>
             <Text style={[styles.badgeText, { color }]}>{ORDER_STATUS_LABELS[item.status]}</Text>
@@ -113,11 +128,17 @@ export default function OrdersScreen() {
           </View>
         )}
 
-        {/* Archive button for finished orders */}
-        {isFinished && (
+        {/* Archive / Unarchive button */}
+        {isFinished && !showArchived && (
           <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(item.id)}>
             <Ionicons name="archive-outline" size={14} color="#888" />
             <Text style={styles.archiveBtnText}>Archive</Text>
+          </TouchableOpacity>
+        )}
+        {showArchived && (
+          <TouchableOpacity style={styles.archiveBtn} onPress={() => handleUnarchive(item.id)}>
+            <Ionicons name="arrow-undo-outline" size={14} color="#F25C05" />
+            <Text style={[styles.archiveBtnText, { color: "#F25C05" }]}>Unarchive</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -127,6 +148,20 @@ export default function OrdersScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>My Orders</Text>
+
+      {/* Tab pills */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tabPill, !showArchived && styles.tabPillActive]}
+          onPress={() => setShowArchived(false)}>
+          <Text style={[styles.tabPillText, !showArchived && styles.tabPillTextActive]}>Active</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabPill, showArchived && styles.tabPillActive]}
+          onPress={() => setShowArchived(true)}>
+          <Text style={[styles.tabPillText, showArchived && styles.tabPillTextActive]}>Archived ({archived.size})</Text>
+        </TouchableOpacity>
+      </View>
 
       {loading ? (
         <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
@@ -165,7 +200,8 @@ const styles = StyleSheet.create({
   },
   cardFinished: { borderLeftColor: "#ddd", opacity: 0.9 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
-  orderNum: { fontSize: 13, fontWeight: "bold", color: "#2E1A06", flexShrink: 0 },
+  customerName: { fontSize: 14, fontWeight: "bold", color: "#2E1A06" },
+  orderNum: { fontSize: 11, color: "#888", marginTop: 1 },
   typeChip: { fontSize: 10, color: "#9B59B6", fontWeight: "600", flex: 1 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   badgeText: { fontSize: 10, fontWeight: "bold" },
@@ -185,6 +221,14 @@ const styles = StyleSheet.create({
   trackerLabel: { fontSize: 8, color: "#aaa", textAlign: "center", flex: 1 },
   archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 6, padding: 4 },
   archiveBtnText: { fontSize: 11, color: "#888" },
+  tabRow: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
+  tabPill: {
+    paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E8D8A0",
+  },
+  tabPillActive: { backgroundColor: "#F25C05", borderColor: "#F25C05" },
+  tabPillText: { fontSize: 13, color: "#888", fontWeight: "600" },
+  tabPillTextActive: { color: "#fff", fontWeight: "bold" },
   empty: { alignItems: "center", marginTop: 80 },
   emptyText: { fontSize: 18, fontWeight: "bold", color: "#aaa", marginTop: 12 },
   emptySubtext: { fontSize: 13, color: "#bbb", marginTop: 4 },

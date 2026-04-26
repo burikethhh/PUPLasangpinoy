@@ -418,6 +418,13 @@ export async function getConversations(): Promise<{ customer_id: string; custome
   return Array.from(convMap.values());
 }
 
+export async function deleteMessage(messageId: string): Promise<void> {
+  return firestoreOp(
+    async () => { await deleteDoc(doc(db, "messages", messageId)); },
+    async () => { await RestApi.deleteDocument("messages", messageId); },
+  );
+}
+
 export async function markMessagesRead(conversationId: string, readerRole: string): Promise<void> {
   const messages = await getMessages(conversationId);
   for (const msg of messages) {

@@ -19,7 +19,7 @@ import {
     type MenuItem,
 } from "../../lib/firebase-store";
 
-const CART_KEY = "@lasangpinoy_cart";
+const CART_KEY = "@foodfix_cart";
 
 interface FavCollection { id: string; name: string; count: number; }
 interface FavItem extends MenuItem { collection_id?: string; }

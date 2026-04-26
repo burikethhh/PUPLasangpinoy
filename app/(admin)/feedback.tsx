@@ -2,14 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
-  ActivityIndicator, FlatList, KeyboardAvoidingView, Platform,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+    ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform,
+    StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
 import {
-  getConversations, getMessages, markMessagesRead,
-  sendMessage as sendMsg, type Message,
+    deleteMessage, getConversations, getMessages, markMessagesRead,
+    sendMessage as sendMsg, type Message,
 } from "../../lib/firebase-store";
 
 interface Convo { customer_id: string; customer_name: string; last_message: string; unread: number; }
@@ -48,6 +48,21 @@ export default function AdminMessages() {
     } catch (e) { console.error(e); }
     setLoadingChat(false);
     setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 200);
+  }
+
+  function handleDeleteMessage(msg: Message) {
+    Alert.alert("Delete Message", "Delete this message for everyone?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try {
+          await deleteMessage(msg.id);
+          if (selected) {
+            const msgs = await getMessages(selected.customer_id);
+            setMessages(msgs);
+          }
+        } catch (e) { console.error(e); }
+      }},
+    ]);
   }
 
   async function send() {
@@ -126,14 +141,17 @@ export default function AdminMessages() {
             renderItem={({ item }) => {
               const isAdmin = item.sender_role === "admin";
               return (
-                <View style={[styles.bubble, isAdmin ? styles.bubbleAdmin : styles.bubbleCustomer]}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onLongPress={() => handleDeleteMessage(item)}
+                  style={[styles.bubble, isAdmin ? styles.bubbleAdmin : styles.bubbleCustomer]}>
                   <Text style={[styles.bubbleText, isAdmin && { color: "#fff" }]}>{item.content}</Text>
                   <Text style={[styles.bubbleTime, isAdmin && { color: "rgba(255,255,255,0.7)" }]}>
                     {item.created_at?.seconds
                       ? new Date(item.created_at.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                       : ""}
                   </Text>
-                </View>
+                </TouchableOpacity>
               );
             }}
           />

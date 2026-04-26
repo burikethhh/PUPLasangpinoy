@@ -2,12 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator, FlatList, KeyboardAvoidingView, Platform,
+    ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform,
     StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentUser, getProfile } from '../../lib/firebase';
-import { getMessages, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
+import { deleteMessage, getMessages, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -66,10 +66,23 @@ export default function ChatScreen() {
 
   const userId = getCurrentUser()?.uid;
 
+  function handleDeleteMessage(msg: Message) {
+    Alert.alert('Delete Message', 'Delete this message for everyone?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await deleteMessage(msg.id); await loadMessages(); }
+        catch (e) { console.error(e); }
+      }},
+    ]);
+  }
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isMe = item.sender_id === userId;
     return (
-      <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onLongPress={() => handleDeleteMessage(item)}
+        style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
         {!isMe && (
           <View style={styles.avatarBox}>
             <Ionicons name="storefront" size={16} color="#F25C05" />
@@ -84,7 +97,7 @@ export default function ChatScreen() {
               : ''}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

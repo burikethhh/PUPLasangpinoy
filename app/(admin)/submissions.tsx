@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import {
     ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../lib/firebase";
 
@@ -25,7 +26,8 @@ const FIRESTORE_DATABASE_ID =
 export default function SubmissionsScreen() {
   const [loading, setLoading] = useState(true);
   const [suggestions, setSuggestions] = useState<MenuSuggestion[]>([]);
-  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected" | "archived">("pending");
+  const [archived, setArchived] = useState<Set<string>>(new Set());
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
@@ -113,7 +115,26 @@ export default function SubmissionsScreen() {
     }
   };
 
-  const filtered = filter === "all" ? suggestions : suggestions.filter((s) => s.status === filter);
+  function handleArchive(id: string) {
+    Alert.alert("Archive Suggestion", "Hide this from the main list?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Archive", style: "destructive",
+        onPress: () => setArchived((prev) => new Set([...prev, id])) },
+    ]);
+  }
+
+  function handleUnarchive(id: string) {
+    Alert.alert("Unarchive Suggestion", "Move this back to the main list?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unarchive",
+        onPress: () => setArchived((prev) => { const next = new Set(prev); next.delete(id); return next; }) },
+    ]);
+  }
+
+  const visible = filter === "archived"
+    ? suggestions.filter((s) => archived.has(s.id))
+    : suggestions.filter((s) => !archived.has(s.id));
+  const filtered = filter === "all" ? visible : filter === "archived" ? visible : visible.filter((s) => s.status === filter);
 
   if (loading) {
     return (
@@ -129,14 +150,14 @@ export default function SubmissionsScreen() {
         <Text style={styles.title}>Menu Suggestions</Text>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.filterRow}>
-          {(["all", "pending", "approved", "rejected"] as const).map((f) => (
+          {(["all", "pending", "approved", "rejected", "archived"] as const).map((f) => (
             <TouchableOpacity
               key={f}
               style={[styles.filterPill, filter === f && styles.filterPillActive]}
               onPress={() => setFilter(f)}
             >
               <Text style={[styles.filterPillText, filter === f && styles.filterPillTextActive]} numberOfLines={1}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === "archived" ? `Archived (${archived.size})` : f.charAt(0).toUpperCase() + f.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -157,7 +178,7 @@ export default function SubmissionsScreen() {
                 <Text style={styles.cardCategory}>{item.category}</Text>
                 <Text style={styles.cardDescription}>{item.description}</Text>
                 <Text style={styles.cardMeta}>By {item.user_name} ({item.user_email})</Text>
-                {item.status === "pending" && (
+                {item.status === "pending" && filter !== "archived" && (
                   <View style={styles.actions}>
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.approveBtn]}
@@ -174,6 +195,18 @@ export default function SubmissionsScreen() {
                       <Text style={styles.actionBtnText}>Reject</Text>
                     </TouchableOpacity>
                   </View>
+                )}
+                {filter !== "archived" && (
+                  <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(item.id)}>
+                    <Ionicons name="archive-outline" size={14} color="#888" />
+                    <Text style={styles.archiveBtnText}>Archive</Text>
+                  </TouchableOpacity>
+                )}
+                {filter === "archived" && (
+                  <TouchableOpacity style={styles.archiveBtn} onPress={() => handleUnarchive(item.id)}>
+                    <Ionicons name="arrow-undo-outline" size={14} color="#F25C05" />
+                    <Text style={[styles.archiveBtnText, { color: "#F25C05" }]}>Unarchive</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             ))}
@@ -209,4 +242,6 @@ const styles = StyleSheet.create({
   approveBtn: { backgroundColor: "#4CAF50" },
   rejectBtn: { backgroundColor: "#F44336" },
   actionBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
+  archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 10, padding: 4 },
+  archiveBtnText: { fontSize: 11, color: "#888" },
 });

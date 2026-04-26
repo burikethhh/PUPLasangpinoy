@@ -28,6 +28,7 @@ export default function ProfileScreen() {
   const [scanImage, setScanImage] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [scannedDishName, setScannedDishName] = useState("");
   const [submitModal, setSubmitModal] = useState(false);
   const [suggestionCategories, setSuggestionCategories] = useState<string[]>([...MENU_CATEGORIES]);
   const [submitForm, setSubmitForm] = useState({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
@@ -117,6 +118,7 @@ export default function ProfileScreen() {
     const base64 = result.assets[0].base64 || "";
     setScanImage(uri);
     setScanResult(null);
+    setScannedDishName("");
     setScanModal(true);
     setScanning(true);
 
@@ -127,6 +129,7 @@ export default function ProfileScreen() {
       // Format the result for display
       let resultText = "";
       if (analysis.type === "dish") {
+        setScannedDishName(analysis.dishName || "");
         resultText = `🍽️ **${analysis.dishName}**\n\n`;
         if (analysis.isFilipino) {
           resultText += `✅ Filipino Dish\n`;
@@ -411,7 +414,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.5.0</Text>
+        <Text style={styles.version}>Version 2.6.0</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
@@ -464,9 +467,27 @@ export default function ProfileScreen() {
                   <Text style={{ color: "#888", marginTop: 10 }}>Analyzing image...</Text>
                 </View>
               ) : scanResult ? (
-                <ScrollView style={styles.scanResultScroll} showsVerticalScrollIndicator>
-                  <Text style={styles.scanResultText}>{scanResult}</Text>
-                </ScrollView>
+                <>
+                  <ScrollView style={styles.scanResultScroll} showsVerticalScrollIndicator>
+                    <Text style={styles.scanResultText}>{scanResult}</Text>
+                  </ScrollView>
+                  {scannedDishName ? (
+                    <TouchableOpacity
+                      style={styles.suggestDishBtn}
+                      onPress={() => {
+                        setScanModal(false);
+                        setSubmitForm({
+                          name: scannedDishName,
+                          description: scanResult?.replace(/[*#🍽️✅❌💡]/g, "").slice(0, 200) || "",
+                          category: suggestionCategories[0] || (MENU_CATEGORIES[0] as string),
+                        });
+                        setSubmitModal(true);
+                      }}>
+                      <Ionicons name="bulb" size={16} color="#fff" />
+                      <Text style={styles.suggestDishBtnText}>Suggest This Dish</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </>
               ) : null}
             </View>
           </View>
@@ -595,4 +616,9 @@ const styles = StyleSheet.create({
   suggestionDesc: { fontSize: 11, color: "#888", marginTop: 3, lineHeight: 15 },
   suggestionBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: "flex-start", marginTop: 2 },
   suggestionBadgeText: { fontSize: 11, fontWeight: "bold" },
+  suggestDishBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: "#F39C12", borderRadius: 12, paddingVertical: 12, marginTop: 10,
+  },
+  suggestDishBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
 });

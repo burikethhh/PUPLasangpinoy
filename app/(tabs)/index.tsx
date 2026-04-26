@@ -26,7 +26,8 @@ const DEFAULT_CATEGORIES = [
 
 const { width } = Dimensions.get("window");
 const CARD_SIZE = (width - 48) / 2;
-const CART_KEY = "@lasangpinoy_cart";
+const CART_KEY = "@foodfix_cart";
+const OLD_CART_KEY = "@lasangpinoy_cart";
 
 export default function MenuScreen() {
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -37,6 +38,18 @@ export default function MenuScreen() {
   const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORIES);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Migrate old cart key to new one
+  useEffect(() => {
+    (async () => {
+      const old = await AsyncStorage.getItem(OLD_CART_KEY);
+      if (old) {
+        const existing = await AsyncStorage.getItem(CART_KEY);
+        if (!existing) await AsyncStorage.setItem(CART_KEY, old);
+        await AsyncStorage.removeItem(OLD_CART_KEY);
+      }
+    })();
+  }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => { fetchMenu(); }, []));

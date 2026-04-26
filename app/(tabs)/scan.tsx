@@ -16,7 +16,7 @@ import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order"
 import { getCurrentUser, getProfile } from "../../lib/firebase";
 import { createOrder, getSettings, type AppSettings } from "../../lib/firebase-store";
 
-const CART_KEY = "@lasangpinoy_cart";
+const CART_KEY = "@foodfix_cart";
 
 interface CartItem {
   menu_item_id: string;
@@ -367,7 +367,7 @@ function confirmLocation(){
             )}
             {showTimePicker && (
               <DateTimePicker value={pickerDate} mode="time"
-                is24Hour minuteInterval={15} onChange={onTimeChange} />
+                display="spinner" is24Hour minuteInterval={15} onChange={onTimeChange} />
             )}
 
             {/* Payment Method */}
@@ -387,6 +387,16 @@ function confirmLocation(){
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            {/* GCash notice */}
+            {paymentMethod === "gcash" && (
+              <View style={styles.gcashNotice}>
+                <Ionicons name="information-circle" size={18} color="#3498DB" />
+                <Text style={styles.gcashNoticeText}>
+                  For GCash payments, please use the <Text style={{ fontWeight: "bold" }}>Live Chat</Text> tab to coordinate payment with the store.
+                </Text>
+              </View>
+            )}
 
             {/* Address & Phone */}
             {(orderType === "delivery_now" || orderType === "delivery_later") && (
@@ -560,4 +570,10 @@ const styles = StyleSheet.create({
   },
   mapHeaderTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06" },
   phoneError: { color: "#E74C3C", fontSize: 12, marginHorizontal: 16, marginTop: 2 },
+  gcashNotice: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    backgroundColor: "#EBF5FB", borderRadius: 12, padding: 12, marginHorizontal: 16, marginTop: 8,
+    borderWidth: 1, borderColor: "#3498DB33",
+  },
+  gcashNoticeText: { flex: 1, fontSize: 12, color: "#2E1A06", lineHeight: 18 },
 });
