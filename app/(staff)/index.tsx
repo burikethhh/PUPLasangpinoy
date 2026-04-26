@@ -106,6 +106,9 @@ export default function StaffOrdersScreen() {
   function renderOrder({ item }: { item: Order }) {
     const statusColor = ORDER_STATUS_COLORS[item.status] || "#888";
     const canMarkPrepared = item.status === "accepted" || item.status === "preparing";
+    const isFinished = FINISHED.includes(item.status);
+    const trackSteps = ["pending", "accepted", "preparing", "out_for_delivery", "delivered"];
+    const currentIdx = trackSteps.indexOf(item.status);
 
     return (
       <View style={styles.card}>
@@ -121,7 +124,10 @@ export default function StaffOrdersScreen() {
           </View>
         </View>
 
-        <Text style={styles.customerName}>{item.customer_name}</Text>
+        <Text style={styles.customerName}>{item.customer_name} - {item.customer_phone}</Text>
+        {item.customer_address ? (
+          <Text style={styles.address}>{item.customer_address}</Text>
+        ) : null}
         <View style={styles.itemsList}>
           {(item.items || []).map((i, idx) => (
             <Text key={idx} style={styles.itemText}>
@@ -130,6 +136,25 @@ export default function StaffOrdersScreen() {
           ))}
         </View>
         <Text style={styles.totalText}>Total: P{item.total?.toFixed(2)}</Text>
+
+        {/* Progress tracker */}
+        {!isFinished && (
+          <View style={styles.trackerWrap}>
+            <View style={styles.tracker}>
+              {trackSteps.map((s, idx) => (
+                <View key={s} style={styles.trackStep}>
+                  <View style={[styles.trackDot, idx <= currentIdx && { backgroundColor: "#3498DB" }]} />
+                  {idx < 4 && <View style={[styles.trackLine, idx < currentIdx && { backgroundColor: "#3498DB" }]} />}
+                </View>
+              ))}
+            </View>
+            <View style={styles.trackerLabels}>
+              {["Placed", "Processing", "Preparing", "Delivering", "Done"].map((lbl) => (
+                <Text key={lbl} style={styles.trackerLabel}>{lbl}</Text>
+              ))}
+            </View>
+          </View>
+        )}
 
         {canMarkPrepared && (
           <TouchableOpacity
@@ -221,7 +246,8 @@ const styles = StyleSheet.create({
   orderType: { fontSize: 12, color: "#888", marginTop: 2 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   badgeText: { fontSize: 12, fontWeight: "bold" },
-  customerName: { fontSize: 14, color: "#555", marginBottom: 8 },
+  customerName: { fontSize: 14, color: "#555", marginBottom: 2 },
+  address: { fontSize: 12, color: "#888", marginBottom: 8 },
   itemsList: { marginBottom: 8 },
   itemText: { fontSize: 13, color: "#666", marginBottom: 2 },
   totalText: { fontSize: 15, fontWeight: "bold", color: "#F25C05", marginBottom: 8 },
@@ -232,6 +258,13 @@ const styles = StyleSheet.create({
   preparedBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
   archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 8, padding: 4 },
   archiveBtnText: { fontSize: 11, color: "#888" },
+  trackerWrap: { marginTop: 8, paddingTop: 6 },
+  tracker: { flexDirection: "row", alignItems: "center" },
+  trackStep: { flexDirection: "row", alignItems: "center", flex: 1 },
+  trackDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#ddd" },
+  trackLine: { flex: 1, height: 2, backgroundColor: "#ddd" },
+  trackerLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 3 },
+  trackerLabel: { fontSize: 8, color: "#aaa", textAlign: "center", flex: 1 },
   empty: { alignItems: "center", marginTop: 60 },
   emptyText: { color: "#aaa", fontSize: 14, marginTop: 8 },
 });

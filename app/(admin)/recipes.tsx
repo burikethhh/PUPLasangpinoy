@@ -131,6 +131,9 @@ export default function AdminOrders() {
           renderItem={({ item }) => {
             const color = ORDER_STATUS_COLORS[item.status] || "#888";
             const next = NEXT_STATUS[item.status];
+            const isFinished = FINISHED.includes(item.status);
+            const trackSteps = ["pending", "accepted", "preparing", "out_for_delivery", "delivered"];
+            const currentIdx = trackSteps.indexOf(item.status);
             const date = item.created_at?.seconds
               ? new Date(item.created_at.seconds * 1000).toLocaleString()
               : "";
@@ -165,6 +168,24 @@ export default function AdminOrders() {
                 )}
                 {item.reject_reason && (
                   <Text style={styles.rejectText}>Rejected: {item.reject_reason}</Text>
+                )}
+                {/* Progress tracker */}
+                {!isFinished && (
+                  <View style={styles.trackerWrap}>
+                    <View style={styles.tracker}>
+                      {trackSteps.map((s, idx) => (
+                        <View key={s} style={styles.trackStep}>
+                          <View style={[styles.trackDot, idx <= currentIdx && { backgroundColor: "#F25C05" }]} />
+                          {idx < 4 && <View style={[styles.trackLine, idx < currentIdx && { backgroundColor: "#F25C05" }]} />}
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.trackerLabels}>
+                      {["Placed", "Processing", "Preparing", "Delivering", "Done"].map((lbl) => (
+                        <Text key={lbl} style={styles.trackerLabel}>{lbl}</Text>
+                      ))}
+                    </View>
+                  </View>
                 )}
                 {/* Action Buttons */}
                 {next && (
@@ -261,6 +282,13 @@ const styles = StyleSheet.create({
   actionText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
   archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 8, padding: 4 },
   archiveBtnText: { fontSize: 11, color: "#888" },
+  trackerWrap: { marginTop: 8, paddingTop: 6 },
+  tracker: { flexDirection: "row", alignItems: "center" },
+  trackStep: { flexDirection: "row", alignItems: "center", flex: 1 },
+  trackDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#ddd" },
+  trackLine: { flex: 1, height: 2, backgroundColor: "#ddd" },
+  trackerLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 3 },
+  trackerLabel: { fontSize: 8, color: "#aaa", textAlign: "center", flex: 1 },
   empty: { alignItems: "center", marginTop: 60 },
   emptyText: { fontSize: 15, color: "#aaa", marginTop: 10 },
   overlay: {

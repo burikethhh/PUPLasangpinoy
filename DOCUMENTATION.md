@@ -1,1717 +1,604 @@
-# LasangPinoy Mobile - Complete Documentation
+# FOODFIX — Source Code Documentation
 
-**Version:** 1.1.0  
+**Version:** 2.7.0  
 **Last Updated:** April 2026  
-**Status:** Active Development — Audit Pass Complete
+**Platform:** React Native (Expo) — Android  
+**Repository:** https://github.com/burikethhh/PUPLasangpinoy
 
 ---
 
-## Quick Status Summary
-
-| Category | Count | Status |
-|----------|-------|--------|
-| Completed Features | 52+ | ✅ Done |
-| Pending Features | 2 | 🔄 Planned |
-| Unimplemented Features | 0 | ✅ All Started |
-| Items Pending Testing | 45+ | 🧪 Needs Verification |
-| Bug Fixes Applied | 22 | ✅ Fixed |
-| Known Issues | 2 | ⚠️ Documented |
-
----
-
-# TABLE OF CONTENTS
+## TABLE OF CONTENTS
 
 1. [Project Overview](#1-project-overview)
-2. [Application Goals](#2-application-goals)
-3. [Technology Stack](#3-technology-stack)
-4. [Project Structure](#4-project-structure)
-5. [Environment Variables & API Keys](#5-environment-variables--api-keys)
-6. [Firebase Configuration](#6-firebase-configuration)
-7. [Database Schema](#7-database-schema)
-8. [Security Rules](#8-security-rules)
+2. [Technology Stack](#2-technology-stack)
+3. [Project Structure](#3-project-structure)
+4. [Authentication Flow](#4-authentication-flow)
+5. [Data Models](#5-data-models)
+6. [Firestore Collections](#6-firestore-collections)
+7. [Screen Reference](#7-screen-reference)
+8. [Firebase Integration](#8-firebase-integration)
 9. [AI Integration](#9-ai-integration)
-10. [Features & Screens](#10-features--screens)
-11. [Authentication Flow](#11-authentication-flow)
-12. [REST API Implementation](#12-rest-api-implementation)
-13. [Development Progress](#13-development-progress)
-    - [Completed Features](#completed-features-)
-    - [Pending Features](#pending-features-)
-    - [Unimplemented Features](#unimplemented-features-)
-    - [Pending Testing](#pending-testing-)
-14. [Bug Fixes & Known Issues](#14-bug-fixes--known-issues)
-15. [Future ML Implementation](#15-future-ml-implementation)
-16. [Deployment Guide](#16-deployment-guide)
-17. [Test Accounts & Credentials](#17-test-accounts--credentials)
-18. [Commands Reference](#18-commands-reference)
-19. [Troubleshooting](#19-troubleshooting)
+10. [State Management Patterns](#10-state-management-patterns)
+11. [Environment Variables](#11-environment-variables)
+12. [Build & Release Process](#12-build--release-process)
+13. [Key Logic Flows](#13-key-logic-flows)
+14. [Constants & Configuration](#14-constants--configuration)
 
 ---
 
 # 1. PROJECT OVERVIEW
 
-## What is LasangPinoy Mobile?
+**FOODFIX** is a Filipino food ordering mobile application built for a PUP (Polytechnic University of the Philippines) academic project. It allows customers to browse a menu, add items to a cart, place orders (delivery, dine-in, or pick-up), and track order progress in real-time. Staff can manage incoming orders, and an admin/owner dashboard provides full control over the menu, users, orders, and app settings.
 
-**LasangPinoy Mobile** is a cross-platform mobile application dedicated to preserving and sharing Filipino culinary heritage. The app serves as a comprehensive digital cookbook featuring traditional Filipino recipes, AI-powered food recognition, and an intelligent chatbot for learning about Filipino cuisine.
+## Key Capabilities
 
-## App Identifiers
-
-| Property | Value |
-|----------|-------|
-| App Name | LasangPinoy Mobile |
-| Package Name | lasangpinoymobile |
-| Slug | LasangPinoyMobile |
-| Version | 1.0.0 |
-| Scheme | lasangpinoymobile |
-| Platforms | iOS, Android, Web |
-
-## Target Audience
-
-- Filipino food enthusiasts
-- Home cooks learning Filipino cuisine
-- Cultural heritage preservationists
-- Tourists exploring Filipino food culture
-- Filipino diaspora seeking traditional recipes
+- **Customer**: Browse menu, search, add to cart, checkout with date/time/location picker, GCash or COD payment, track orders, live chat with store, AI food scanner, suggest dishes
+- **Staff**: View orders, mark as prepared, archive completed orders
+- **Admin/Owner**: Full order management (accept/reject/advance status), menu CRUD, user management, staff creation, app settings (delivery fee, GCash toggle), view suggestions, live chat with customers
 
 ---
 
-# 2. APPLICATION GOALS
-
-## Primary Goals
-
-1. **Preserve Filipino Culinary Heritage**
-   - Document traditional recipes with historical context
-   - Include regional variations and cultural significance
-   - Store fun facts and cultural trivia
-
-2. **Educate Users About Filipino Cuisine**
-   - Provide detailed cooking instructions
-   - Include nutritional information
-   - Share health benefits and dietary notes
-   - Offer cultural history of each dish
-
-3. **Enable AI-Powered Food Discovery**
-   - Identify Filipino dishes from photos
-   - Recognize ingredients and suggest recipes
-   - Provide intelligent recipe recommendations
-
-4. **Create an Engaging User Experience**
-   - Bookmark favorite recipes
-   - Rate and review dishes
-   - Interactive AI chatbot for questions
-   - Filter recipes by region and category
-
-## Success Metrics
-
-- Number of registered users
-- Recipes viewed per session
-- Bookmarks created
-- AI scan usage
-- Chatbot interactions
-- User feedback ratings
-
----
-
-# 3. TECHNOLOGY STACK
+# 2. TECHNOLOGY STACK
 
 ## Frontend
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
 | React Native | 0.81.5 | Cross-platform mobile framework |
-| Expo | SDK 54.0.33 | Development platform & tooling |
-| Expo Router | 6.0.23 | File-based navigation |
-| TypeScript | 5.9.2 | Type-safe JavaScript |
-| React | 19.1.0 | UI component library |
+| Expo | SDK 54 | Development platform & build tooling |
+| Expo Router | 6.x | File-based navigation (tabs, stacks) |
+| TypeScript | 5.9.x | Type safety |
+| React | 19.1.0 | UI rendering |
 
-## Backend Services
+## Backend & Services
 
 | Service | Provider | Purpose |
 |---------|----------|---------|
-| Authentication | Firebase Auth | User sign-in/sign-up |
-| Database | Firebase Firestore | NoSQL document storage |
-| Storage | Firebase Storage | Image storage |
-| AI Vision | Alibaba Qwen VL Max | Food/ingredient recognition |
-| AI Chat | Alibaba Qwen Plus | Conversational AI |
+| Authentication | Firebase Auth | Email/password + Google + Facebook sign-in |
+| Database | Cloud Firestore | NoSQL document storage for all data |
+| Image Upload | Cloudinary | Menu item images |
+| AI Vision | Alibaba Qwen VL Max | Food image recognition (dish/ingredient scan) |
+| Local Storage | AsyncStorage | Cart persistence, caching |
 
-## Complete Dependencies
+## Key Dependencies
 
-```json
-{
-  "dependencies": {
-    "@expo/vector-icons": "^15.0.3",
-    "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-firebase/app": "^23.8.8",
-    "@react-native-firebase/auth": "^23.8.8",
-    "@react-native-firebase/firestore": "^23.8.8",
-    "@react-navigation/bottom-tabs": "^7.4.0",
-    "@react-navigation/elements": "^2.6.3",
-    "@react-navigation/native": "^7.2.1",
-    "@react-navigation/native-stack": "^7.14.9",
-    "expo": "~54.0.33",
-    "expo-auth-session": "~7.0.10",
-    "expo-constants": "~18.0.13",
-    "expo-crypto": "~15.0.8",
-    "expo-file-system": "~19.0.21",
-    "expo-font": "~14.0.11",
-    "expo-haptics": "~15.0.8",
-    "expo-image": "~3.0.11",
-    "expo-image-picker": "~17.0.10",
-    "expo-linking": "~8.0.11",
-    "expo-router": "~6.0.23",
-    "expo-secure-store": "~15.0.8",
-    "expo-splash-screen": "~31.0.13",
-    "expo-status-bar": "~3.0.9",
-    "expo-symbols": "~1.0.8",
-    "expo-system-ui": "~6.0.9",
-    "expo-web-browser": "~15.0.10",
-    "firebase": "^12.11.0",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-gesture-handler": "~2.28.0",
-    "react-native-reanimated": "~4.1.1",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0",
-    "react-native-url-polyfill": "^3.0.0",
-    "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.5.1"
-  },
-  "devDependencies": {
-    "@types/react": "~19.1.0",
-    "eslint": "^9.25.0",
-    "eslint-config-expo": "~10.0.0",
-    "typescript": "~5.9.2"
-  }
-}
+- `@react-native-async-storage/async-storage` — Cart data persistence
+- `@react-native-community/datetimepicker` — Schedule pickup/delivery time
+- `expo-image-picker` — Camera for AI food scan
+- `expo-location` — Delivery location picker
+- `expo-notifications` — Push notifications
+- `firebase` (v12) — Auth, Firestore, Storage
+- `react-native-safe-area-context` — Safe area insets
+
+---
+
+# 3. PROJECT STRUCTURE
+
+```
+FOODFIX/
+├── app/                          # Expo Router screens
+│   ├── (auth)/                   # Authentication screens
+│   │   ├── _layout.tsx           # Auth stack layout
+│   │   ├── welcome.tsx           # Unified login (email+password+social)
+│   │   ├── login.tsx             # Customer-specific login (legacy, still used for deep links)
+│   │   └── signup.tsx            # Customer registration
+│   │
+│   ├── (tabs)/                   # Customer tab navigator
+│   │   ├── _layout.tsx           # Tab bar config + cart badge
+│   │   ├── index.tsx             # Menu browsing (categories, search, favorites)
+│   │   ├── scan.tsx              # Cart + Checkout (time picker, map, payment)
+│   │   ├── collections.tsx       # Order history + archive
+│   │   ├── chat.tsx              # Live chat with store
+│   │   ├── submit.tsx            # Favorites screen
+│   │   └── profile.tsx           # Profile, AI scanner, suggestions, logout
+│   │
+│   ├── (admin)/                  # Admin tab navigator
+│   │   ├── _layout.tsx           # Admin tabs + auth guard
+│   │   ├── index.tsx             # Admin dashboard (stats, quick actions)
+│   │   ├── recipes.tsx           # Order management (status workflow)
+│   │   ├── categories.tsx        # Menu CRUD (add/edit/delete items)
+│   │   ├── feedback.tsx          # Live chat with customers
+│   │   ├── submissions.tsx       # Review customer dish suggestions
+│   │   └── users.tsx             # Staff/user management, settings
+│   │
+│   ├── (staff)/                  # Staff tab navigator
+│   │   ├── _layout.tsx           # Staff tabs + auth guard
+│   │   ├── index.tsx             # Staff order view + mark prepared
+│   │   └── profile.tsx           # Staff profile + logout
+│   │
+│   ├── _layout.tsx               # Root layout (auth state listener)
+│   ├── index.tsx                 # Entry redirect
+│   └── policies.tsx              # Privacy policy / Terms
+│
+├── lib/                          # Business logic & API layer
+│   ├── firebase.ts               # Firebase init, auth functions, profile CRUD
+│   ├── firebase-store.ts         # Firestore CRUD: orders, messages, reviews, etc.
+│   ├── firestore-rest.ts         # REST API fallback for Firestore operations
+│   ├── firebase-helpers.ts       # Utility helpers for Firebase
+│   ├── cloudinary.ts             # Image upload to Cloudinary
+│   ├── qwen-ai.ts                # AI food/ingredient analysis
+│   ├── notifications.ts          # Push notification helpers
+│   └── logger.ts                 # Debug logging utility
+│
+├── constants/                    # App-wide constants
+│   ├── order.ts                  # Order statuses, types, payment methods, categories
+│   ├── theme.ts                  # Color palette, typography
+│   └── food-categories.ts        # Food category definitions
+│
+├── components/                   # Reusable UI components
+│   ├── ui/                       # Base UI primitives
+│   └── ...                       # Themed text, views, etc.
+│
+├── app.json                      # Expo config (name, icons, version, plugins)
+├── package.json                  # Dependencies
+├── tsconfig.json                 # TypeScript config
+├── firestore.rules               # Firestore security rules
+└── .env                          # Environment variables (not committed)
 ```
 
 ---
 
-# 4. PROJECT STRUCTURE
+# 4. AUTHENTICATION FLOW
 
-```
-C:\Users\USER\OneDrive\Desktop\PUP\
-│
-├── app/                              # Application screens (Expo Router)
-│   ├── _layout.tsx                   # Root layout with navigation
-│   ├── index.tsx                     # Entry point (auth redirect)
-│   ├── modal.tsx                     # Modal screen
-│   │
-│   ├── (auth)/                       # Authentication screens
-│   │   ├── _layout.tsx               # Auth layout
-│   │   ├── welcome.tsx               # Landing page
-│   │   ├── login.tsx                 # User login (email + OAuth)
-│   │   ├── signup.tsx                # User registration
-│   │   └── admin-login.tsx           # Admin login
-│   │
-│   ├── (tabs)/                       # Main user screens (tab navigation)
-│   │   ├── _layout.tsx               # Tab bar layout
-│   │   ├── index.tsx                 # Home - Browse recipes
-│   │   ├── scan.tsx                  # AI image scanner
-│   │   ├── chat.tsx                  # AI chatbot
-│   │   └── profile.tsx               # User profile & bookmarks
-│   │
-│   ├── (admin)/                      # Admin screens
-│   │   ├── _layout.tsx               # Admin layout
-│   │   ├── index.tsx                 # Admin dashboard
-│   │   ├── recipes.tsx               # Recipe management
-│   │   ├── users.tsx                 # User management
-│   │   ├── regions.tsx               # Region management
-│   │   └── nutrition.tsx             # Nutrition info editor
-│   │
-│   └── recipe/                       # Recipe detail screens
-│       └── [id].tsx                  # Dynamic recipe detail page
-│
-├── lib/                              # Core libraries
-│   ├── firebase.ts                   # Firebase SDK + REST API client
-│   ├── firestore-rest.ts             # Firestore REST API fallback
-│   ├── firebase-helpers.ts           # Error handling utilities
-│   └── qwen-ai.ts                    # Alibaba Qwen AI integration
-│
-├── components/                       # Reusable UI components
-├── constants/                        # App constants and themes
-├── hooks/                            # Custom React hooks
-│
-├── assets/                           # Static assets
-│   └── images/
-│       ├── icon.png
-│       ├── favicon.png
-│       ├── splash-icon.png
-│       ├── android-icon-foreground.png
-│       ├── android-icon-background.png
-│       └── android-icon-monochrome.png
-│
-├── scripts/                          # Utility scripts
-│   ├── seed-firebase-rest.ts         # Database seeding
-│   ├── setup-admin.ts                # Admin user creation
-│   ├── diagnose-firestore.ts         # Firestore diagnostics
-│   └── test-firestore-rest.ts        # REST API testing
-│
-├── .env                              # Environment variables
-├── app.json                          # Expo configuration
-├── package.json                      # Dependencies
-├── tsconfig.json                     # TypeScript configuration
-├── firebase.json                     # Firebase CLI configuration
-├── firestore.rules                   # Firestore security rules (production)
-├── firestore-dev.rules               # Firestore security rules (development)
-├── firestore.indexes.json            # Firestore indexes
-└── storage.rules                     # Storage security rules
-```
+## Unified Login (v2.7.0+)
+
+The welcome screen (`app/(auth)/welcome.tsx`) provides a single unified login form for all roles:
+
+1. User enters **email + password** → Firebase Auth `signInWithEmailAndPassword`
+2. On success, fetch profile from Firestore (`users/{uid}`)
+3. **Auto-route by role**:
+   - `profile.is_admin === true` → redirect to `/(admin)`
+   - `profile.role === "staff"` → redirect to `/(staff)`
+   - else → redirect to `/(tabs)` (customer)
+4. Social login (Google, Facebook) follows the same auto-routing logic
+
+## Role Hierarchy
+
+| Role | Created By | Capabilities |
+|------|-----------|-------------|
+| **Admin** | Manual (Firestore) | Full access: orders, menu, users, settings, chat |
+| **Staff** | Admin (via Users screen) | View orders, mark prepared, archive |
+| **Customer** | Self-registration | Browse, order, track, chat, scan, suggest |
+
+## Auth State Listener
+
+`app/_layout.tsx` listens to `onAuthStateChanged`. When a user is detected, it fetches the profile and routes accordingly. On sign-out, it redirects to `/(auth)/welcome`.
+
+## Signup
+
+`signup.tsx` creates a Firebase Auth account, then creates a Firestore profile document with `role: "customer"`, `is_admin: false`.
 
 ---
 
-# 5. ENVIRONMENT VARIABLES & API KEYS
+# 5. DATA MODELS
 
-## .env File Location
+All TypeScript interfaces are defined in `lib/firebase-store.ts` and `lib/firebase.ts`.
 
-`C:\Users\USER\OneDrive\Desktop\PUP\.env`
-
-## Complete Environment Configuration
-
-```env
-# ============================================
-# FIREBASE CONFIGURATION
-# ============================================
-
-# Firebase Web API Key
-EXPO_PUBLIC_FIREBASE_API_KEY=<your-firebase-api-key>
-
-# Firebase Auth Domain
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=lasangpinoy-mobile.firebaseapp.com
-
-# Firebase Project ID
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=lasangpinoy-mobile
-
-# Firebase Storage Bucket
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=lasangpinoy-mobile.firebasestorage.app
-
-# Firebase Messaging Sender ID
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=<your-sender-id>
-
-# Firebase App ID
-EXPO_PUBLIC_FIREBASE_APP_ID=<your-app-id>
-
-# ============================================
-# ALIBABA CLOUD QWEN AI CONFIGURATION
-# ============================================
-
-# Qwen API Key (DashScope Platform)
-EXPO_PUBLIC_QWEN_API_KEY=<your-dashscope-api-key>
-```
-
-## API Keys Summary Table
-
-| Service | Key Name | Value | Purpose |
-|---------|----------|-------|---------|
-| Firebase | API Key | `<set in .env>` | Web SDK authentication |
-| Firebase | Project ID | `lasangpinoy-mobile` | Project identifier |
-| Firebase | App ID | `<set in .env>` | Web app identifier |
-| Firebase | Sender ID | `<set in .env>` | Cloud messaging |
-| Firebase | Auth Domain | `lasangpinoy-mobile.firebaseapp.com` | OAuth redirects |
-| Firebase | Storage Bucket | `lasangpinoy-mobile.firebasestorage.app` | File storage |
-| Qwen AI | API Key | `<set in .env>` | AI Vision & Chat |
-
----
-
-# 6. FIREBASE CONFIGURATION
-
-## Firebase Project Details
-
-| Property | Value |
-|----------|-------|
-| Project Name | lasangpinoy-mobile |
-| Project ID | lasangpinoy-mobile |
-| Project Number | `<see Firebase console>` |
-| Region | asia-southeast1 |
-| Database Type | Firestore Native Mode |
-| Database Name | (default) |
-
-## Firebase Console URLs
-
-| Service | URL |
-|---------|-----|
-| Console Home | https://console.firebase.google.com/project/lasangpinoy-mobile |
-| Authentication | https://console.firebase.google.com/project/lasangpinoy-mobile/authentication |
-| Firestore | https://console.firebase.google.com/project/lasangpinoy-mobile/firestore |
-| Storage | https://console.firebase.google.com/project/lasangpinoy-mobile/storage |
-| Users | https://console.firebase.google.com/project/lasangpinoy-mobile/authentication/users |
-
-## Firebase Services Status
-
-| Service | Status | Configuration |
-|---------|--------|---------------|
-| Authentication | ✅ Enabled | Email/Password, Google, Facebook |
-| Cloud Firestore | ✅ Enabled | asia-southeast1 region |
-| Cloud Storage | ✅ Enabled | Default bucket |
-| Hosting | ❌ Not configured | - |
-| Functions | ❌ Not configured | - |
-| Analytics | ❌ Not configured | - |
-
-## Firebase Configuration in Code
-
-**File:** `lib/firebase.ts`
-
-```typescript
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "",
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || ""
-};
-```
-
----
-
-# 7. DATABASE SCHEMA
-
-## Collections Overview
-
-| Collection | Description | Document Count |
-|------------|-------------|----------------|
-| `profiles` | User profiles and admin flags | Variable |
-| `recipes` | Filipino recipes with full details | 8+ (seeded) |
-| `regions` | Philippine regions | 8 (seeded) |
-| `bookmarks` | User's saved recipes | Variable |
-| `feedback` | Recipe ratings and reviews | Variable |
-
-## Collection: profiles
-
-**Purpose:** Store user account information and admin privileges.
+## Profile (`lib/firebase.ts`)
 
 ```typescript
 interface Profile {
-  id: string;              // Firebase Auth UID (document ID)
-  email: string;           // User's email address
-  username: string;        // Display name
-  is_admin: boolean;       // Admin privilege flag (default: false)
-  created_at: Timestamp;   // Account creation timestamp
+  id: string;           // Firebase Auth UID
+  email: string;
+  username: string;
+  is_admin: boolean;
+  role: 'admin' | 'staff' | 'customer';
+  phone?: string;
+  address?: string;
+  created_at: Timestamp;
 }
 ```
 
-**Example Document:**
-```json
-{
-  "id": "<user-uid>",
-  "email": "<admin-email>",
-  "username": "Admin",
-  "is_admin": true,
-  "created_at": "2026-03-27T10:30:00Z"
-}
-```
-
-## Collection: recipes
-
-**Purpose:** Store complete Filipino recipe information.
+## MenuItem (`lib/firebase-store.ts`)
 
 ```typescript
-interface Recipe {
-  id: string;              // Auto-generated document ID
-  title: string;           // Recipe name
-  category: string;        // "Main Dish" | "Soup" | "Noodles" | "Dessert"
-  region: string;          // Philippine region of origin
-  ingredients: string;     // Comma-separated ingredient list
-  instructions: string;    // Step-by-step cooking guide
-  nutrition: string;       // Nutritional information
-  health_notes: string;    // Health benefits and dietary notes
-  history: string;         // Cultural and historical background
-  fun_fact: string;        // Interesting trivia
-  image_url: string;       // URL to recipe photo
-  user_id: string;         // Creator's UID (empty for admin-created)
-  created_at: Timestamp;   // Creation timestamp
+interface MenuItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  image_url: string;
+  available: boolean;
+  created_at: Timestamp;
 }
 ```
 
-**Example Document:**
-```json
-{
-  "id": "adobo",
-  "title": "Chicken Adobo",
-  "category": "Main Dish",
-  "region": "NCR - Metro Manila",
-  "ingredients": "Chicken, soy sauce, vinegar, garlic, bay leaves, black peppercorns",
-  "instructions": "1. Marinate chicken in soy sauce and vinegar...",
-  "nutrition": "Calories: 350kcal, Protein: 28g, Fat: 22g, Carbs: 5g",
-  "health_notes": "High in protein. Vinegar aids digestion.",
-  "history": "Adobo predates Spanish colonization...",
-  "fun_fact": "Over 100 variations of adobo exist!",
-  "image_url": "https://images.unsplash.com/...",
-  "user_id": "",
-  "created_at": "2026-03-27T10:30:00Z"
-}
-```
-
-## Collection: regions
-
-**Purpose:** Store Philippine regions with culinary descriptions.
+## Order
 
 ```typescript
-interface Region {
-  id: string;              // Document ID (slug)
-  name: string;            // Region display name
-  description: string;     // Culinary description
-  created_at: Timestamp;   // Creation timestamp
+interface Order {
+  id: string;
+  order_number: string;       // e.g. "LP-20260426-1234"
+  customer_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  items: OrderItem[];
+  subtotal: number;
+  delivery_fee: number;
+  total: number;
+  status: OrderStatus;        // pending → accepted → preparing → out_for_delivery → delivered
+  order_type: OrderType;      // delivery_now | delivery_later | dine_in | pick_up
+  payment_method: PaymentMethod; // cod | gcash
+  scheduled_date?: string;
+  scheduled_time?: string;
+  reject_reason?: string;
+  prepared_by?: string;
+  created_at: Timestamp;
+  updated_at?: Timestamp;
 }
 ```
 
-**Seeded Regions (8 total):**
-
-| ID | Name | Description |
-|----|------|-------------|
-| ncr | NCR - Metro Manila | The culinary melting pot of the Philippines |
-| ilocos | Ilocos Region | Known for Bagnet, Pinakbet, and Empanada |
-| central-luzon | Central Luzon | Rice granary with Kapampangan cuisine |
-| calabarzon | CALABARZON | Famous for Bulalo and Tawilis |
-| bicol | Bicol Region | Spicy coconut-based dishes like Bicol Express |
-| western-visayas | Western Visayas | Home of La Paz Batchoy and Chicken Inasal |
-| central-visayas | Central Visayas | Known for Lechon Cebu |
-| davao | Davao Region | Fresh seafood and tropical fruits |
-
-## Collection: bookmarks
-
-**Purpose:** Track user's saved/favorite recipes.
+## OrderItem
 
 ```typescript
-interface Bookmark {
-  id: string;              // Auto-generated document ID
-  user_id: string;         // User's Firebase UID
-  recipe_id: string;       // Recipe document ID
-  created_at: Timestamp;   // Bookmark timestamp
+interface OrderItem {
+  menu_item_id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image_url?: string;
 }
 ```
 
-## Collection: feedback
-
-**Purpose:** Store user ratings and reviews for recipes.
+## Message
 
 ```typescript
-interface Feedback {
-  id: string;              // Auto-generated document ID
-  user_id: string;         // User's Firebase UID
-  recipe_id: string;       // Recipe document ID
-  rating: number;          // 1-5 star rating
-  comment: string;         // Written review
-  created_at: Timestamp;   // Submission timestamp
+interface Message {
+  id: string;
+  conversation_id: string;   // customer's UID
+  sender_id: string;
+  sender_name: string;
+  sender_role: string;        // "customer" | "admin" | "staff"
+  content: string;
+  read: boolean;
+  created_at: Timestamp;
 }
 ```
 
-## Database Indexes
+## Review
 
-**File:** `firestore.indexes.json`
-
-```json
-{
-  "indexes": [
-    {
-      "collectionGroup": "bookmarks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "user_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "bookmarks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "recipe_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "feedback",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "recipe_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "feedback",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "user_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "recipes",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "category", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "recipes",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "region", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
-      ]
-    }
-  ]
+```typescript
+interface Review {
+  id: string;
+  user_id: string;
+  username: string;
+  order_id: string;
+  menu_item_id: string;
+  menu_item_name: string;
+  rating: number;
+  comment: string;
+  created_at: Timestamp;
 }
 ```
 
-## Database Relationships
+## AppSettings
 
-```
-┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│   profiles  │       │   recipes   │       │   regions   │
-├─────────────┤       ├─────────────┤       ├─────────────┤
-│ id (PK)     │       │ id (PK)     │       │ id (PK)     │
-│ email       │       │ title       │       │ name        │
-│ username    │       │ category    │       │ description │
-│ is_admin    │       │ region ─────┼───────│             │
-│ created_at  │       │ ingredients │       │ created_at  │
-└──────┬──────┘       │ instructions│       └─────────────┘
-       │              │ nutrition   │
-       │              │ health_notes│
-       │              │ history     │
-       │              │ fun_fact    │
-       │              │ image_url   │
-       │              │ user_id ────┼─────┐
-       │              │ created_at  │     │
-       │              └──────┬──────┘     │
-       │                     │            │
-       │    ┌────────────────┼────────────┘
-       │    │                │
-       ▼    ▼                ▼
-┌─────────────┐       ┌─────────────┐
-│  bookmarks  │       │  feedback   │
-├─────────────┤       ├─────────────┤
-│ id (PK)     │       │ id (PK)     │
-│ user_id (FK)│       │ user_id (FK)│
-│ recipe_id(FK)│      │ recipe_id(FK)│
-│ created_at  │       │ rating      │
-└─────────────┘       │ comment     │
-                      │ created_at  │
-                      └─────────────┘
+```typescript
+interface AppSettings {
+  delivery_fee: number;
+  gcash_enabled: boolean;
+  gcash_number?: string;
+  store_name: string;
+  store_address: string;
+  store_phone: string;
+}
 ```
 
 ---
 
-# 8. SECURITY RULES
+# 6. FIRESTORE COLLECTIONS
 
-## Firestore Security Rules (Production)
+| Collection | Document ID | Description |
+|-----------|-------------|-------------|
+| `users` | Firebase Auth UID | User profiles (role, contact info) |
+| `menu_items` | Auto-generated | Menu items with name, price, category, image |
+| `orders` | Auto-generated | Customer orders with items, status, delivery info |
+| `messages` | Auto-generated | Chat messages grouped by `conversation_id` |
+| `reviews` | Auto-generated | Menu item reviews and ratings |
+| `favorites` | Auto-generated | Customer favorited menu items |
+| `suggestions` | Auto-generated | Customer-submitted dish suggestions |
+| `settings` | `app_settings` | Singleton: delivery fee, GCash config |
 
-**File:** `firestore.rules`
+## Order Status Workflow
 
-```javascript
-rules_version = '2';
+```
+pending → accepted → preparing → out_for_delivery → delivered
+   └────────→ rejected (with reason)
+   └────────→ cancelled
+```
 
-service cloud.firestore {
-  match /databases/{database}/documents {
-    
-    // ============================================
-    // HELPER FUNCTIONS
-    // ============================================
-    
-    // Check if user is authenticated
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    // Check if user is admin
-    function isAdmin() {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.is_admin == true;
-    }
-    
-    // Check if user owns the resource
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    
-    // ============================================
-    // COLLECTION RULES
-    // ============================================
-    
-    // PROFILES - Users can read their own, update own (except is_admin)
-    match /profiles/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isOwner(userId) && 
-                       request.resource.data.is_admin == resource.data.is_admin ||
-                       isAdmin();
-      allow delete: if isAdmin();
-    }
-    
-    // RECIPES - Anyone can read, only admins can write
-    match /recipes/{recipeId} {
-      allow read: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-    
-    // REGIONS - Anyone can read, only admins can write
-    match /regions/{regionId} {
-      allow read: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-    
-    // BOOKMARKS - Users can only access their own
-    match /bookmarks/{bookmarkId} {
-      allow read: if isOwner(resource.data.user_id);
-      allow create: if isSignedIn() && 
-                       request.resource.data.user_id == request.auth.uid;
-      allow update: if false; // Bookmarks shouldn't be updated
-      allow delete: if isOwner(resource.data.user_id) || isAdmin();
-    }
-    
-    // FEEDBACK - Anyone can read, users can manage own
-    match /feedback/{feedbackId} {
-      allow read: if true;
-      allow create: if isSignedIn() && 
-                       request.resource.data.user_id == request.auth.uid &&
-                       request.resource.data.rating >= 1 && 
-                       request.resource.data.rating <= 5;
-      allow update: if isOwner(resource.data.user_id);
-      allow delete: if isOwner(resource.data.user_id) || isAdmin();
-    }
+Each transition is triggered by admin via the Orders screen (`recipes.tsx`). Staff can mark orders as `preparing` → `out_for_delivery` (via "Mark as Prepared").
+
+---
+
+# 7. SCREEN REFERENCE
+
+## Customer Screens (`(tabs)/`)
+
+| File | Tab Name | Description |
+|------|----------|-------------|
+| `index.tsx` | Menu | Category filter, search, add-to-cart, favorites |
+| `scan.tsx` | Cart | Cart items, checkout flow (date/time/location/payment), GCash notice |
+| `collections.tsx` | Orders | Active/history orders with tracker, archive tab |
+| `chat.tsx` | Chat | Real-time messaging with store, long-press delete |
+| `submit.tsx` | Favorites | Saved favorite menu items |
+| `profile.tsx` | Profile | Edit profile, AI food scanner, suggest dish, logout |
+
+## Admin Screens (`(admin)/`)
+
+| File | Tab Name | Description |
+|------|----------|-------------|
+| `index.tsx` | Dashboard | Order stats, quick actions |
+| `recipes.tsx` | Orders | Full order management with status advancement, reject, archive, tracker |
+| `categories.tsx` | Menu | Add/edit/delete menu items with image upload |
+| `feedback.tsx` | Messages | Chat with customers, long-press delete messages |
+| `submissions.tsx` | Suggestions | Review/approve/reject dish suggestions, archive |
+| `users.tsx` | More | Staff/user management (collapsible), settings, role previews |
+
+## Staff Screens (`(staff)/`)
+
+| File | Tab Name | Description |
+|------|----------|-------------|
+| `index.tsx` | Orders | View orders, mark prepared, address visible, tracker, archive |
+| `profile.tsx` | Profile | Basic profile info, logout |
+
+---
+
+# 8. FIREBASE INTEGRATION
+
+## Dual-Mode Architecture
+
+The app uses a **dual-mode** Firestore access pattern defined in `lib/firebase-store.ts`:
+
+1. **SDK Mode** (default): Uses the Firebase JS SDK (`firebase/firestore`) for direct Firestore access
+2. **REST API Mode** (fallback): Uses `lib/firestore-rest.ts` to make direct HTTP requests to the Firestore REST API when the SDK is blocked (e.g., certain network environments)
+
+The `firestoreOp` helper function abstracts this:
+
+```typescript
+async function firestoreOp<T>(sdkFn: () => Promise<T>, restFn: () => Promise<T>): Promise<T> {
+  if (useRestApi) return restFn();
+  try { return await sdkFn(); }
+  catch (e) {
+    handleSdkBlocked(e);     // Switches to REST mode on specific errors
+    return restFn();          // Retry with REST
   }
 }
 ```
 
-## Storage Security Rules
+## Key Functions (`lib/firebase-store.ts`)
 
-**File:** `storage.rules`
+| Function | Description |
+|----------|-------------|
+| `getMenuItems()` | Fetch all menu items |
+| `createOrder(data)` | Create new order with auto-generated order number |
+| `getOrders(filter?)` | Fetch orders, optionally filtered by status |
+| `getOrdersByUser(userId)` | Fetch orders for a specific customer |
+| `updateOrderStatus(id, status, data?)` | Advance order status |
+| `sendMessage(data)` | Send a chat message |
+| `getMessages(conversationId)` | Fetch chat messages for a conversation |
+| `deleteMessage(messageId)` | Delete a chat message |
+| `getConversations()` | Get all conversation threads (admin) |
+| `markMessagesRead(convId, role)` | Mark messages as read |
+| `getSettings()` | Fetch app settings |
+| `saveSettings(data)` | Save app settings |
+| `getAllUsers()` | Fetch all user profiles |
+| `createStaffAccount(...)` | Create a staff user via Firebase Auth + Firestore |
 
-```javascript
-rules_version = '2';
+## Auth Functions (`lib/firebase.ts`)
 
-service firebase.storage {
-  match /b/{bucket}/o {
-    
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isAdmin() {
-      return isSignedIn() && 
-             firestore.get(/databases/(default)/documents/profiles/$(request.auth.uid)).data.is_admin == true;
-    }
-    
-    // Recipe images - public read, admin write only
-    match /recipe-images/{imageId} {
-      allow read: if true;
-      allow write: if isAdmin() && 
-                      request.resource.size < 5 * 1024 * 1024 &&  // Max 5MB
-                      request.resource.contentType.matches('image/.*');
-    }
-    
-    // Profile images - public read, owner write
-    match /profile-images/{userId}/{imageId} {
-      allow read: if true;
-      allow write: if isSignedIn() && 
-                      request.auth.uid == userId &&
-                      request.resource.size < 2 * 1024 * 1024 &&  // Max 2MB
-                      request.resource.contentType.matches('image/.*');
-    }
-  }
-}
-```
+| Function | Description |
+|----------|-------------|
+| `signIn(email, password)` | Email/password authentication |
+| `signUp(email, password)` | Create new customer account |
+| `logOut()` | Sign out current user |
+| `resetPassword(email)` | Send password reset email |
+| `getProfile(userId)` | Fetch user profile from Firestore |
+| `updateProfile(userId, data)` | Update user profile fields |
+| `getCurrentUser()` | Get currently authenticated user |
+| `setRestTokenFromUser(user)` | Store auth token for REST API mode |
 
 ---
 
 # 9. AI INTEGRATION
 
-## Alibaba Cloud Qwen AI
+File: `lib/qwen-ai.ts`
 
-**Platform:** DashScope (Alibaba Cloud AI Services)
-**Base URL:** `https://dashscope.aliyuncs.com/compatible-mode/v1`
+The app uses the **Alibaba Qwen VL Max** model for food image analysis, accessed via the OpenRouter API.
 
-### AI Models Used
+## `analyzeImageWithQwen(base64Image, type)`
 
-| Model | Model ID | Purpose | Input |
-|-------|----------|---------|-------|
-| Qwen VL Max | qwen-vl-max | Image analysis | Images + text |
-| Qwen Plus | qwen-plus | Chat conversations | Text only |
+- **type = "dish"**: Identifies the dish name, whether it's Filipino, description, ingredients, and cooking tips
+- **type = "ingredient"**: Identifies individual ingredients in the image
 
-### Configuration
+The AI scan is accessible from the customer Profile screen. After scanning, a **"Suggest This Dish"** button auto-fills the suggestion form with the detected dish name and description.
 
-**File:** `lib/qwen-ai.ts`
+## Response Format (dish)
 
 ```typescript
-const QWEN_API_KEY = process.env.EXPO_PUBLIC_QWEN_API_KEY || '';
-const QWEN_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-```
-
-### AI Features
-
-#### 1. Food Scanner (Image Recognition)
-
-**Screen:** `app/(tabs)/scan.tsx`
-
-**Modes:**
-- **Dish Mode:** Identifies Filipino dishes from photos
-- **Ingredients Mode:** Recognizes ingredients and suggests recipes
-
-**Response Interface:**
-```typescript
-interface ScanResult {
-  type: 'dish' | 'ingredients' | 'unknown';
-  dishName?: string;           // Identified dish name
-  confidence?: string;         // "high" | "medium" | "low"
-  ingredients?: string[];      // Detected ingredients
-  description?: string;        // Brief description
-  suggestedRecipes?: string[]; // Recipe suggestions
-  funFact?: string;           // Interesting trivia
-  isFilipino?: boolean;       // Filipino dish flag
-}
-```
-
-**Example API Request:**
-```typescript
-const response = await fetch(`${QWEN_BASE_URL}/chat/completions`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${QWEN_API_KEY}`
-  },
-  body: JSON.stringify({
-    model: 'qwen-vl-max',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { 
-        role: 'user', 
-        content: [
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
-          { type: 'text', text: 'What Filipino dish is this?' }
-        ]
-      }
-    ],
-    max_tokens: 1000
-  })
-});
-```
-
-#### 2. AI Chatbot (Chef Pinoy)
-
-**Screen:** `app/(tabs)/chat.tsx`
-
-**Persona:** "Chef Pinoy" - Filipino cuisine expert
-
-**Capabilities:**
-- Answer questions about Filipino dishes
-- Share recipe suggestions and cooking tips
-- Explain cooking techniques
-- Provide cultural context and history
-- Share fun facts and trivia
-
-**Example API Request:**
-```typescript
-const response = await fetch(`${QWEN_BASE_URL}/chat/completions`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${QWEN_API_KEY}`
-  },
-  body: JSON.stringify({
-    model: 'qwen-plus',
-    messages: [
-      { role: 'system', content: chefPinoySystemPrompt },
-      ...conversationHistory,
-      { role: 'user', content: userMessage }
-    ],
-    max_tokens: 500
-  })
-});
-```
-
----
-
-# 10. FEATURES & SCREENS
-
-## User Features
-
-| Feature | Screen | File | Description |
-|---------|--------|------|-------------|
-| Welcome | Welcome Page | `(auth)/welcome.tsx` | App introduction and entry |
-| Login | User Login | `(auth)/login.tsx` | Email/password + OAuth |
-| Sign Up | Registration | `(auth)/signup.tsx` | New user account creation |
-| Browse | Home | `(tabs)/index.tsx` | Recipe grid with filters |
-| Recipe Detail | Recipe View | `recipe/[id].tsx` | Full recipe information |
-| Bookmark | Save Recipe | `recipe/[id].tsx` | Add to favorites |
-| Feedback | Rate & Review | `recipe/[id].tsx` | Submit ratings |
-| AI Scanner | Food Scan | `(tabs)/scan.tsx` | Photo-based recognition |
-| AI Chat | Chatbot | `(tabs)/chat.tsx` | Conversational assistant |
-| Profile | User Info | `(tabs)/profile.tsx` | Account and bookmarks |
-
-## Admin Features
-
-| Feature | Screen | File | Description |
-|---------|--------|------|-------------|
-| Admin Login | Admin Auth | `(auth)/admin-login.tsx` | Secure admin access |
-| Dashboard | Overview | `(admin)/index.tsx` | Statistics and summary |
-| Recipes | CRUD | `(admin)/recipes.tsx` | Manage recipes |
-| Users | Management | `(admin)/users.tsx` | View/manage users |
-| Regions | Management | `(admin)/regions.tsx` | Add/edit regions |
-| Nutrition | Editor | `(admin)/nutrition.tsx` | Update nutrition info |
-
-## Recipe Categories
-
-| Category | Color | Hex Code | Description |
-|----------|-------|----------|-------------|
-| Main Dish | Orange | `#F25C05` | Primary dishes |
-| Soup | Blue | `#4A8FE7` | Soups and stews |
-| Noodles | Green | `#34B36A` | Noodle dishes |
-| Dessert | - | - | Sweet treats |
-
----
-
-# 11. AUTHENTICATION FLOW
-
-## Flow Diagram
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       APP LAUNCH                             │
-│                           │                                  │
-│                           ▼                                  │
-│                   ┌───────────────┐                         │
-│                   │   index.tsx   │                         │
-│                   │  onAuthChange │                         │
-│                   └───────┬───────┘                         │
-│                           │                                  │
-│         ┌─────────────────┼─────────────────┐               │
-│         │                 │                 │               │
-│         ▼                 ▼                 ▼               │
-│   ┌───────────┐    ┌───────────┐    ┌─────────────┐        │
-│   │   GUEST   │    │   USER    │    │    ADMIN    │        │
-│   │  No Auth  │    │  is_admin │    │   is_admin  │        │
-│   │           │    │  = false  │    │   = true    │        │
-│   └─────┬─────┘    └─────┬─────┘    └──────┬──────┘        │
-│         │                │                 │                │
-│         ▼                ▼                 ▼                │
-│   ┌───────────┐    ┌───────────┐    ┌─────────────┐        │
-│   │  Welcome  │    │  (tabs)   │    │   (admin)   │        │
-│   │  Screen   │    │   Home    │    │  Dashboard  │        │
-│   └───────────┘    └───────────┘    └─────────────┘        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Auth Token Management
-
-The app uses a dual authentication system for maximum compatibility:
-
-1. **Firebase SDK Auth:** Primary authentication method
-2. **REST API Token:** Fallback for ad-blocked browsers
-
-### Token Setting Points
-
-| Action | Function | Token Set? |
-|--------|----------|------------|
-| Email/Password Login | `signIn()` | ✅ Yes |
-| Email/Password Signup | `signUp()` | ✅ Yes |
-| Google OAuth | `signInWithPopup()` + `setRestTokenFromUser()` | ✅ Yes |
-| Facebook OAuth | `signInWithPopup()` + `setRestTokenFromUser()` | ✅ Yes |
-| App Load (returning user) | `onAuthChange()` | ✅ Yes |
-| Logout | `logOut()` | ✅ Cleared |
-
-### Code Implementation
-
-```typescript
-// lib/firebase.ts
-
-// Called on every auth state change
-export function onAuthChange(callback: (user: User | null) => void) {
-  return onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      const token = await user.getIdToken();
-      RestApi.setAuthToken(token);  // Set REST API token
-    } else {
-      RestApi.setAuthToken(null);   // Clear token
-    }
-    callback(user);
-  });
-}
-
-// Helper for OAuth flows
-export async function setRestTokenFromUser(user: User) {
-  if (user) {
-    const token = await user.getIdToken();
-    RestApi.setAuthToken(token);
-  }
+{
+  type: "dish",
+  dishName: "Adobo",
+  isFilipino: true,
+  description: "...",
+  ingredients: ["pork", "soy sauce", ...],
+  cookingTips: "...",
+  funFact: "..."
 }
 ```
 
 ---
 
-# 12. REST API IMPLEMENTATION
+# 10. STATE MANAGEMENT PATTERNS
 
-## Why REST API Fallback?
+The app uses **React hooks** for all state management — no external state libraries.
 
-Ad blockers on web browsers can block Firebase SDK requests. The app automatically falls back to Firestore REST API to ensure functionality.
+## Patterns Used
 
-## REST API Base URL
+- **`useState`** — Component-local state for form fields, lists, modals
+- **`useEffect`** — Data fetching on mount, timers
+- **`useCallback`** — Memoized fetch functions
+- **`useFocusEffect`** (Expo Router) — Refresh data when screen comes into focus
+- **`AsyncStorage`** — Cart persistence across sessions
+  - Key: `@foodfix_cart` (migrated from `@lasangpinoy_cart`)
+  - Stores: `JSON.stringify(cartItems[])` with `menu_item_id`, `name`, `price`, `quantity`, `image_url`
 
-```
-https://firestore.googleapis.com/v1/projects/lasangpinoy-mobile/databases/(default)/documents
-```
+## Cart Badge
 
-## REST API Endpoints
+`(tabs)/_layout.tsx` polls `AsyncStorage` every 3 seconds to update the cart item count badge on the Cart tab icon.
 
-| Operation | Method | Endpoint |
-|-----------|--------|----------|
-| List Documents | GET | `/{collection}?key={API_KEY}` |
-| Get Document | GET | `/{collection}/{docId}?key={API_KEY}` |
-| Create Document | POST | `/{collection}?key={API_KEY}` |
-| Update Document | PATCH | `/{collection}/{docId}?key={API_KEY}` |
-| Delete Document | DELETE | `/{collection}/{docId}?key={API_KEY}` |
-| Query Documents | POST | `:runQuery?key={API_KEY}` |
+## Data Refresh
 
-## REST API Functions
+Most screens use `useFocusEffect` to reload data from Firestore whenever the screen gains focus. Pull-to-refresh is available on order lists.
 
-**File:** `lib/firestore-rest.ts`
+---
 
-| Function | Purpose |
-|----------|---------|
-| `getDocument(collection, docId)` | Fetch single document |
-| `getCollection(collection, orderBy?)` | Fetch all documents |
-| `queryCollection(collection, field, op, value)` | Query with filter |
-| `createDocument(collection, data)` | Create new document |
-| `setDocument(collection, docId, data)` | Set document with ID |
-| `updateDocument(collection, docId, data)` | Update specific fields |
-| `deleteDocument(collection, docId)` | Delete document |
+# 11. ENVIRONMENT VARIABLES
 
-## Auth Header Management
+Stored in `.env` (not committed). Required variables:
 
-```typescript
-// lib/firestore-rest.ts
-
-let cachedToken: string | null = null;
-let tokenExpiry: number = 0;
-
-export async function setAuthToken(token: string | null) {
-  cachedToken = token;
-  tokenExpiry = token ? Date.now() + 3600000 : 0; // 1 hour expiry
-}
-
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (cachedToken && Date.now() < tokenExpiry) {
-    headers['Authorization'] = `Bearer ${cachedToken}`;
-  }
-  
-  return headers;
-}
+```env
+EXPO_PUBLIC_FIREBASE_API_KEY=...
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+EXPO_PUBLIC_FIREBASE_APP_ID=...
+EXPO_PUBLIC_FIREBASE_DATABASE_ID=...       # Firestore database ID (or "default")
+EXPO_PUBLIC_QWEN_API_KEY=...               # Alibaba Qwen API key
+EXPO_PUBLIC_OPENROUTER_API_KEY=...         # OpenRouter API key (for AI)
+EXPO_PUBLIC_GEMINI_API_KEY=...             # Google Gemini (optional fallback)
+EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=...      # Cloudinary cloud name
+EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET=...   # Cloudinary unsigned upload preset
 ```
 
 ---
 
-# 13. DEVELOPMENT PROGRESS
-
-## Completed Features ✅
-
-### Core Features
-- [x] Firebase Authentication (email/password)
-- [x] Google OAuth integration
-- [x] Facebook OAuth integration
-- [x] User registration and login
-- [x] Admin login with role verification
-- [x] REST API fallback for web browsers
-- [x] Auth token management
-
-### Recipe Features
-- [x] Browse all recipes
-- [x] Filter by category (Main Dish, Soup, Noodles, Dessert)
-- [x] Filter by Philippine region
-- [x] Search recipes by title/ingredients
-- [x] View recipe details
-- [x] Bookmark favorite recipes
-- [x] Rate and review recipes
-- [x] Share recipes via native Share API
-
-### AI Features
-- [x] Image-based dish recognition (Qwen VL Max)
-- [x] Ingredient identification
-- [x] Recipe suggestions from ingredients
-- [x] AI chatbot "Chef Pinoy" (Qwen Plus)
-- [x] Conversation history
-
-### Admin Features
-- [x] Admin dashboard with statistics
-- [x] Recipe CRUD operations
-- [x] User management
-- [x] Toggle admin status for users
-- [x] Region management
-- [x] Nutrition information editor
-- [x] Feedback/reviews management
-- [x] Firebase Storage image upload for recipes
-
-### User Account Features
-- [x] Edit profile (change display name)
-- [x] Delete account with full data cleanup
-- [x] Dark mode with persistence
-
-### Shopping List
-- [x] Shopping list utility (lib/shopping-list.ts) with AsyncStorage persistence
-- [x] Shopping list tab screen (app/(tabs)/shopping.tsx)
-- [x] Add/remove recipes from shopping list on recipe detail
-- [x] Check off ingredients as you shop with progress bar
-- [x] Share shopping list via native Share API
-- [x] Shopping list access from Profile Settings with item count badge
-
-### Push Notifications (NEW)
-- [x] expo-notifications installed and configured
-- [x] lib/notifications.ts — registerForPushNotificationsAsync, sendLocalNotification, scheduleLocalNotification
-- [x] app/_layout.tsx — permission request on load, token saved to user profile
-- [x] app.json — expo-notifications plugin added with orange icon tint
-- [x] notifyRecipeApproved / notifyRecipeRejected / notifyNewRecipe helpers
-- [x] Notifications fire when admin approves or rejects a submission
-
-### User Recipe Submissions (NEW)
-- [x] RecipeSubmission interface + CRUD in lib/firebase.ts (submitRecipe, getSubmissions, getUserSubmissions, approveSubmission, rejectSubmission, deleteSubmission)
-- [x] app/(tabs)/submit.tsx — full submission form with image picker, category chips, region selector, optional fields, and My Submissions history tab
-- [x] app/(admin)/submissions.tsx — admin approval panel with filter tabs (Pending/All/Approved/Rejected), approve/reject/delete actions, rejection reason modal, detail bottom sheet
-- [x] Firestore security rules updated for recipe_submissions collection
-- [x] Admin dashboard shows pending submission count badge in Submissions menu card
-- [x] Submit tab added to user tab bar
-
-### Technical
-- [x] TypeScript throughout
-- [x] Expo Router navigation
-- [x] Firebase Firestore integration
-- [x] REST API fallback
-- [x] Error handling and retry logic
-- [x] Security rules implemented
-- [x] Database indexes configured
-- [x] Offline cache invalidation on recipe/region writes
-- [x] Admin layout auth race condition fix (onAuthChange listener)
-- [x] Guest recipe reviews (unauthenticated users can read reviews)
-
-## Pending Features 🔄
-
-### High Priority (Recommended Next)
-
-| Feature | Description | Difficulty | Estimated Effort |
-|---------|-------------|------------|------------------|
-| Push Notifications | Alert users about new recipes, bookmarked updates | Medium | 2-3 days |
-
-### Medium Priority
-
-| Feature | Description | Difficulty | Estimated Effort |
-|---------|-------------|------------|------------------|
-| Recipe Collections | Create custom lists/folders of recipes | Medium | 2-3 days |
-
-### Low Priority (Future Enhancements)
-
-| Feature | Description | Difficulty | Estimated Effort |
-|---------|-------------|------------|------------------|
-| Social Features | Follow users, see their activity | Hard | 5-7 days |
-| Custom ML Engine | On-device recipe recommendations | Hard | 1-2 weeks |
-| Multi-language | Tagalog/Cebuano translations | Medium | 3-4 days |
-| Video Recipes | Embed cooking tutorial videos | Medium | 2-3 days |
-| Nutritional Calculator | Calculate totals for meal combinations | Medium | 2 days |
-| User Recipe Submissions | Allow users to submit recipes (moderated) | Medium | 3-4 days |
-| Advanced Search | Full-text search with filters | Medium | 2-3 days |
-| Recipe Scaling | Adjust ingredient amounts by servings | Easy | 1 day |
-| Cooking Timers | Built-in timers for recipe steps | Medium | 2 days |
-| Print Recipe | Print-friendly recipe view | Easy | 0.5 day |
-
----
-
-## Unimplemented Features ❌
-
-The following features are **planned but not yet coded**:
-
-### 1. Push Notifications
-**Status:** Not started  
-**Requirements:**
-- Firebase Cloud Messaging (FCM) setup
-- Expo Notifications configuration
-- Notification permission handling
-- Server-side trigger logic (optional: Firebase Functions)
-
-**Files to create:**
-- `lib/notifications.ts` - Notification service
-- Update `app/_layout.tsx` - Permission request on app load
-
-### 2. Offline Mode / Data Caching
-**Status:** ✅ Completed  
-**Implementation:**
-- `getRecipes()` and `getRegions()` in `lib/firebase.ts` cache data to AsyncStorage
-- When network requests fail, cached data is automatically loaded
-- Cache is refreshed on every successful network fetch
-- Uses keys `@lasangpinoy_recipes_cache` and `@lasangpinoy_regions_cache`
-
-### 3. Password Reset Flow
-**Status:** ✅ Completed  
-**Implementation:**
-- `resetPassword()` function in `lib/firebase.ts` calls `sendPasswordResetEmail()`
-- "Forgot Password" modal in `app/(auth)/login.tsx` with email input
-- Success/error handling with user-friendly messages
-- Pre-fills user's email from the login form
-
-### 4. Email Verification
-**Status:** ✅ Completed  
-**Implementation:**
-- `verifyEmail()` function in `lib/firebase.ts` calls `sendEmailVerification()`
-- Automatically triggered after signup in `app/(auth)/signup.tsx`
-- Non-blocking: verification email is sent in background without affecting signup flow
-
-### 5. Image Upload for Admin
-**Status:** ✅ Completed  
-**Implementation:**
-- `uploadRecipeImage()` function in `lib/firebase.ts` uses Firebase Storage SDK
-- Admin recipe form now uploads picked images to Firebase Storage
-- Falls back to local URI if Storage upload fails
-- Also added Image URL text input so admins can paste external image URLs
-- Recipe form in `app/(admin)/recipes.tsx` supports both methods
-
-### 6. Recipe Sharing
-**Status:** ✅ Completed  
-**Implementation:**
-- Share button added to recipe detail screen (`app/recipe/[id].tsx`)
-- Uses React Native's native `Share` API
-- Shares recipe title, region, category, and ingredients
-- Works on iOS, Android, and Web
-
-### 7. Shopping List Generator
-**Status:** ✅ Completed  
-**Implementation:**
-- `lib/shopping-list.ts` — full AsyncStorage-backed service (add, toggle, remove, clear, share)
-- `app/(tabs)/shopping.tsx` — dedicated Shopping tab with grouped ingredients, checkboxes, progress bar
-- Recipe detail (`app/recipe/[id].tsx`) — cart icon + banner to add/remove ingredients
-- Profile Settings row with live item count badge
-- Native Share API export with emoji-formatted grouped text
-
-### 8. User Recipe Submissions
-**Status:** Not started  
-**Requirements:**
-- New collection: `recipe_submissions` (pending approval)
-- Admin approval workflow
-- User notification on approval/rejection
-
-### 9. Custom ML Recommendation Engine
-**Status:** Documented only (see Section 15)  
-**Requirements:**
-- Content-based filtering algorithm
-- User profile vector from bookmarks
-- Recipe feature extraction
-- Similarity calculation
-
----
-
-## Pending Testing 🧪
-
-The following items have been **implemented but need verification**:
-
-### Critical - Must Test Before Release
-
-| Item | What to Test | How to Test | Status |
-|------|--------------|-------------|--------|
-| REST API Auth Fix | Bookmarks load for returning users | 1. Login, bookmark a recipe, logout 2. Close browser completely 3. Reopen app, login again 4. Check profile - bookmarks should load | ⏳ Pending |
-| OAuth Token Fix | Google/Facebook login sets REST token | 1. Use Google Sign In 2. Check console for `[REST] Auth token set` 3. Navigate to profile, bookmarks should work | ⏳ Pending |
-| `onAuthChange` Integration | App correctly redirects on load | 1. Login as user → should go to (tabs) 2. Login as admin → should go to (admin) 3. Not logged in → should go to welcome | ⏳ Pending |
-
-### Authentication Testing
-
-| Test Case | Steps | Expected Result | Status |
-|-----------|-------|-----------------|--------|
-| Email/Password Login | Enter valid credentials, submit | Redirect to home, user data loads | ⏳ Pending |
-| Email/Password Signup | Enter new email/password | Account created, profile created, redirect | ⏳ Pending |
-| Admin Login | Login with admin credentials | Redirect to admin dashboard | ⏳ Pending |
-| Invalid Login | Enter wrong password | Error message displayed | ⏳ Pending |
-| Logout | Tap logout button | Redirect to welcome, session cleared | ⏳ Pending |
-| Google OAuth | Tap "Sign in with Google" | Google popup, successful auth | ⏳ Pending |
-| Facebook OAuth | Tap "Sign in with Facebook" | Facebook popup, successful auth | ⏳ Pending |
-
-### Recipe Features Testing
-
-| Test Case | Steps | Expected Result | Status |
-|-----------|-------|-----------------|--------|
-| Browse Recipes | Open home screen | All recipes displayed in grid | ⏳ Pending |
-| Filter by Category | Tap category filter | Only matching recipes shown | ⏳ Pending |
-| Filter by Region | Tap region filter | Only matching recipes shown | ⏳ Pending |
-| Search Recipes | Type in search bar | Filtered results displayed | ⏳ Pending |
-| View Recipe Detail | Tap on recipe card | Full recipe info displayed | ⏳ Pending |
-| Bookmark Recipe | Tap bookmark icon | Recipe saved, icon changes | ⏳ Pending |
-| Remove Bookmark | Tap bookmarked icon | Bookmark removed | ⏳ Pending |
-| Submit Rating | Select stars, submit | Rating saved, average updated | ⏳ Pending |
-| Submit Review | Write comment, submit | Review appears in list | ⏳ Pending |
-
-### AI Features Testing
-
-| Test Case | Steps | Expected Result | Status |
-|-----------|-------|-----------------|--------|
-| Scan Dish Photo | Take/select dish photo | AI identifies Filipino dish | ⏳ Pending |
-| Scan Ingredients | Take photo of ingredients | AI lists ingredients, suggests recipes | ⏳ Pending |
-| Chat with Chef Pinoy | Send question about Filipino food | AI responds with relevant info | ⏳ Pending |
-| Chat History | Send multiple messages | Conversation history maintained | ⏳ Pending |
-| Image from Gallery | Select from camera roll | Image processes correctly | ⏳ Pending |
-| Camera Capture | Use camera directly | Photo captured and analyzed | ⏳ Pending |
-
-### Admin Features Testing
-
-| Test Case | Steps | Expected Result | Status |
-|-----------|-------|-----------------|--------|
-| View Dashboard | Login as admin | Statistics displayed | ⏳ Pending |
-| Create Recipe | Fill form, submit | New recipe appears in list | ⏳ Pending |
-| Edit Recipe | Modify existing recipe | Changes saved | ⏳ Pending |
-| Delete Recipe | Delete recipe | Recipe removed | ⏳ Pending |
-| View Users | Open users screen | All users listed | ⏳ Pending |
-| Toggle Admin | Make user admin | User can access admin features | ⏳ Pending |
-| Add Region | Create new region | Region appears in filters | ⏳ Pending |
-| Edit Nutrition | Update nutrition info | Changes saved | ⏳ Pending |
-
-### Cross-Platform Testing
-
-| Platform | Device/Emulator | Status |
-|----------|-----------------|--------|
-| Web (Chrome) | Desktop browser | ⏳ Pending |
-| Web (Safari) | Desktop browser | ⏳ Pending |
-| Web (Firefox) | Desktop browser | ⏳ Pending |
-| Web (with Ad Blocker) | Browser + uBlock Origin | ⏳ Pending |
-| Android | Emulator / Physical device | ⏳ Pending |
-| iOS | Simulator / Physical device | ⏳ Pending |
-| Expo Go (Android) | Physical device | ⏳ Pending |
-| Expo Go (iOS) | Physical device | ⏳ Pending |
-
-### Error Handling Testing
-
-| Test Case | How to Simulate | Expected Behavior | Status |
-|-----------|-----------------|-------------------|--------|
-| Network Error | Disable WiFi | Graceful error message | ⏳ Pending |
-| Invalid API Key | Modify .env temporarily | Error logged, fallback attempted | ⏳ Pending |
-| Firestore Permission Denied | Try unauthorized action | User-friendly error | ⏳ Pending |
-| AI Service Down | Invalid Qwen key | Error message, app stable | ⏳ Pending |
-
-### Performance Testing
-
-| Metric | Target | How to Measure | Status |
-|--------|--------|----------------|--------|
-| Initial Load Time | < 3 seconds | Chrome DevTools | ⏳ Pending |
-| Recipe List Render | < 500ms | React DevTools Profiler | ⏳ Pending |
-| Image Scan Response | < 5 seconds | Console logging | ⏳ Pending |
-| Chat Response Time | < 3 seconds | Console logging | ⏳ Pending |
-
----
-
-# 14. BUG FIXES & KNOWN ISSUES
-
-## Fixed Issues ✅
-
-### Issue 1: REST API Token Not Set on App Load
-
-**Problem:** When a user was already logged in (returning user), the REST API auth token was never set, causing authenticated API calls to fail.
-
-**Root Cause:** `app/index.tsx` used `onAuthStateChanged` directly instead of `onAuthChange`.
-
-**Fix Applied:**
-```typescript
-// Before (broken)
-import { onAuthStateChanged } from 'firebase/auth';
-onAuthStateChanged(auth, (user) => { ... });
-
-// After (fixed)
-import { onAuthChange } from '../lib/firebase';
-onAuthChange((user) => { ... });
-```
-
-### Issue 2: OAuth Login Not Setting REST API Token
-
-**Problem:** Google and Facebook sign-in didn't set the REST API token.
-
-**Fix Applied:**
-```typescript
-// Added helper function
-export async function setRestTokenFromUser(user: User) {
-  const token = await user.getIdToken();
-  RestApi.setAuthToken(token);
-}
-
-// Called after OAuth sign-in
-const result = await signInWithPopup(auth, googleProvider);
-await setRestTokenFromUser(result.user);
-```
-
-### Issue 3: Insufficient Error Logging
-
-**Problem:** REST API errors showed generic messages without details.
-
-**Fix Applied:** Enhanced logging in `firestore-rest.ts` with request details, auth status, and full error responses.
-
-### Issue 4: Supabase References Remaining
-
-**Problem:** Old Supabase imports and code remained after migration.
-
-**Fix Applied:** Removed all Supabase references, deleted `lib/supabase.ts`, uninstalled package.
-
-### Issue 5: Admin Layout Auth Race Condition
-
-**Problem:** `app/(admin)/_layout.tsx` used synchronous `getCurrentUser()` which returns `null` on cold start before Firebase Auth restores the persisted session. Legitimate admins were redirected to the welcome screen.
-
-**Fix Applied:** Replaced with a one-shot `onAuthChange` listener that waits for the first auth state resolution before making the admin check.
-
-### Issue 6: Guest Users Could Not See Recipe Reviews
-
-**Problem:** `fetchFeedbackData()` was only called inside `checkUser()`, which only ran for authenticated users. Logged-out visitors saw an empty reviews section even though reviews are publicly readable.
-
-**Fix Applied:** `fetchFeedbackData()` is now called directly in the root `useEffect([id])` block, independent of authentication state.
-
-### Issue 7: Stale Cache After Recipe/Region Writes
-
-**Problem:** After adding, updating, or deleting a recipe or region, the AsyncStorage offline cache was never invalidated. The next offline session served stale data (showing deleted recipes, missing new ones).
-
-**Fix Applied:** All write functions (`addRecipe`, `updateRecipe`, `deleteRecipe`, `addRegion`, `updateRegion`, `deleteRegion`) now call `AsyncStorage.removeItem(CACHE_KEY_*)` after every successful write — across both SDK and REST code paths.
-
-### Issue 8: Hardcoded Qwen API Key
-
-**Problem:** The Alibaba Qwen API key was hardcoded as a fallback string in `lib/qwen-ai.ts`, exposing it in every app bundle.
-
-**Fix Applied:** Hardcoded fallback removed. The app now reads exclusively from `EXPO_PUBLIC_QWEN_API_KEY`. A `console.error` warning is shown if the key is missing, and both AI functions throw a descriptive error rather than silently using a baked-in key.
-
-### Issue 9: Scan Mode Switch Did Not Clear Previous Result
-
-**Problem:** Switching between "Identify Dish" and "Scan Ingredients" modes left the previous result card on screen, mixing UI from both modes.
-
-**Fix Applied:** Mode toggle buttons now call `setResult(null)`, `setMatchedRecipes([])`, and `setError(null)` in addition to `setScanMode(...)`.
-
-### Issue 10: Category/Region Filter Ignored Active Search Text
-
-**Problem:** When tapping a category or region filter chip, `fetchRecipesData()` was called with no search keyword, silently discarding any text the user had typed.
-
-**Fix Applied:** The `[activeCategory, activeRegion]` `useEffect` now calls `fetchRecipesData(search)`, passing the current search state.
-
-### Issue 11: Deprecated Firebase Error Codes
-
-**Problem:** Error handlers in `login.tsx` and `admin-login.tsx` checked for `auth/user-not-found` and `auth/wrong-password`, which are deprecated in Firebase SDK v9+. Friendly error messages never displayed.
-
-**Fix Applied:** Added `auth/invalid-credential` error code handling in both files. The old codes are kept for backward compatibility.
-
-## Known Issues 🐛
-
-| Issue | Status | Workaround |
-|-------|--------|------------|
-| Ad blockers block Firebase SDK | Mitigated | REST API fallback |
-| OAuth requires Firebase Console setup | Open | Manual setup in Firebase Console |
-
----
-
-# 15. FUTURE ML IMPLEMENTATION
-
-## Recommended ML Models (No External APIs)
-
-### Option 1: Recipe Recommendation System ⭐ BEST
-
-**Algorithm:** Content-Based Filtering with Cosine Similarity
-
-**How It Works:**
-1. Extract features from recipes (category, region, ingredients)
-2. Create user profile from bookmarked recipes
-3. Calculate similarity between user profile and all recipes
-4. Recommend most similar recipes
-
-**Math:**
-```
-similarity(A, B) = cos(θ) = (A · B) / (||A|| × ||B||)
-```
-
-### Option 2: K-Nearest Neighbors (KNN)
-
-**Purpose:** Find similar recipes
-
-**Algorithm:**
-1. Extract features from target recipe
-2. Calculate Euclidean distance to all other recipes
-3. Return K nearest neighbors
-
-**Math:**
-```
-distance(A, B) = √(Σ(ai - bi)²)
-```
-
-### Option 3: Image Classification (Advanced)
-
-**Library:** TensorFlow.js
-**Model:** Convolutional Neural Network (CNN)
-**Requirement:** 100+ training images per dish
-
-### Implementation Files
-
-See `CUSTOM_ML_IMPLEMENTATION.md` for complete code examples.
-
----
-
-# 16. DEPLOYMENT GUIDE
+# 12. BUILD & RELEASE PROCESS
 
 ## Prerequisites
 
-- Node.js 18+ installed
-- npm or yarn package manager
-- Expo CLI (`npm install -g expo-cli`)
-- Firebase CLI (`npm install -g firebase-tools`)
+- Node.js 18+
+- Java 17 (for Android builds)
+- Android SDK
+- Expo CLI (`npx expo`)
 
-## Local Development
-
-```bash
-# 1. Navigate to project
-cd C:\Users\USER\OneDrive\Desktop\PUP
-
-# 2. Install dependencies
-npm install
-
-# 3. Start development server
-npx expo start
-
-# 4. Run options:
-#    Press 'w' - Web browser
-#    Press 'a' - Android emulator
-#    Press 'i' - iOS simulator
-#    Scan QR - Expo Go app
-```
-
-## Deploy Firebase Rules
+## Development
 
 ```bash
-# Login to Firebase
-firebase login
-
-# Deploy Firestore rules
-firebase deploy --only firestore:rules
-
-# Deploy Firestore indexes
-firebase deploy --only firestore:indexes
-
-# Deploy Storage rules
-firebase deploy --only storage
-
-# Deploy everything
-firebase deploy
+npx expo start          # Start dev server
+npx expo start --android   # Start with Android device/emulator
 ```
 
-## Build for Production
+## Production Build (APK)
 
 ```bash
-# Build for Android
-npx expo build:android
+# 1. Prebuild native code
+npx expo prebuild --platform android --clean
 
-# Build for iOS
-npx expo build:ios
+# 2. Build release APK
+cd android
+./gradlew assembleRelease -x lintVitalAnalyzeRelease
 
-# Build for Web
-npx expo export:web
+# 3. APK location
+# android/app/build/outputs/apk/release/app-release.apk
 ```
 
-## Environment Setup for New Developers
+## GitHub Release
 
-1. Clone repository
-2. Copy `.env.example` to `.env` (if exists)
-3. Or create `.env` with all variables from Section 5
-4. Run `npm install`
-5. Run `npx expo start`
+```bash
+gh release create v2.7.0 \
+  "android/app/build/outputs/apk/release/app-release.apk#FOODFIX-v2.7.0.apk" \
+  --title "FOODFIX v2.7.0" \
+  --notes "Changelog..."
+```
+
+## Version Bumping
+
+Update all three locations:
+1. `app.json` → `expo.version`, `expo.android.versionCode`, `expo.ios.buildNumber`
+2. `app/(tabs)/profile.tsx` → version display text
 
 ---
 
-# 17. TEST ACCOUNTS & CREDENTIALS
+# 13. KEY LOGIC FLOWS
 
-## Admin Account
+## Order Placement (Customer)
 
-| Property | Value |
-|----------|-------|
-| Email | `<set in .env as ADMIN_EMAIL>` |
-| Password | `<set in .env as ADMIN_PASSWORD>` |
-| User UID | `<from Firebase Auth console>` |
-| Role | Administrator |
-| is_admin | true |
+1. Customer browses menu (`index.tsx`), adds items to cart → stored in `AsyncStorage`
+2. Opens Cart tab (`scan.tsx`), sees cart items with quantities
+3. Selects order type: Delivery Now, Delivery Later, Dine-In, Pick-Up
+4. For delivery: picks date/time (spinner picker), selects location on map
+5. Chooses payment: COD or GCash (shows notice to coordinate via chat)
+6. Confirms → `createOrder()` writes to Firestore with status `"pending"`
+7. Cart is cleared from AsyncStorage
 
-## Creating Test User
+## Order Workflow (Admin)
 
-1. Open app
-2. Navigate to Sign Up
-3. Enter email and password (6+ characters)
-4. Account created with `is_admin: false`
+1. Admin sees new orders in Orders tab (`recipes.tsx`)
+2. Can advance status: `pending` → `accepted` → `preparing` → `out_for_delivery` → `delivered`
+3. Can reject with reason at `pending` stage
+4. Each status change calls `updateOrderStatus()`
+5. Completed orders can be archived (local-only, stored in `Set<string>`)
 
-## Admin Features Access
+## Live Chat
 
-After logging in as admin:
-- Dashboard: Statistics overview
-- `/recipes`: Create, edit, delete recipes
-- `/users`: View all users, toggle admin
-- `/regions`: Manage Philippine regions
-- `/nutrition`: Update nutritional info
+1. Customer sends message → stored in `messages` collection with `conversation_id = customer.uid`
+2. Admin sees conversation list → clicks to open → marks messages as read
+3. Both sides can long-press to delete messages (calls `deleteMessage()`)
 
----
+## AI Food Scanner
 
-# 18. COMMANDS REFERENCE
-
-## Development Commands
-
-```bash
-# Start development server
-npx expo start
-
-# Clear cache and start
-npx expo start -c
-
-# Start for specific platform
-npx expo start --web
-npx expo start --android
-npx expo start --ios
-
-# TypeScript check
-npx tsc --noEmit
-
-# Expo diagnostics
-npx expo-doctor
-
-# Security audit
-npm audit
-
-# Fix security issues
-npm audit fix
-```
-
-## Firebase Commands
-
-```bash
-# Login
-firebase login
-
-# Logout
-firebase logout
-
-# List projects
-firebase projects:list
-
-# Deploy all
-firebase deploy
-
-# Deploy specific
-firebase deploy --only firestore:rules
-firebase deploy --only firestore:indexes
-firebase deploy --only storage
-```
-
-## Build Commands
-
-```bash
-# Install dependencies
-npm install
-
-# Update dependencies
-npm update
-
-# Clean install
-rm -rf node_modules && npm install
-
-# Build web
-npx expo export:web
-
-# Build Android
-eas build --platform android
-
-# Build iOS
-eas build --platform ios
-```
-
-## Seeding & Setup Scripts
-
-```bash
-# Seed database with regions and recipes
-npx ts-node scripts/seed-firebase-rest.ts
-
-# Create admin user
-npx ts-node scripts/setup-admin.ts
-
-# Test Firestore connectivity
-npx ts-node scripts/test-firestore-rest.ts
-
-# Diagnose Firestore issues
-npx ts-node scripts/diagnose-firestore.ts
-```
+1. Customer taps "AI Scan" on profile → camera opens
+2. Photo captured → base64 sent to `analyzeImageWithQwen()`
+3. Result displayed in modal with dish name, description, ingredients
+4. "Suggest This Dish" button → auto-fills suggestion form → submits to `suggestions` collection
 
 ---
 
-# 19. TROUBLESHOOTING
+# 14. CONSTANTS & CONFIGURATION
 
-## Common Issues
+## Order Statuses (`constants/order.ts`)
 
-### App doesn't start
-
-```bash
-# Clear cache and restart
-npx expo start -c
-
-# Reinstall dependencies
-rm -rf node_modules
-npm install
-npx expo start
+```typescript
+const ORDER_STATUSES = ["pending", "accepted", "preparing", "out_for_delivery", "delivered", "rejected", "cancelled"];
 ```
 
-### Firebase errors
+## Order Types
 
-1. Check internet connection
-2. Verify `.env` file exists with correct values
-3. Check Firebase Console for project status
-4. Ensure security rules are deployed
-
-### AI features don't work
-
-1. Verify Qwen API key in `.env`
-2. Check internet connection
-3. Ensure camera/gallery permissions granted
-4. Check console for API error messages
-
-### Authentication issues
-
-1. Verify Firebase Auth is enabled in Console
-2. Check if email/password provider is enabled
-3. For OAuth: Ensure providers configured in Firebase
-4. Check console for auth error codes
-
-### REST API errors
-
-1. Check if auth token is set (look for `[REST] Auth token set` in console)
-2. Verify security rules allow the operation
-3. Check for index requirements (Firestore may need indexes)
-4. Look for detailed error in `[REST] ... error:` logs
-
-### TypeScript errors
-
-```bash
-# Check for type errors
-npx tsc --noEmit
-
-# If errors, fix them before running
+```typescript
+const ORDER_TYPES = ["delivery_now", "delivery_later", "dine_in", "pick_up"];
 ```
 
-### Build errors
+## Payment Methods
 
-```bash
-# Check Expo doctor
-npx expo-doctor
-
-# Fix any reported issues
+```typescript
+const PAYMENT_METHODS = ["cod", "gcash"];
 ```
+
+## Menu Categories
+
+```typescript
+const MENU_CATEGORIES = [
+  "Main Dish", "Soup", "Noodles", "Dessert", "Appetizer",
+  "Breakfast", "Seafood", "Vegetable", "Snacks", "Beverage"
+];
+```
+
+## Theme Colors
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Primary Orange | `#F25C05` | Buttons, accents, customer theme |
+| Dark Brown | `#2E1A06` | Text, admin theme |
+| Cream Background | `#F9F0DC` | Screen backgrounds |
+| Staff Blue | `#3498DB` | Staff theme, processing status |
+| Success Green | `#27AE60` | Delivered, approved |
+| Error Red | `#E74C3C` | Rejected, errors |
+| Warning Yellow | `#F39C12` | Pending status |
 
 ---
 
-# DOCUMENT INFO
-
-| Property | Value |
-|----------|-------|
-| Document Title | LasangPinoy Mobile - Complete Documentation |
-| Version | 1.0.0 |
-| Created | March 28, 2026 |
-| Last Updated | March 28, 2026 |
-| Author | Development Team |
-| Project Status | Active Development |
-
----
-
-**⚠️ CONFIDENTIAL: This document contains API keys and sensitive configuration. Do not share publicly.**
-
----
-
-*End of Documentation*
+*End of Documentation — FOODFIX v2.7.0*

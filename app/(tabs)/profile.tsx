@@ -414,7 +414,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.6.0</Text>
+        <Text style={styles.version}>Version 2.7.0</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>

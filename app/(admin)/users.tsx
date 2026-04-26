@@ -103,7 +103,7 @@ export default function AdminMoreScreen() {
       Alert.alert(
         "Success",
         `Staff account created for ${staffForm.name.trim()}!\n\nPlease log in again as admin to continue.`,
-        [{ text: "OK", onPress: () => router.replace("/(auth)/admin-login") }],
+        [{ text: "OK", onPress: () => router.replace("/(auth)/welcome") }],
       );
       setStaffModal(false);
       setStaffForm({ name: "", email: "", password: "", phone: "" });
