@@ -151,7 +151,7 @@ export default function WelcomeScreen() {
           {/* LOGO */}
           <View style={styles.logoBox}>
             <View style={styles.logoCircle}>
-              <Text style={styles.logoEmoji}>🍽️</Text>
+              <Ionicons name="restaurant" size={36} color="#fff" />
             </View>
             <Text style={styles.appName}>FOODFIX</Text>
             <Text style={styles.appSub}>Filipino Food Ordering System</Text>
@@ -284,7 +284,6 @@ const styles = StyleSheet.create({
     // @ts-ignore
     boxShadow: "0px 4px 10px rgba(242, 92, 5, 0.3)",
   },
-  logoEmoji: { fontSize: 36 },
   appName: { fontSize: 26, fontWeight: "bold", color: "#2E1A06" },
   appSub: { fontSize: 12, color: "#C07A20", marginTop: 2 },
   card: {

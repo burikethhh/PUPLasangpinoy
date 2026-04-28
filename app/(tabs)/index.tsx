@@ -221,7 +221,7 @@ export default function MenuScreen() {
                     />
                   ) : (
                     <View style={[styles.imagePlaceholder, { backgroundColor: color + "22" }]}>
-                      <Text style={{ fontSize: 36 }}>🍽️</Text>
+                      <Ionicons name="restaurant-outline" size={36} color="#ccc" />
                     </View>
                   )}
 

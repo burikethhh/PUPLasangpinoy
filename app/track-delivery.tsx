@@ -3,8 +3,11 @@ import * as ExpoLocation from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator, Alert, Linking, StyleSheet,
-    Text, TouchableOpacity, View,
+    ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal,
+    Platform, ScrollView, StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
@@ -27,8 +30,14 @@ export default function TrackDeliveryScreen() {
   const [otherOptIn, setOtherOptIn] = useState(false);
   const [tracking, setTracking] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [chatVisible, setChatVisible] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [aiThinking, setAiThinking] = useState(false);
+  const [customerLoc, setCustomerLoc] = useState<LiveLocation | null>(null);
   const webViewRef = useRef<WebView>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const chatScrollRef = useRef<ScrollView>(null);
 
   const isCustomer = role === "customer";
   const user = getCurrentUser();
@@ -50,7 +59,7 @@ export default function TrackDeliveryScreen() {
     })();
   }, [orderId, user, isCustomer]);
 
-  // Subscribe to driver location (customer watches staff, staff watches nothing extra)
+  // Subscribe to driver location (customer watches staff)
   useEffect(() => {
     if (!orderId || !myOptIn || !otherOptIn) return;
     const unsub = onLocationUpdate(orderId, "staff", (loc) => {
@@ -62,6 +71,40 @@ export default function TrackDeliveryScreen() {
     unsubRef.current = unsub;
     return () => unsub?.();
   }, [orderId, myOptIn, otherOptIn]);
+
+  // Staff subscribes to customer location
+  useEffect(() => {
+    if (!orderId || isCustomer || !myOptIn) return;
+    const unsub = onLocationUpdate(orderId, "customer", (loc) => {
+      setCustomerLoc(loc);
+      if (loc && webViewRef.current) {
+        webViewRef.current.postMessage(JSON.stringify({ type: "customerUpdate", lat: loc.lat, lng: loc.lng }));
+      }
+    });
+    return () => unsub?.();
+  }, [orderId, isCustomer, myOptIn]);
+
+  // Customer shares their foreground location when both opted in
+  useEffect(() => {
+    if (!isCustomer || !(myOptIn && otherOptIn) || !orderId || !user) return;
+    let interval: ReturnType<typeof setInterval>;
+    (async () => {
+      const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const push = async () => {
+        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
+        if (loc) {
+          await upsertLocation(orderId, user.uid, "customer", {
+            lat: loc.coords.latitude, lng: loc.coords.longitude,
+            accuracy: loc.coords.accuracy ?? undefined,
+          }).catch(() => {});
+        }
+      };
+      await push();
+      interval = setInterval(push, 20000);
+    })();
+    return () => clearInterval(interval);
+  }, [isCustomer, myOptIn, otherOptIn, orderId, user]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -130,16 +173,76 @@ export default function TrackDeliveryScreen() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
+  // Use customer's live location for ETA if available, else fall back to store
+  function getDestCoords() {
+    if (customerLoc) return { lat: customerLoc.lat, lng: customerLoc.lng };
+    return { lat: STORE_LAT, lng: STORE_LNG };
+  }
+
   function getETA(): string {
     if (!driverLoc || !order) return "...";
-    const addrCoords = { lat: STORE_LAT, lng: STORE_LNG }; // fallback
-    const dist = calcDistance(driverLoc.lat, driverLoc.lng, addrCoords.lat, addrCoords.lng);
+    const dest = getDestCoords();
+    const dist = calcDistance(driverLoc.lat, driverLoc.lng, dest.lat, dest.lng);
     const speedKmh = driverLoc.speed && driverLoc.speed > 2 ? driverLoc.speed : 25;
     const mins = Math.round((dist / speedKmh) * 60);
     return `~${mins} min · ${dist.toFixed(1)} km away`;
   }
 
-  function getMapHtml(customerLat = STORE_LAT, customerLng = STORE_LNG) {
+  function generateAiResponse(question: string): string {
+    const q = question.toLowerCase();
+    if (!driverLoc) {
+      return "I'm waiting for the driver to start sharing their location. Once they begin tracking, I can give you live updates!";
+    }
+    const dest = getDestCoords();
+    const dist = calcDistance(driverLoc.lat, driverLoc.lng, dest.lat, dest.lng);
+    const speedKmh = driverLoc.speed && driverLoc.speed > 2 ? driverLoc.speed : 25;
+    const mins = Math.round((dist / speedKmh) * 60);
+    const distStr = dist < 1 ? `${(dist * 1000).toFixed(0)} meters` : `${dist.toFixed(1)} km`;
+
+    if (q.includes("where") || q.includes("location") || q.includes("driver") || q.includes("rider")) {
+      if (dist < 0.3) return `Your driver is almost at your door — less than 300 meters away! Get ready!`;
+      if (dist < 1) return `Your driver is very close, only ${distStr} away. Should arrive in ~${mins} minute${mins === 1 ? "" : "s"}!`;
+      return `Your driver is currently ${distStr} away, moving at ~${speedKmh} km/h.`;
+    }
+    if (q.includes("how long") || q.includes("when") || q.includes("eta") || q.includes("arrive") || q.includes("time")) {
+      if (mins <= 1) return `Your order should arrive any moment now!`;
+      if (mins <= 5) return `Almost there — estimated arrival in about ${mins} minutes!`;
+      return `Estimated arrival in ~${mins} minutes based on current speed and distance (${distStr}).`;
+    }
+    if (q.includes("speed") || q.includes("fast") || q.includes("slow") || q.includes("moving")) {
+      if (driverLoc.speed != null && driverLoc.speed > 0)
+        return `The driver is moving at ${driverLoc.speed} km/h. ${driverLoc.speed < 5 ? "They may be in traffic or at a stop." : "They're on the way!"}`;
+      return `Speed data isn't available right now, but the driver is ${distStr} away.`;
+    }
+    if (q.includes("near") || q.includes("close") || q.includes("far")) {
+      if (dist < 0.5) return `Very close! The driver is only ${distStr} away — ~${mins} min.`;
+      if (dist < 2) return `Getting there! Driver is ${distStr} away, ~${mins} minutes to go.`;
+      return `The driver is still ${distStr} out. Estimated ~${mins} minutes.`;
+    }
+    if (q.includes("order") || q.includes("status") || q.includes("update")) {
+      return `Your order ${order?.order_number} is out for delivery. Driver is ${distStr} away, ETA ~${mins} min. Live tracking is ${sharingActive ? "active" : "waiting"}.`;
+    }
+    if (q.includes("hello") || q.includes("hi") || q.includes("hey")) {
+      return `Hi! I'm your live delivery assistant. Your driver is ${distStr} away with an ETA of ~${mins} minutes. Ask me anything about your delivery!`;
+    }
+    return `Your driver is currently ${distStr} away at ~${speedKmh} km/h — estimated arrival in ~${mins} minutes. ${sharingActive ? "Live tracking is active." : ""}\n\nAsk me: "Where is my driver?", "How long until delivery?", or "Is my order nearby?"`;
+  }
+
+  function handleAiQuery(question: string) {
+    if (!question.trim() || aiThinking) return;
+    const userMsg = question.trim();
+    setChatMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setChatInput("");
+    setAiThinking(true);
+    setTimeout(() => {
+      const response = generateAiResponse(userMsg);
+      setChatMessages(prev => [...prev, { role: "ai", text: response }]);
+      setAiThinking(false);
+      setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }, 700);
+  }
+
+  function getMapHtml(customerLat = customerLoc?.lat ?? STORE_LAT, customerLng = customerLoc?.lng ?? STORE_LNG) {
     const dLat = driverLoc?.lat ?? STORE_LAT;
     const dLng = driverLoc?.lng ?? STORE_LNG;
     const centerLat = isCustomer ? (customerLat + dLat) / 2 : dLat;
@@ -162,24 +265,29 @@ var map = L.map('map').setView([${centerLat},${centerLng}], 14);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'&copy; OSM contributors', maxZoom:19}).addTo(map);
 
-var storeIcon = L.divIcon({html:'🏪',className:'',iconSize:[24,24],iconAnchor:[12,12]});
-var custIcon  = L.divIcon({html:'📍',className:'',iconSize:[24,24],iconAnchor:[12,24]});
-var driverIcon= L.divIcon({html:'🛵',className:'',iconSize:[28,28],iconAnchor:[14,14]});
+var storeIcon = L.divIcon({html:'<div style="background:#F25C05;color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">S</div>',className:'',iconSize:[26,26],iconAnchor:[13,13]});
+var custIcon  = L.divIcon({html:'<div style="background:#E74C3C;color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">C</div>',className:'',iconSize:[26,26],iconAnchor:[13,26]});
+var driverIcon= L.divIcon({html:'<div style="background:#3498DB;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">D</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
 
 L.marker([${STORE_LAT},${STORE_LNG}],{icon:storeIcon}).addTo(map).bindPopup('FOODFIX Store');
 var custMarker = L.marker([${customerLat},${customerLng}],{icon:custIcon}).addTo(map).bindPopup('Delivery Location');
 var driverMarker = ${myOptIn && otherOptIn ? `L.marker([${dLat},${dLng}],{icon:driverIcon}).addTo(map).bindPopup('Driver')` : "null"};
 
-${isCustomer ? `document.getElementById('legend').innerHTML = '<b>🛵 Driver</b> &bull; <b>📍 You</b> &bull; <b>🏪 Store</b>';` :
-  `document.getElementById('legend').innerHTML = '<b>📍 Delivery Address</b> &bull; <b>🛵 Your Location</b>';`}
+${isCustomer ? `document.getElementById('legend').innerHTML = '<span style="color:#3498DB">&#9679;</span> Driver &bull; <span style="color:#E74C3C">&#9679;</span> You &bull; <span style="color:#F25C05">&#9679;</span> Store';` :
+  `document.getElementById('legend').innerHTML = '<span style="color:#E74C3C">&#9679;</span> Delivery Address &bull; <span style="color:#3498DB">&#9679;</span> Your Location';`}
 
 document.addEventListener('message', function(e){ handleMsg(e.data); });
 window.addEventListener('message', function(e){ handleMsg(e.data); });
+var custMarkerLive = null;
 function handleMsg(raw){
   try{
     var d = JSON.parse(raw);
     if(d.type === 'driverUpdate' && driverMarker){
       driverMarker.setLatLng([d.lat, d.lng]);
+    }
+    if(d.type === 'customerUpdate'){
+      if(!custMarkerLive) custMarkerLive = L.marker([d.lat,d.lng],{icon:custIcon}).addTo(map).bindPopup('Customer');
+      else custMarkerLive.setLatLng([d.lat,d.lng]);
     }
   }catch(err){}
 }
@@ -211,6 +319,7 @@ function handleMsg(raw){
   }
 
   const sharingActive = myOptIn && otherOptIn;
+  const QUICK_QUESTIONS = ["Where is my driver?", "How long until delivery?", "Is my order close?"];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -259,8 +368,87 @@ function handleMsg(raw){
         <View style={styles.etaBar}>
           <Ionicons name="time-outline" size={16} color="#2E1A06" />
           <Text style={styles.etaText}>{getETA()}</Text>
+          <TouchableOpacity style={styles.aiChatBtn} onPress={() => setChatVisible(true)}>
+            <Text style={styles.aiChatBtnText}>Ask AI</Text>
+          </TouchableOpacity>
         </View>
       )}
+
+      {/* AI floating button when sharing active but no driverLoc yet */}
+      {isCustomer && sharingActive && !driverLoc && (
+        <TouchableOpacity style={styles.aiFloatingBtn} onPress={() => setChatVisible(true)}>
+          <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
+        </TouchableOpacity>
+      )}
+
+      {/* AI Chat Modal */}
+      <Modal visible={chatVisible} animationType="slide" transparent onRequestClose={() => setChatVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
+          <View style={styles.chatModal}>
+            {/* Header */}
+            <View style={styles.chatHeader}>
+              <View style={styles.chatHeaderLeft}>
+                <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
+                <View>
+                  <Text style={styles.chatTitle}>AI Delivery Assistant</Text>
+                  <Text style={styles.chatSub}>Powered by live location data</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setChatVisible(false)}>
+                <Ionicons name="close" size={22} color="#888" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick question chips */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll} contentContainerStyle={styles.chipsRow}>
+              {QUICK_QUESTIONS.map((q) => (
+                <TouchableOpacity key={q} style={styles.chip} onPress={() => handleAiQuery(q)}>
+                  <Text style={styles.chipText}>{q}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Messages */}
+            <ScrollView ref={chatScrollRef} style={styles.chatMessages} contentContainerStyle={{ padding: 12, gap: 10 }} showsVerticalScrollIndicator={false}>
+              {chatMessages.length === 0 && (
+                <View style={styles.chatEmpty}>
+                  <Ionicons name="navigate-outline" size={36} color="#ddd" />
+                  <Text style={styles.chatEmptyText}>Ask me anything about your delivery!</Text>
+                </View>
+              )}
+              {chatMessages.map((msg, i) => (
+                <View key={i} style={[styles.bubble, msg.role === "user" ? styles.bubbleUser : styles.bubbleAi]}>
+                  <Text style={[styles.bubbleText, msg.role === "user" ? styles.bubbleTextUser : styles.bubbleTextAi]}>{msg.text}</Text>
+                </View>
+              ))}
+              {aiThinking && (
+                <View style={styles.bubbleAi}>
+                  <ActivityIndicator size="small" color="#F25C05" />
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Input */}
+            <View style={styles.chatInputRow}>
+              <TextInput
+                style={styles.chatInput}
+                value={chatInput}
+                onChangeText={setChatInput}
+                placeholder="Ask about your delivery..."
+                placeholderTextColor="#aaa"
+                onSubmitEditing={() => handleAiQuery(chatInput)}
+                returnKeyType="send"
+              />
+              <TouchableOpacity
+                style={[styles.sendBtn, (!chatInput.trim() || aiThinking) && { opacity: 0.4 }]}
+                onPress={() => handleAiQuery(chatInput)}
+                disabled={!chatInput.trim() || aiThinking}>
+                <Ionicons name="send" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Customer waiting for driver */}
       {isCustomer && myOptIn && !otherOptIn && (
@@ -335,4 +523,38 @@ const styles = StyleSheet.create({
   stopBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#888", borderRadius: 12, paddingVertical: 12 },
   deliveredBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#27AE60", borderRadius: 12, paddingVertical: 12 },
   startBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
+  // AI Chat
+  aiChatBtn: { backgroundColor: "#F25C0520", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  aiChatBtnText: { fontSize: 12, fontWeight: "700", color: "#F25C05" },
+  aiFloatingBtn: {
+    position: "absolute", bottom: 80, right: 16, width: 48, height: 48,
+    borderRadius: 24, backgroundColor: "#fff", elevation: 4,
+    justifyContent: "center", alignItems: "center", shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4,
+  },
+  chatModal: {
+    backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: "80%", minHeight: 360,
+    shadowColor: "#000", shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 10,
+  },
+  chatHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: "#f0e8d8" },
+  chatHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  chatTitle: { fontSize: 15, fontWeight: "bold", color: "#2E1A06" },
+  chatSub: { fontSize: 11, color: "#aaa" },
+  chipsScroll: { flexGrow: 0 },
+  chipsRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  chip: { backgroundColor: "#FEF3EC", borderWidth: 1, borderColor: "#F25C0540", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
+  chipText: { fontSize: 12, color: "#F25C05", fontWeight: "600" },
+  chatMessages: { flex: 1, maxHeight: 260 },
+  chatEmpty: { alignItems: "center", paddingVertical: 24, gap: 8 },
+  chatEmptyText: { fontSize: 13, color: "#bbb", textAlign: "center" },
+  bubble: { maxWidth: "82%", borderRadius: 16, padding: 10 },
+  bubbleUser: { alignSelf: "flex-end", backgroundColor: "#F25C05" },
+  bubbleAi: { alignSelf: "flex-start", backgroundColor: "#F5F0E8", borderWidth: 1, borderColor: "#E8D8A0", padding: 10, borderRadius: 16, maxWidth: "82%" },
+  bubbleText: { fontSize: 13, lineHeight: 18 },
+  bubbleTextUser: { color: "#fff" },
+  bubbleTextAi: { color: "#2E1A06" },
+  chatInputRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderTopWidth: 1, borderTopColor: "#f0e8d8" },
+  chatInput: { flex: 1, backgroundColor: "#F9F5EF", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 13, color: "#333" },
+  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#F25C05", justifyContent: "center", alignItems: "center" },
 });

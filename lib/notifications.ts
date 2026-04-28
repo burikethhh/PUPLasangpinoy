@@ -129,7 +129,7 @@ export function addNotificationResponseListener(
  */
 export async function notifyRecipeApproved(recipeTitle: string): Promise<void> {
   await sendLocalNotification(
-    "Recipe Approved! 🎉",
+    "Recipe Approved!",
     `Your recipe "${recipeTitle}" has been approved and is now live!`,
     { screen: "/(tabs)" },
   );
@@ -156,7 +156,7 @@ export async function notifyRecipeRejected(
  */
 export async function notifyNewRecipe(recipeTitle: string): Promise<void> {
   await sendLocalNotification(
-    "New Recipe Added! 🍽️",
+    "New Recipe Added!",
     `Check out the new recipe: ${recipeTitle}`,
     { screen: "/(tabs)" },
   );
@@ -167,7 +167,7 @@ export async function notifyNewRecipe(recipeTitle: string): Promise<void> {
  */
 export async function notifyDeliveryStarted(orderNumber: string): Promise<void> {
   await sendLocalNotification(
-    "Your order is on the way! 🛵",
+    "Your order is on the way!",
     `Order ${orderNumber} has been picked up. Tap to track live delivery.`,
     { screen: "/(tabs)/collections" },
   );
@@ -178,7 +178,7 @@ export async function notifyDeliveryStarted(orderNumber: string): Promise<void> 
  */
 export async function notifyBothOptedIn(): Promise<void> {
   await sendLocalNotification(
-    "Live tracking is active 📍",
+    "Live tracking is active",
     "You can now see real-time delivery location on the map.",
     {},
   );

@@ -189,11 +189,11 @@ function reverseGeocode(lat,lng){
     {headers:{'User-Agent':'FOODFIX-App/2.3'}})
   .then(r=>r.json()).then(d=>{
     selectedAddr=d.display_name||(''+lat.toFixed(5)+', '+lng.toFixed(5));
-    document.getElementById('addr').innerHTML='<b>📍 </b>'+selectedAddr;
+    document.getElementById('addr').innerHTML='<b>Location: </b>'+selectedAddr;
     document.getElementById('confirm').style.display='block';
   }).catch(()=>{
     selectedAddr=lat.toFixed(5)+', '+lng.toFixed(5);
-    document.getElementById('addr').innerHTML='<b>📍 </b>'+selectedAddr;
+    document.getElementById('addr').innerHTML='<b>Location: </b>'+selectedAddr;
     document.getElementById('confirm').style.display='block';
   });
 }

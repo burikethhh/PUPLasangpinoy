@@ -165,7 +165,7 @@ export default function FavoritesScreen() {
                       contentFit="cover" transition={200} />
                   ) : (
                     <View style={[styles.cardImage, styles.cardImagePlaceholder, { backgroundColor: color + "22" }]}>
-                      <Text style={{ fontSize: 24 }}>🍽️</Text>
+                      <Ionicons name="restaurant-outline" size={24} color="#ccc" />
                     </View>
                   )}
                   <View style={styles.cardInfo}>

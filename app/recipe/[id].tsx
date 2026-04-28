@@ -289,7 +289,7 @@ export default function RecipeDetail() {
                 try {
                   await Share.share({
                     title: recipe.title,
-                    message: `🍽️ ${recipe.title}\n\n📍 ${recipe.region || "Filipino Cuisine"}\n📂 ${recipe.category}\n\n🧾 Ingredients:\n${recipe.ingredients}\n\nShared from FOODFIX 🇵🇭`,
+                    message: `${recipe.title}\n\nRegion: ${recipe.region || "Filipino Cuisine"}\nCategory: ${recipe.category}\n\nIngredients:\n${recipe.ingredients}\n\nShared from FOODFIX`,
                   });
                 } catch {
                   /* user cancelled */
@@ -335,7 +335,7 @@ export default function RecipeDetail() {
           />
         ) : (
           <View style={styles.recipeImagePlaceholder}>
-            <Text style={{ fontSize: 70 }}>🍽️</Text>
+            <Ionicons name="restaurant-outline" size={70} color="#ddd" />
           </View>
         )}
 

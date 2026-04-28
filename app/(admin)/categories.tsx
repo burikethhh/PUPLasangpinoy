@@ -293,7 +293,7 @@ export default function AdminMenuScreen() {
                     <Image source={{ uri: item.image_url }} style={styles.cardImg} contentFit="cover" transition={200} />
                   ) : (
                     <View style={[styles.cardImg, { backgroundColor: color + "22", justifyContent: "center", alignItems: "center" }]}>
-                      <Text style={{ fontSize: 20 }}>🍽️</Text>
+                      <Ionicons name="restaurant-outline" size={20} color="#ccc" />
                     </View>
                   )}
                   <View style={styles.cardInfo}>

@@ -130,18 +130,18 @@ export default function ProfileScreen() {
       let resultText = "";
       if (analysis.type === "dish") {
         setScannedDishName(analysis.dishName || "");
-        resultText = `🍽️ **${analysis.dishName}**\n\n`;
+        resultText = `**${analysis.dishName}**\n\n`;
         if (analysis.isFilipino) {
-          resultText += `✅ Filipino Dish\n`;
+          resultText += `Filipino Dish\n`;
         } else {
-          resultText += `❌ Not a Filipino dish\n`;
+          resultText += `Not a Filipino dish\n`;
         }
         resultText += `\n${analysis.description}\n\n`;
         if (analysis.ingredients && analysis.ingredients.length > 0) {
           resultText += `**Ingredients:** ${analysis.ingredients.join(", ")}\n\n`;
         }
         if (analysis.funFact) {
-          resultText += `💡 **Fun Fact:** ${analysis.funFact}\n\n`;
+          resultText += `**Fun Fact:** ${analysis.funFact}\n\n`;
         }
         if (analysis.nutrition) {
           resultText += `**Nutrition (per serving):**\n`;
@@ -351,6 +351,16 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.exploreRow} onPress={() => router.push("/(tabs)/collections")}>
+            <View style={[styles.exploreIcon, { backgroundColor: "#3498DB22" }]}>
+              <Ionicons name="navigate" size={20} color="#3498DB" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.exploreName}>Live Delivery Tracker</Text>
+              <Text style={styles.exploreSub}>Track your order's real-time location</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.exploreRow, { borderBottomWidth: 0 }]} onPress={handleSubmitMenu}>
             <View style={[styles.exploreIcon, { backgroundColor: "#F39C1222" }]}>
               <Ionicons name="add-circle" size={20} color="#F39C12" />
@@ -414,7 +424,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.8.0</Text>
+        <Text style={styles.version}>Version 2.9.0</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
@@ -482,7 +492,7 @@ export default function ProfileScreen() {
                         setScanModal(false);
                         setSubmitForm({
                           name: scannedDishName,
-                          description: scanResult?.replace(/[*#🍽️✅❌💡]/g, "").slice(0, 200) || "",
+                          description: scanResult?.replace(/[*#]/g, "").slice(0, 200) || "",
                           category: suggestionCategories[0] || (MENU_CATEGORIES[0] as string),
                         });
                         setSubmitModal(true);
