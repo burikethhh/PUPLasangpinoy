@@ -473,8 +473,26 @@ function handleMsg(raw){
         />
       </View>
 
-      {/* Permission Banner — show only if permission not granted */}
-      {!myOptIn && (
+      {/* Location sharing status bar — always visible for customer */}
+      {isCustomer && (
+        <View style={[styles.permissionBanner, myOptIn && { backgroundColor: "#E8F8F0" }]}>
+          <Ionicons
+            name={myOptIn ? "location" : "location-outline"}
+            size={18}
+            color={myOptIn ? "#27AE60" : "#F25C05"}
+          />
+          <Text style={[styles.permissionText, myOptIn && { color: "#27AE60" }]}>
+            {myOptIn ? "Sharing your location with driver" : "Enable location sharing for real-time tracking"}
+          </Text>
+          {!myOptIn && (
+            <TouchableOpacity style={styles.allowBtn} onPress={handleOptIn}>
+              <Text style={styles.allowBtnText}>Enable</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+      {/* Staff: show banner only when not yet opted in */}
+      {!isCustomer && !myOptIn && (
         <View style={styles.permissionBanner}>
           <Ionicons name="location-outline" size={18} color="#F25C05" />
           <Text style={styles.permissionText}>Enable location sharing for real-time tracking</Text>

@@ -343,7 +343,7 @@ export default function ProfileScreen() {
                   value: { stringValue: user.uid },
                 },
               },
-              orderBy: [{ field: { fieldPath: "created_at" }, direction: "DESCENDING" }],
+              // No orderBy — avoids requiring a composite index; sort client-side below
             },
           }),
         }
@@ -358,7 +358,9 @@ export default function ProfileScreen() {
           description: r.document.fields?.description?.stringValue || "",
           status: r.document.fields?.status?.stringValue || "pending",
           created_at: r.document.fields?.created_at?.timestampValue || "",
-        }));
+        }))
+        // Sort newest first client-side
+        .sort((a: any, b: any) => (b.created_at > a.created_at ? 1 : -1));
       setMySuggestions(parsed);
     } catch (e) { console.error("loadMySuggestions", e); }
     setLoadingSuggestions(false);
@@ -560,7 +562,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.9.4</Text>
+        <Text style={styles.version}>Version 2.9.5</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
