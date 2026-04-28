@@ -190,6 +190,45 @@ export default function TrackDeliveryScreen() {
 
   function generateAiResponse(question: string): string {
     const q = question.toLowerCase();
+    
+    // Staff context - asking about customer
+    if (!isCustomer) {
+      if (!customerLoc) {
+        return "I'm waiting for the customer to share their location. Once they opt in, I can give you their live position and distance.";
+      }
+      // Calculate distance from driver (staff) to customer
+      const dist = driverLoc 
+        ? calcDistance(driverLoc.lat, driverLoc.lng, customerLoc.lat, customerLoc.lng)
+        : calcDistance(STORE_LAT, STORE_LNG, customerLoc.lat, customerLoc.lng);
+      const speedKmh = driverLoc?.speed && driverLoc.speed > 2 ? driverLoc.speed : 25;
+      const mins = Math.round((dist / speedKmh) * 60);
+      const distStr = dist < 1 ? `${(dist * 1000).toFixed(0)} meters` : `${dist.toFixed(1)} km`;
+      
+      if (q.includes("where") || q.includes("location") || q.includes("customer")) {
+        if (dist < 0.3) return `Your customer is very close — less than 300 meters away! Almost there.`;
+        if (dist < 1) return `Your customer is ${distStr} away. Just a short drive remaining!`;
+        return `Your customer is currently ${distStr} away from your position.`;
+      }
+      if (q.includes("how long") || q.includes("when") || q.includes("eta") || q.includes("arrive") || q.includes("time") || q.includes("delivery")) {
+        if (mins <= 1) return `You'll reach your customer any moment now!`;
+        if (mins <= 5) return `About ${mins} minutes until you reach your customer.`;
+        return `Estimated arrival at customer location in ~${mins} minutes (${distStr} remaining).`;
+      }
+      if (q.includes("route") || q.includes("way") || q.includes("direction") || q.includes("go")) {
+        return `Head toward your customer's location. They are ${distStr} away. The map shows their live position with the red (C) marker.`;
+      }
+      if (q.includes("near") || q.includes("close") || q.includes("far")) {
+        if (dist < 0.5) return `Very close! Only ${distStr} to go.`;
+        if (dist < 2) return `Getting closer — ${distStr} remaining.`;
+        return `Still ${distStr} to your customer's location.`;
+      }
+      if (q.includes("hello") || q.includes("hi") || q.includes("hey")) {
+        return `Hello! Your customer is ${distStr} away. Estimated arrival in ~${mins} minutes. Ask me about their location or best route!`;
+      }
+      return `Your customer is ${distStr} away — about ${mins} minutes at current speed. Live tracking is ${sharingActive ? "active" : "waiting for customer"}. Ask me: "Where is my customer?" or "How long to delivery?"`;
+    }
+    
+    // Customer context - asking about driver
     if (!driverLoc) {
       return "I'm waiting for the driver to start sharing their location. Once they begin tracking, I can give you live updates!";
     }
@@ -271,23 +310,32 @@ var driverIcon= L.divIcon({html:'<div style="background:#3498DB;color:#fff;width
 
 L.marker([${STORE_LAT},${STORE_LNG}],{icon:storeIcon}).addTo(map).bindPopup('FOODFIX Store');
 var custMarker = L.marker([${customerLat},${customerLng}],{icon:custIcon}).addTo(map).bindPopup('Delivery Location');
-var driverMarker = ${myOptIn && otherOptIn ? `L.marker([${dLat},${dLng}],{icon:driverIcon}).addTo(map).bindPopup('Driver')` : "null"};
+
+// Start with null markers - will be created dynamically on first update
+var driverMarker = null;
+var custMarkerLive = null;
 
 ${isCustomer ? `document.getElementById('legend').innerHTML = '<span style="color:#3498DB">&#9679;</span> Driver &bull; <span style="color:#E74C3C">&#9679;</span> You &bull; <span style="color:#F25C05">&#9679;</span> Store';` :
-  `document.getElementById('legend').innerHTML = '<span style="color:#E74C3C">&#9679;</span> Delivery Address &bull; <span style="color:#3498DB">&#9679;</span> Your Location';`}
+  `document.getElementById('legend').innerHTML = '<span style="color:#E74C3C">&#9679;</span> Customer &bull; <span style="color:#3498DB">&#9679;</span> You (Driver) &bull; <span style="color:#F25C05">&#9679;</span> Store';`}
 
 document.addEventListener('message', function(e){ handleMsg(e.data); });
 window.addEventListener('message', function(e){ handleMsg(e.data); });
-var custMarkerLive = null;
 function handleMsg(raw){
   try{
     var d = JSON.parse(raw);
-    if(d.type === 'driverUpdate' && driverMarker){
-      driverMarker.setLatLng([d.lat, d.lng]);
+    if(d.type === 'driverUpdate'){
+      if(!driverMarker) {
+        driverMarker = L.marker([d.lat,d.lng],{icon:driverIcon}).addTo(map).bindPopup('Driver');
+      } else {
+        driverMarker.setLatLng([d.lat, d.lng]);
+      }
     }
     if(d.type === 'customerUpdate'){
-      if(!custMarkerLive) custMarkerLive = L.marker([d.lat,d.lng],{icon:custIcon}).addTo(map).bindPopup('Customer');
-      else custMarkerLive.setLatLng([d.lat,d.lng]);
+      if(!custMarkerLive) {
+        custMarkerLive = L.marker([d.lat,d.lng],{icon:custIcon}).addTo(map).bindPopup('Customer');
+      } else {
+        custMarkerLive.setLatLng([d.lat,d.lng]);
+      }
     }
   }catch(err){}
 }
@@ -319,7 +367,9 @@ function handleMsg(raw){
   }
 
   const sharingActive = myOptIn && otherOptIn;
-  const QUICK_QUESTIONS = ["Where is my driver?", "How long until delivery?", "Is my order close?"];
+  const CUSTOMER_QUESTIONS = ["Where is my driver?", "How long until delivery?", "Is my order close?"];
+  const STAFF_QUESTIONS = ["Where is my customer?", "How long to delivery?", "Best route?"];
+  const QUICK_QUESTIONS = isCustomer ? CUSTOMER_QUESTIONS : STAFF_QUESTIONS;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -363,8 +413,8 @@ function handleMsg(raw){
         </View>
       )}
 
-      {/* ETA bar — customer view when sharing is active */}
-      {isCustomer && sharingActive && driverLoc && (
+      {/* ETA bar — shows for both customer and staff when sharing active */}
+      {sharingActive && (
         <View style={styles.etaBar}>
           <Ionicons name="time-outline" size={16} color="#2E1A06" />
           <Text style={styles.etaText}>{getETA()}</Text>
@@ -374,8 +424,8 @@ function handleMsg(raw){
         </View>
       )}
 
-      {/* AI floating button when sharing active but no driverLoc yet */}
-      {isCustomer && sharingActive && !driverLoc && (
+      {/* AI floating button when sharing active but no location data yet */}
+      {sharingActive && !driverLoc && !customerLoc && (
         <TouchableOpacity style={styles.aiFloatingBtn} onPress={() => setChatVisible(true)}>
           <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
         </TouchableOpacity>
@@ -391,7 +441,7 @@ function handleMsg(raw){
                 <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
                 <View>
                   <Text style={styles.chatTitle}>AI Delivery Assistant</Text>
-                  <Text style={styles.chatSub}>Powered by live location data</Text>
+                  <Text style={styles.chatSub}>{isCustomer ? "Track your driver's location" : "Track your customer's location"}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setChatVisible(false)}>
@@ -413,7 +463,11 @@ function handleMsg(raw){
               {chatMessages.length === 0 && (
                 <View style={styles.chatEmpty}>
                   <Ionicons name="navigate-outline" size={36} color="#ddd" />
-                  <Text style={styles.chatEmptyText}>Ask me anything about your delivery!</Text>
+                  <Text style={styles.chatEmptyText}>
+                    {isCustomer 
+                      ? "Ask me about your driver's location and ETA!"
+                      : "Ask me about your customer's location and distance!"}
+                  </Text>
                 </View>
               )}
               {chatMessages.map((msg, i) => (
@@ -450,11 +504,13 @@ function handleMsg(raw){
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Customer waiting for driver */}
-      {isCustomer && myOptIn && !otherOptIn && (
+      {/* Waiting for other party to share location */}
+      {myOptIn && !otherOptIn && (
         <View style={styles.waitingBar}>
           <ActivityIndicator size="small" color="#F39C12" />
-          <Text style={styles.waitingText}>Waiting for driver to start tracking...</Text>
+          <Text style={styles.waitingText}>
+            {isCustomer ? "Waiting for driver to start tracking..." : "Waiting for customer to share location..."}
+          </Text>
         </View>
       )}
 
