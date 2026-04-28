@@ -4,8 +4,10 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput,
-    TouchableOpacity, View,
+    ActivityIndicator, Alert,
+    Modal,
+    ScrollView, StyleSheet, Text, TextInput,
+    TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MENU_CATEGORIES } from "../../constants/order";
@@ -34,6 +36,19 @@ export default function ProfileScreen() {
   const [submitForm, setSubmitForm] = useState({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
   const [mySuggestions, setMySuggestions] = useState<{ id: string; name: string; category: string; description: string; status: string; created_at: string }[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  // Ask AI state
+  const [aiVisible, setAiVisible] = useState(false);
+  const [aiMessages, setAiMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiThinking, setAiThinking] = useState(false);
+  const [aiOrder, setAiOrder] = useState<Order | null>(null);
+  const [aiDriverLoc, setAiDriverLoc] = useState<LiveLocation | null>(null);
+  const aiScrollRef = useRef<ScrollView>(null);
+  const aiUnsubRef = useRef<(() => void) | null>(null);
+
+  const STORE_LAT_AI = 14.5995;
+  const STORE_LNG_AI = 120.9842;
 
   useFocusEffect(useCallback(() => { loadProfile(); loadMySuggestions(); }, []));
 
@@ -103,6 +118,114 @@ export default function ProfileScreen() {
       },
     ]);
   }
+
+  // Delivery AI functions
+  async function handleAskAiOpen() {
+    const user = getCurrentUser();
+    if (!user) return;
+    
+    setAiVisible(true);
+    setAiThinking(true);
+    
+    // Find latest out_for_delivery order
+    try {
+      const orders = await getOrdersByUser(user.uid);
+      const activeOrder = orders.find(o => o.status === "out_for_delivery" || o.status === "accepted" || o.status === "preparing");
+      
+      if (!activeOrder) {
+        setAiOrder(null);
+        setAiMessages([{ role: "ai", text: "No active delivery found. Your order may still be preparing or already delivered. Check your orders list for details." }]);
+        setAiThinking(false);
+        return;
+      }
+      
+      setAiOrder(activeOrder);
+      setAiMessages([{ role: "ai", text: `Hello! I'm your delivery assistant for order ${activeOrder.order_number}. Ask me about your driver's location, ETA, or anything about your delivery!` }]);
+      
+      // Subscribe to driver location
+      aiUnsubRef.current?.();
+      const unsub = onLocationUpdate(activeOrder.id, "staff", (loc) => {
+        setAiDriverLoc(loc);
+      });
+      aiUnsubRef.current = unsub;
+    } catch (e) {
+      setAiMessages([{ role: "ai", text: "Could not fetch delivery info. Please try again." }]);
+    }
+    setAiThinking(false);
+  }
+
+  function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function generateDeliveryAiResponse(question: string): string {
+    if (!aiDriverLoc || !aiOrder) {
+      return "I'm waiting for the driver to start sharing their location. Once they begin tracking, I can give you live updates!";
+    }
+    
+    const q = question.toLowerCase();
+    const destLat = aiOrder.customer_lat ?? STORE_LAT_AI;
+    const destLng = aiOrder.customer_lng ?? STORE_LNG_AI;
+    const dist = calcDistance(aiDriverLoc.lat, aiDriverLoc.lng, destLat, destLng);
+    const speedKmh = aiDriverLoc.speed && aiDriverLoc.speed > 2 ? aiDriverLoc.speed : 25;
+    const mins = Math.round((dist / speedKmh) * 60);
+    const distStr = dist < 1 ? `${(dist * 1000).toFixed(0)} meters` : `${dist.toFixed(1)} km`;
+
+    if (q.includes("where") || q.includes("location") || q.includes("driver") || q.includes("rider")) {
+      if (dist < 0.3) return `Your driver is almost at your door — less than 300 meters away! Get ready!`;
+      if (dist < 1) return `Your driver is very close, only ${distStr} away. Should arrive in ~${mins} minute${mins === 1 ? "" : "s"}!`;
+      return `Your driver is currently ${distStr} away, moving at ~${speedKmh} km/h.`;
+    }
+    if (q.includes("how long") || q.includes("when") || q.includes("eta") || q.includes("arrive") || q.includes("time")) {
+      if (mins <= 1) return `Your order should arrive any moment now!`;
+      if (mins <= 5) return `Almost there — estimated arrival in about ${mins} minutes!`;
+      return `Estimated arrival in ~${mins} minutes based on current speed and distance (${distStr}).`;
+    }
+    if (q.includes("near") || q.includes("close")) {
+      if (dist < 0.5) return `Very close! The driver is only ${distStr} away — ~${mins} min.`;
+      if (dist < 2) return `Getting there! Driver is ${distStr} away, ~${mins} minutes to go.`;
+      return `The driver is still ${distStr} out. Estimated ~${mins} minutes.`;
+    }
+    if (q.includes("order") || q.includes("status")) {
+      return `Your order ${aiOrder.order_number} is ${aiOrder.status}. Driver is ${distStr} away, ETA ~${mins} min.`;
+    }
+    if (q.includes("hello") || q.includes("hi") || q.includes("hey")) {
+      return `Hi! I'm your delivery assistant. Your driver is ${distStr} away with an ETA of ~${mins} minutes. Ask me anything about your delivery!`;
+    }
+    return `Your driver is currently ${distStr} away at ~${speedKmh} km/h — estimated arrival in ~${mins} minutes.\n\nAsk me: "Where is my driver?", "How long until delivery?", or "Is my order nearby?"`;
+  }
+
+  function handleAiQuery(question: string) {
+    if (!question.trim() || aiThinking) return;
+    const userMsg = question.trim();
+    setAiMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setAiInput("");
+    setAiThinking(true);
+    setTimeout(() => {
+      const response = generateDeliveryAiResponse(userMsg);
+      setAiMessages(prev => [...prev, { role: "ai", text: response }]);
+      setAiThinking(false);
+      setTimeout(() => aiScrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }, 700);
+  }
+
+  function handleCloseAi() {
+    setAiVisible(false);
+    aiUnsubRef.current?.();
+    aiUnsubRef.current = null;
+    setAiDriverLoc(null);
+    setAiOrder(null);
+    setAiMessages([]);
+  }
+
+  useEffect(() => {
+    return () => { aiUnsubRef.current?.(); };
+  }, []);
 
   async function handleScanFood() {
     // Request camera permission explicitly
@@ -361,6 +484,16 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.exploreRow} onPress={handleAskAiOpen}>
+            <View style={[styles.exploreIcon, { backgroundColor: "#F25C0522" }]}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#F25C05" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.exploreName}>Ask AI About Delivery</Text>
+              <Text style={styles.exploreSub}>Chat with AI about your driver's location & ETA</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.exploreRow, { borderBottomWidth: 0 }]} onPress={handleSubmitMenu}>
             <View style={[styles.exploreIcon, { backgroundColor: "#F39C1222" }]}>
               <Ionicons name="add-circle" size={20} color="#F39C12" />
@@ -424,7 +557,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.9.2</Text>
+        <Text style={styles.version}>Version 2.9.3</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
@@ -546,6 +679,75 @@ export default function ProfileScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* AI Delivery Chat Modal */}
+        <Modal visible={aiVisible} animationType="slide" transparent onRequestClose={handleCloseAi}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
+            <View style={styles.aiModal}>
+              {/* Header */}
+              <View style={styles.aiHeader}>
+                <View style={styles.aiHeaderLeft}>
+                  <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
+                  <View>
+                    <Text style={styles.aiTitle}>AI Delivery Assistant</Text>
+                    <Text style={styles.aiSub}>Ask about your driver's location</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={handleCloseAi}>
+                  <Ionicons name="close" size={22} color="#888" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick question chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.aiChipsScroll} contentContainerStyle={styles.aiChipsRow}>
+                {["Where is my driver?", "How long until delivery?", "Is my order close?"].map((q) => (
+                  <TouchableOpacity key={q} style={styles.aiChip} onPress={() => handleAiQuery(q)}>
+                    <Text style={styles.aiChipText}>{q}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Messages */}
+              <ScrollView ref={aiScrollRef} style={styles.aiMessages} contentContainerStyle={{ padding: 12, gap: 10 }} showsVerticalScrollIndicator={false}>
+                {aiMessages.length === 0 && (
+                  <View style={styles.aiEmpty}>
+                    <Ionicons name="navigate-outline" size={36} color="#ddd" />
+                    <Text style={styles.aiEmptyText}>Ask me about your driver's location and ETA!</Text>
+                  </View>
+                )}
+                {aiMessages.map((msg, i) => (
+                  <View key={i} style={[styles.aiBubble, msg.role === "user" ? styles.aiBubbleUser : styles.aiBubbleAi]}>
+                    <Text style={[styles.aiBubbleText, msg.role === "user" ? styles.aiBubbleTextUser : styles.aiBubbleTextAi]}>{msg.text}</Text>
+                  </View>
+                ))}
+                {aiThinking && (
+                  <View style={styles.aiBubbleAi}>
+                    <ActivityIndicator size="small" color="#F25C05" />
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Input */}
+              <View style={styles.aiInputRow}>
+                <TextInput
+                  style={styles.aiInput}
+                  value={aiInput}
+                  onChangeText={setAiInput}
+                  placeholder="Ask about your delivery..."
+                  placeholderTextColor="#aaa"
+                  onSubmitEditing={() => handleAiQuery(aiInput)}
+                  returnKeyType="send"
+                />
+                <TouchableOpacity
+                  style={[styles.aiSendBtn, (!aiInput.trim() || aiThinking) && { opacity: 0.4 }]}
+                  onPress={() => handleAiQuery(aiInput)}
+                  disabled={!aiInput.trim() || aiThinking}>
+                  <Ionicons name="send" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -637,4 +839,30 @@ const styles = StyleSheet.create({
   suggestDishBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
   aiDisclaimer: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#FFF8E1", borderRadius: 8, padding: 8, marginBottom: 10 },
   aiDisclaimerText: { flex: 1, fontSize: 11, color: "#B07820", lineHeight: 15 },
+  // AI Chat styles
+  aiModal: {
+    backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: "80%", minHeight: 360,
+    shadowColor: "#000", shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 10,
+  },
+  aiHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: "#f0e8d8" },
+  aiHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  aiTitle: { fontSize: 15, fontWeight: "bold", color: "#2E1A06" },
+  aiSub: { fontSize: 11, color: "#aaa" },
+  aiChipsScroll: { flexGrow: 0 },
+  aiChipsRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  aiChip: { backgroundColor: "#FEF3EC", borderWidth: 1, borderColor: "#F25C0540", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
+  aiChipText: { fontSize: 12, color: "#F25C05", fontWeight: "600" },
+  aiMessages: { flex: 1, maxHeight: 260 },
+  aiEmpty: { alignItems: "center", marginTop: 30 },
+  aiEmptyText: { fontSize: 13, color: "#aaa", marginTop: 8 },
+  aiBubble: { padding: 10, borderRadius: 16, marginHorizontal: 4, maxWidth: "85%" },
+  aiBubbleUser: { backgroundColor: "#F25C05", alignSelf: "flex-end", borderBottomRightRadius: 4 },
+  aiBubbleAi: { backgroundColor: "#F5F0E6", alignSelf: "flex-start", borderBottomLeftRadius: 4 },
+  aiBubbleText: { fontSize: 14, lineHeight: 19 },
+  aiBubbleTextUser: { color: "#fff" },
+  aiBubbleTextAi: { color: "#2E1A06" },
+  aiInputRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: "#f0e8d8" },
+  aiInput: { flex: 1, borderWidth: 1, borderColor: "#E8D8A0", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: "#2E1A06" },
+  aiSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#F25C05", justifyContent: "center", alignItems: "center" },
 });

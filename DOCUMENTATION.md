@@ -1,6 +1,6 @@
 # FOODFIX — Source Code Documentation
 
-**Version:** 2.9.2  
+**Version:** 2.9.3  
 **Last Updated:** April 2026  
 **Platform:** React Native (Expo) — Android  
 **Repository:** https://github.com/burikethhh/PUPLasangpinoy
@@ -601,4 +601,4 @@ const MENU_CATEGORIES = [
 
 ---
 
-*End of Documentation — FOODFIX v2.9.2*
+*End of Documentation — FOODFIX v2.9.3*

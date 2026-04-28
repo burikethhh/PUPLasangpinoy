@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { getCurrentUser } from "../lib/firebase";
 import {
-    onLocationUpdate,
+    onLocationUpdate, onOrderUpdate,
     setLocationOptIn, updateOrderStatus, upsertLocation,
     type LiveLocation, type Order
 } from "../lib/firebase-store";
@@ -36,6 +36,7 @@ export default function TrackDeliveryScreen() {
   const [chatInput, setChatInput] = useState("");
   const [aiThinking, setAiThinking] = useState(false);
   const [customerLoc, setCustomerLoc] = useState<LiveLocation | null>(null);
+  const [webViewReady, setWebViewReady] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const unsubRef = useRef<(() => void) | null>(null);
   const orderUnsubRef = useRef<(() => void) | null>(null);
@@ -151,6 +152,17 @@ export default function TrackDeliveryScreen() {
     
     return () => clearInterval(staffInterval);
   }, [isCustomer, orderId, user]);
+
+  // Re-send location data when WebView finishes loading (fixes race condition)
+  useEffect(() => {
+    if (!webViewReady || !webViewRef.current) return;
+    if (driverLoc) {
+      webViewRef.current.postMessage(JSON.stringify({ type: "driverUpdate", lat: driverLoc.lat, lng: driverLoc.lng }));
+    }
+    if (customerLoc) {
+      webViewRef.current.postMessage(JSON.stringify({ type: "customerUpdate", lat: customerLoc.lat, lng: customerLoc.lng }));
+    }
+  }, [webViewReady]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -456,6 +468,7 @@ function handleMsg(raw){
           javaScriptEnabled
           domStorageEnabled
           style={{ flex: 1 }}
+          onLoadEnd={() => setWebViewReady(true)}
         />
       </View>
 

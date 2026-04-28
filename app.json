@@ -2,7 +2,7 @@
   "expo": {
     "name": "FOODFIX",
     "slug": "foodfix",
-    "version": "2.9.2",
+    "version": "2.9.3",
     "orientation": "portrait",
     "icon": "./logo.jpg",
     "scheme": "foodfix",
@@ -11,11 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.foodfix.mobile",
-      "buildNumber": "17"
+      "buildNumber": "18"
     },
     "android": {
       "package": "com.foodfix.mobile",
-      "versionCode": 17,
+      "versionCode": 18,
       "adaptiveIcon": {
         "foregroundImage": "./logo.jpg",
         "backgroundColor": "#F5EDD9"
