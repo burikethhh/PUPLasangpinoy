@@ -110,7 +110,7 @@ export default function OrdersScreen() {
         )}
 
         {/* Live tracking button */}
-        {item.status === "out_for_delivery" && (
+        {(item.status === "out_for_delivery" || item.status === "accepted" || item.status === "preparing") && (
           <TouchableOpacity
             style={styles.trackLiveBtn}
             onPress={() => (router as any).push({ pathname: "/track-delivery", params: { orderId: item.id, role: "customer" } })}>

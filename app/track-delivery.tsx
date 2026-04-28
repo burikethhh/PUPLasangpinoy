@@ -13,7 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { getCurrentUser } from "../lib/firebase";
 import {
-    getOrders, getOrdersByUser, onLocationUpdate, setLocationOptIn, updateOrderStatus, upsertLocation,
+    onLocationUpdate,
+    setLocationOptIn, updateOrderStatus, upsertLocation,
     type LiveLocation, type Order
 } from "../lib/firebase-store";
 import { startDeliveryTracking, stopDeliveryTracking } from "../lib/location-task";
@@ -37,31 +38,36 @@ export default function TrackDeliveryScreen() {
   const [customerLoc, setCustomerLoc] = useState<LiveLocation | null>(null);
   const webViewRef = useRef<WebView>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const orderUnsubRef = useRef<(() => void) | null>(null);
   const chatScrollRef = useRef<ScrollView>(null);
 
   const isCustomer = role === "customer";
   const user = getCurrentUser();
 
-  // Load order
+  // Real-time order subscription - keeps opt-in status live
   useEffect(() => {
     if (!orderId || !user) return;
-    (async () => {
-      const rawOrders = isCustomer
-        ? await getOrdersByUser(user.uid).catch(() => [] as Order[])
-        : await getOrders().catch(() => [] as Order[]);
-      const found = rawOrders.find((o: Order) => o.id === orderId);
-      setOrder(found ?? null);
-      if (found) {
-        setMyOptIn(isCustomer ? (found.customer_location_opt_in ?? false) : (found.staff_location_opt_in ?? false));
-        setOtherOptIn(isCustomer ? (found.staff_location_opt_in ?? false) : (found.customer_location_opt_in ?? false));
+    setLoading(true);
+    
+    // Subscribe to real-time order updates
+    const unsub = onOrderUpdate(orderId, (updatedOrder) => {
+      setOrder(updatedOrder);
+      if (updatedOrder) {
+        setMyOptIn(isCustomer ? (updatedOrder.customer_location_opt_in ?? false) : (updatedOrder.staff_location_opt_in ?? false));
+        setOtherOptIn(isCustomer ? (updatedOrder.staff_location_opt_in ?? false) : (updatedOrder.customer_location_opt_in ?? false));
+        setLoading(false);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
-    })();
+    });
+    
+    orderUnsubRef.current = unsub;
+    return () => unsub?.();
   }, [orderId, user, isCustomer]);
 
-  // Subscribe to driver location (customer watches staff)
+  // Subscribe to driver location (customer watches staff) - NO opt-in gate, always subscribe
   useEffect(() => {
-    if (!orderId || !myOptIn || !otherOptIn) return;
+    if (!orderId) return;
     const unsub = onLocationUpdate(orderId, "staff", (loc) => {
       setDriverLoc(loc);
       if (loc && webViewRef.current) {
@@ -70,11 +76,11 @@ export default function TrackDeliveryScreen() {
     });
     unsubRef.current = unsub;
     return () => unsub?.();
-  }, [orderId, myOptIn, otherOptIn]);
+  }, [orderId]);
 
-  // Staff subscribes to customer location
+  // Staff subscribes to customer location - NO opt-in gate, always subscribe
   useEffect(() => {
-    if (!orderId || isCustomer || !myOptIn) return;
+    if (!orderId || isCustomer) return;
     const unsub = onLocationUpdate(orderId, "customer", (loc) => {
       setCustomerLoc(loc);
       if (loc && webViewRef.current) {
@@ -82,33 +88,76 @@ export default function TrackDeliveryScreen() {
       }
     });
     return () => unsub?.();
-  }, [orderId, isCustomer, myOptIn]);
+  }, [orderId, isCustomer]);
 
-  // Customer shares their foreground location when both opted in
+  // Auto-opt-in on screen open + Customer foreground location push every 5s
   useEffect(() => {
-    if (!isCustomer || !(myOptIn && otherOptIn) || !orderId || !user) return;
-    let interval: ReturnType<typeof setInterval>;
+    if (!orderId || !user) return;
+    
+    // Auto opt-in when screen opens
+    (async () => {
+      const field = isCustomer ? "customer_location_opt_in" : "staff_location_opt_in";
+      const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+      if (status === "granted" && !myOptIn) {
+        await setLocationOptIn(orderId, field, true);
+        setMyOptIn(true);
+      }
+    })();
+    
+    // Customer pushes location every 5 seconds
+    let customerInterval: ReturnType<typeof setInterval>;
+    if (isCustomer) {
+      (async () => {
+        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const push = async () => {
+          const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
+          if (loc) {
+            await upsertLocation(orderId, user.uid, "customer", {
+              lat: loc.coords.latitude, lng: loc.coords.longitude,
+              accuracy: loc.coords.accuracy ?? undefined,
+            }).catch(() => {});
+          }
+        };
+        await push();
+        customerInterval = setInterval(push, 5000);
+      })();
+    }
+    
+    return () => clearInterval(customerInterval);
+  }, [orderId, user, isCustomer, myOptIn]);
+
+  // Staff foreground location push every 5 seconds (complements background task)
+  useEffect(() => {
+    if (isCustomer || !orderId || !user) return;
+    
+    let staffInterval: ReturnType<typeof setInterval>;
     (async () => {
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
       const push = async () => {
         const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
         if (loc) {
-          await upsertLocation(orderId, user.uid, "customer", {
+          await upsertLocation(orderId, user.uid, "staff", {
             lat: loc.coords.latitude, lng: loc.coords.longitude,
             accuracy: loc.coords.accuracy ?? undefined,
+            speed: loc.coords.speed != null ? Math.round(loc.coords.speed * 3.6) : undefined,
           }).catch(() => {});
         }
       };
       await push();
-      interval = setInterval(push, 20000);
+      staffInterval = setInterval(push, 5000);
     })();
-    return () => clearInterval(interval);
-  }, [isCustomer, myOptIn, otherOptIn, orderId, user]);
+    
+    return () => clearInterval(staffInterval);
+  }, [isCustomer, orderId, user]);
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { unsubRef.current?.(); };
+    return () => { 
+      unsubRef.current?.(); 
+      orderUnsubRef.current?.();
+    };
   }, []);
 
   async function handleOptIn() {
@@ -320,6 +369,12 @@ ${isCustomer ? `document.getElementById('legend').innerHTML = '<span style="colo
 
 document.addEventListener('message', function(e){ handleMsg(e.data); });
 window.addEventListener('message', function(e){ handleMsg(e.data); });
+function fitBoundsIfBoth(){
+  if(driverMarker && custMarkerLive){
+    var group = new L.featureGroup([driverMarker, custMarkerLive]);
+    map.fitBounds(group.getBounds().pad(0.2));
+  }
+}
 function handleMsg(raw){
   try{
     var d = JSON.parse(raw);
@@ -329,6 +384,7 @@ function handleMsg(raw){
       } else {
         driverMarker.setLatLng([d.lat, d.lng]);
       }
+      fitBoundsIfBoth();
     }
     if(d.type === 'customerUpdate'){
       if(!custMarkerLive) {
@@ -336,6 +392,7 @@ function handleMsg(raw){
       } else {
         custMarkerLive.setLatLng([d.lat,d.lng]);
       }
+      fitBoundsIfBoth();
     }
   }catch(err){}
 }
@@ -402,19 +459,19 @@ function handleMsg(raw){
         />
       </View>
 
-      {/* Permission Banner — show until both opted in */}
+      {/* Permission Banner — show only if permission not granted */}
       {!myOptIn && (
         <View style={styles.permissionBanner}>
           <Ionicons name="location-outline" size={18} color="#F25C05" />
-          <Text style={styles.permissionText}>Share your live location to enable real-time tracking</Text>
+          <Text style={styles.permissionText}>Enable location sharing for real-time tracking</Text>
           <TouchableOpacity style={styles.allowBtn} onPress={handleOptIn}>
-            <Text style={styles.allowBtnText}>Allow</Text>
+            <Text style={styles.allowBtnText}>Enable</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* ETA bar — shows for both customer and staff when sharing active */}
-      {sharingActive && (
+      {/* ETA bar — shows when we have location data */}
+      {(driverLoc || customerLoc) && (
         <View style={styles.etaBar}>
           <Ionicons name="time-outline" size={16} color="#2E1A06" />
           <Text style={styles.etaText}>{getETA()}</Text>
@@ -424,8 +481,8 @@ function handleMsg(raw){
         </View>
       )}
 
-      {/* AI floating button when sharing active but no location data yet */}
-      {sharingActive && !driverLoc && !customerLoc && (
+      {/* AI floating button — always visible when not in chat */}
+      {!chatVisible && (
         <TouchableOpacity style={styles.aiFloatingBtn} onPress={() => setChatVisible(true)}>
           <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
         </TouchableOpacity>

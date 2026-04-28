@@ -67,8 +67,8 @@ export async function startDeliveryTracking(orderId: string): Promise<boolean> {
 
     await Location.startLocationUpdatesAsync(LOCATION_TASK, {
       accuracy: Location.Accuracy.Balanced,
-      timeInterval: 15000,     // every 15 seconds
-      distanceInterval: 10,    // or every 10 meters
+      timeInterval: 5000,     // every 5 seconds for real-time tracking
+      distanceInterval: 5,    // or every 5 meters
       showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: "FOODFIX Delivery",

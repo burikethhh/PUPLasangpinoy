@@ -772,6 +772,34 @@ export function onLocationUpdate(
   }
 }
 
+export function onOrderUpdate(
+  orderId: string,
+  callback: (order: Order | null) => void,
+): () => void {
+  try {
+    const { onSnapshot: firestoreOnSnapshot } = require("firebase/firestore");
+    const orderRef = doc(db, "orders", orderId);
+    const unsub = firestoreOnSnapshot(orderRef, (snap: any) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const order: Order = {
+          id: snap.id,
+          ...data,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          items: data.items || [],
+        };
+        callback(order);
+      } else {
+        callback(null);
+      }
+    });
+    return unsub;
+  } catch {
+    return () => {};
+  }
+}
+
 export async function setLocationOptIn(
   orderId: string,
   field: "customer_location_opt_in" | "staff_location_opt_in" | "location_sharing_enabled" | "driver_id",
