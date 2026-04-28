@@ -2,7 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+    ActivityIndicator, Alert, Modal,
+    ScrollView, StyleSheet, Text, TextInput,
+    TouchableOpacity, View
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,6 +19,7 @@ interface MenuSuggestion {
   user_email: string;
   user_name: string;
   status: "pending" | "approved" | "rejected";
+  reject_reason?: string;
   created_at: { seconds: number } | string;
 }
 
@@ -28,6 +31,9 @@ export default function SubmissionsScreen() {
   const [suggestions, setSuggestions] = useState<MenuSuggestion[]>([]);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected" | "archived">("pending");
   const [archived, setArchived] = useState<Set<string>>(new Set());
+  const [rejectModal, setRejectModal] = useState(false);
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
@@ -63,6 +69,7 @@ export default function SubmissionsScreen() {
           user_email: doc.fields?.user_email?.stringValue || "",
           user_name: doc.fields?.user_name?.stringValue || "",
           status: doc.fields?.status?.stringValue || "pending",
+          reject_reason: doc.fields?.reject_reason?.stringValue || "",
           created_at: doc.fields?.created_at?.timestampValue || "",
         }));
         setSuggestions(parsed);
@@ -78,13 +85,16 @@ export default function SubmissionsScreen() {
 
   useFocusEffect(useCallback(() => { fetchSuggestions(); }, [fetchSuggestions]));
 
-  const updateSuggestionStatus = async (suggestionId: string, status: "approved" | "rejected") => {
+  const updateSuggestionStatus = async (suggestionId: string, status: "approved" | "rejected", reason?: string) => {
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("Not authenticated");
 
       const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
       if (!projectId) throw new Error("Missing EXPO_PUBLIC_FIREBASE_PROJECT_ID");
+
+      const fields: Record<string, any> = { status: { stringValue: status } };
+      if (reason) fields.reject_reason = { stringValue: reason };
 
       const response = await fetch(
         `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DATABASE_ID}/documents/menu_suggestions/${suggestionId}`,
@@ -94,9 +104,7 @@ export default function SubmissionsScreen() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            fields: { status: { stringValue: status } },
-          }),
+          body: JSON.stringify({ fields }),
         },
       );
 
@@ -114,6 +122,21 @@ export default function SubmissionsScreen() {
       Alert.alert("Error", "Failed to update suggestion");
     }
   };
+
+  function openRejectModal(id: string) {
+    setRejectTargetId(id);
+    setRejectReason("");
+    setRejectModal(true);
+  }
+
+  async function confirmReject() {
+    if (!rejectReason.trim()) { Alert.alert("Required", "Please enter a reason for rejection."); return; }
+    if (!rejectTargetId) return;
+    setRejectModal(false);
+    await updateSuggestionStatus(rejectTargetId, "rejected", rejectReason.trim());
+    setRejectTargetId(null);
+    setRejectReason("");
+  }
 
   function handleArchive(id: string) {
     Alert.alert("Archive Suggestion", "Hide this from the main list?", [
@@ -178,6 +201,12 @@ export default function SubmissionsScreen() {
                 <Text style={styles.cardCategory}>{item.category}</Text>
                 <Text style={styles.cardDescription}>{item.description}</Text>
                 <Text style={styles.cardMeta}>By {item.user_name} ({item.user_email})</Text>
+                {item.status === "rejected" && item.reject_reason ? (
+                  <View style={styles.rejectReasonBox}>
+                    <Ionicons name="alert-circle" size={13} color="#E74C3C" />
+                    <Text style={styles.rejectReasonText}>Reason: {item.reject_reason}</Text>
+                  </View>
+                ) : null}
                 {item.status === "pending" && filter !== "archived" && (
                   <View style={styles.actions}>
                     <TouchableOpacity
@@ -189,7 +218,7 @@ export default function SubmissionsScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.rejectBtn]}
-                      onPress={() => updateSuggestionStatus(item.id, "rejected")}
+                      onPress={() => openRejectModal(item.id)}
                     >
                       <Ionicons name="close" size={20} color="#fff" />
                       <Text style={styles.actionBtnText}>Reject</Text>
@@ -213,6 +242,33 @@ export default function SubmissionsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Reject Reason Modal */}
+      <Modal visible={rejectModal} transparent animationType="fade" onRequestClose={() => setRejectModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Reason for Rejection</Text>
+            <Text style={styles.modalSubtitle}>Please provide a reason so the customer understands the decision.</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. Already on the menu, Missing details..."
+              placeholderTextColor="#aaa"
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setRejectModal(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={confirmReject}>
+                <Text style={styles.modalConfirmText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -244,4 +300,16 @@ const styles = StyleSheet.create({
   actionBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
   archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 10, padding: 4 },
   archiveBtnText: { fontSize: 11, color: "#888" },
+  rejectReasonBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#3A1A1A", borderRadius: 8, padding: 8, marginTop: 8 },
+  rejectReasonText: { color: "#E74C3C", fontSize: 12, flex: 1, lineHeight: 16 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
+  modalCard: { backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%", elevation: 8 },
+  modalTitle: { fontSize: 17, fontWeight: "bold", color: "#2E1A06", marginBottom: 6 },
+  modalSubtitle: { fontSize: 13, color: "#666", marginBottom: 12, lineHeight: 18 },
+  modalInput: { backgroundColor: "#F9F0DC", borderRadius: 10, borderWidth: 1, borderColor: "#E8D8A0", padding: 12, fontSize: 14, color: "#333", minHeight: 80, textAlignVertical: "top" },
+  modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
+  modalCancel: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: "#eee", alignItems: "center" },
+  modalCancelText: { color: "#666", fontWeight: "600" },
+  modalConfirm: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: "#E74C3C", alignItems: "center" },
+  modalConfirmText: { color: "#fff", fontWeight: "bold" },
 });

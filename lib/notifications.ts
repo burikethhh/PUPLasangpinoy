@@ -161,3 +161,25 @@ export async function notifyNewRecipe(recipeTitle: string): Promise<void> {
     { screen: "/(tabs)" },
   );
 }
+
+/**
+ * Notify customer that delivery has started — invite them to track live.
+ */
+export async function notifyDeliveryStarted(orderNumber: string): Promise<void> {
+  await sendLocalNotification(
+    "Your order is on the way! 🛵",
+    `Order ${orderNumber} has been picked up. Tap to track live delivery.`,
+    { screen: "/(tabs)/collections" },
+  );
+}
+
+/**
+ * Notify both parties that live tracking is now active.
+ */
+export async function notifyBothOptedIn(): Promise<void> {
+  await sendLocalNotification(
+    "Live tracking is active 📍",
+    "You can now see real-time delivery location on the map.",
+    {},
+  );
+}

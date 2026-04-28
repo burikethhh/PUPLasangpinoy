@@ -601,4 +601,4 @@ const MENU_CATEGORIES = [
 
 ---
 
-*End of Documentation — FOODFIX v2.7.0*
+*End of Documentation — FOODFIX v2.8.0*

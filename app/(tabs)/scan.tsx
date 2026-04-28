@@ -23,6 +23,7 @@ interface CartItem {
   name: string;
   price: number;
   quantity: number;
+  stock_quantity: number;
   image_url?: string;
 }
 
@@ -209,7 +210,11 @@ function confirmLocation(){
 
   function updateQty(idx: number, delta: number) {
     const next = [...cart];
-    next[idx].quantity = Math.max(1, next[idx].quantity + delta);
+    const maxQty = next[idx].stock_quantity || 999;
+    next[idx].quantity = Math.min(maxQty, Math.max(1, next[idx].quantity + delta));
+    if (delta > 0 && next[idx].quantity === maxQty && cart[idx].quantity === maxQty) {
+      Alert.alert("Stock Limit", `Only ${maxQty} left in stock.`);
+    }
     saveCart(next);
   }
 
@@ -318,7 +323,7 @@ function confirmLocation(){
                     <Ionicons name="remove" size={16} color="#F25C05" />
                   </TouchableOpacity>
                   <Text style={styles.qtyText}>{item.quantity}</Text>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(idx, 1)}>
+                  <TouchableOpacity style={[styles.qtyBtn, item.quantity >= (item.stock_quantity || 999) && { opacity: 0.4 }]} onPress={() => updateQty(idx, 1)}>
                     <Ionicons name="add" size={16} color="#F25C05" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => removeItem(idx)} style={{ marginLeft: 8 }}>

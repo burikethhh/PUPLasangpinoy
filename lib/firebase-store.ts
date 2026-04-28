@@ -65,8 +65,23 @@ export interface Order {
   scheduled_time?: string;
   reject_reason?: string;
   prepared_by?: string;
+  location_sharing_enabled?: boolean;
+  customer_location_opt_in?: boolean;
+  staff_location_opt_in?: boolean;
+  driver_id?: string;
   created_at: Timestamp | { seconds: number };
   updated_at?: Timestamp | { seconds: number };
+}
+
+export interface LiveLocation {
+  user_id: string;
+  role: "customer" | "staff";
+  lat: number;
+  lng: number;
+  heading?: number;
+  speed?: number;
+  accuracy?: number;
+  updated_at: Timestamp | { seconds: number };
 }
 
 export interface Message {
@@ -711,5 +726,59 @@ export async function getStaffProfiles(): Promise<Profile[]> {
       const data = await RestApi.getCollection("profiles", "created_at");
       return (data as Profile[]).filter((p) => p.role === "staff");
     },
+  );
+}
+
+// ==================== LIVE LOCATION ====================
+
+export async function upsertLocation(
+  orderId: string,
+  userId: string,
+  role: "customer" | "staff",
+  coords: { lat: number; lng: number; heading?: number; speed?: number; accuracy?: number },
+): Promise<void> {
+  return firestoreOp(
+    async () => {
+      const { serverTimestamp } = await import("firebase/firestore");
+      await setDoc(
+        doc(db, "orders", orderId, "locations", role),
+        { user_id: userId, role, ...coords, updated_at: serverTimestamp() },
+        { merge: true },
+      );
+    },
+    async () => {
+      await RestApi.updateDocument(`orders/${orderId}/locations`, role, {
+        user_id: userId, role, ...coords, updated_at: new Date().toISOString(),
+      });
+    },
+  );
+}
+
+export function onLocationUpdate(
+  orderId: string,
+  role: "customer" | "staff",
+  callback: (loc: LiveLocation | null) => void,
+): () => void {
+  try {
+    const { onSnapshot: firestoreOnSnapshot } = require("firebase/firestore");
+    const locRef = doc(db, "orders", orderId, "locations", role === "staff" ? "staff" : "customer");
+    const unsub = firestoreOnSnapshot(locRef, (snap: any) => {
+      if (snap.exists()) callback({ ...snap.data() } as LiveLocation);
+      else callback(null);
+    });
+    return unsub;
+  } catch {
+    return () => {};
+  }
+}
+
+export async function setLocationOptIn(
+  orderId: string,
+  field: "customer_location_opt_in" | "staff_location_opt_in" | "location_sharing_enabled" | "driver_id",
+  value: boolean | string,
+): Promise<void> {
+  return firestoreOp(
+    async () => { await updateDoc(doc(db, "orders", orderId), { [field]: value }); },
+    async () => { await RestApi.updateDocument("orders", orderId, { [field]: value }); },
   );
 }

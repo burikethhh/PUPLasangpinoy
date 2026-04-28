@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator, Alert, RefreshControl, SectionList,
@@ -107,6 +107,16 @@ export default function OrdersScreen() {
             <Ionicons name="alert-circle" size={12} color="#E74C3C" />
             <Text style={styles.rejectText}>{item.reject_reason}</Text>
           </View>
+        )}
+
+        {/* Live tracking button */}
+        {item.status === "out_for_delivery" && (
+          <TouchableOpacity
+            style={styles.trackLiveBtn}
+            onPress={() => (router as any).push({ pathname: "/track-delivery", params: { orderId: item.id, role: "customer" } })}>
+            <Ionicons name="navigate" size={14} color="#fff" />
+            <Text style={styles.trackLiveBtnText}>Track Live Delivery</Text>
+          </TouchableOpacity>
         )}
 
         {/* Compact tracker for active orders */}
@@ -221,6 +231,8 @@ const styles = StyleSheet.create({
   trackerLabel: { fontSize: 8, color: "#aaa", textAlign: "center", flex: 1 },
   archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 6, padding: 4 },
   archiveBtnText: { fontSize: 11, color: "#888" },
+  trackLiveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#3498DB", borderRadius: 10, paddingVertical: 10, marginTop: 8 },
+  trackLiveBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
   tabRow: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   tabPill: {
     paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20,

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator, Alert, FlatList, RefreshControl,
@@ -165,6 +165,14 @@ export default function StaffOrdersScreen() {
             <Text style={styles.preparedBtnText}>Mark as Prepared</Text>
           </TouchableOpacity>
         )}
+        {item.status === "out_for_delivery" && (
+          <TouchableOpacity
+            style={styles.startDeliveryBtn}
+            onPress={() => (router as any).push({ pathname: "/track-delivery", params: { orderId: item.id, role: "staff" } })}>
+            <Ionicons name="navigate" size={16} color="#fff" />
+            <Text style={styles.startDeliveryBtnText}>Start Delivery Tracking</Text>
+          </TouchableOpacity>
+        )}
         {FINISHED.includes(item.status) && filter !== "archived" && (
           <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(item.id)}>
             <Ionicons name="archive-outline" size={14} color="#888" />
@@ -258,6 +266,8 @@ const styles = StyleSheet.create({
   preparedBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
   archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 8, padding: 4 },
   archiveBtnText: { fontSize: 11, color: "#888" },
+  startDeliveryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#3498DB", borderRadius: 12, padding: 12, marginTop: 8 },
+  startDeliveryBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
   trackerWrap: { marginTop: 8, paddingTop: 6 },
   tracker: { flexDirection: "row", alignItems: "center" },
   trackStep: { flexDirection: "row", alignItems: "center", flex: 1 },

@@ -4,10 +4,11 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { onAuthChange, updateProfile } from '../lib/firebase';
+import '../lib/location-task'; // Register background location task definition
 import {
-  addNotificationReceivedListener,
-  addNotificationResponseListener,
-  registerForPushNotificationsAsync,
+    addNotificationReceivedListener,
+    addNotificationResponseListener,
+    registerForPushNotificationsAsync,
 } from '../lib/notifications';
 
 export default function RootLayout() {

@@ -120,12 +120,16 @@ export default function MenuScreen() {
   async function addToCart(item: MenuItem) {
     try {
       const raw = await AsyncStorage.getItem(CART_KEY);
-      const cart: { menu_item_id: string; name: string; price: number; quantity: number; image_url?: string }[] = raw ? JSON.parse(raw) : [];
+      const cart: { menu_item_id: string; name: string; price: number; quantity: number; stock_quantity: number; image_url?: string }[] = raw ? JSON.parse(raw) : [];
       const existing = cart.find((c) => c.menu_item_id === item.id);
       if (existing) {
+        if (existing.quantity >= item.stock_quantity) {
+          Alert.alert("Stock Limit", `Only ${item.stock_quantity} left in stock.`);
+          return;
+        }
         existing.quantity += 1;
       } else {
-        cart.push({ menu_item_id: item.id, name: item.name, price: item.price, quantity: 1, image_url: item.image_url });
+        cart.push({ menu_item_id: item.id, name: item.name, price: item.price, quantity: 1, stock_quantity: item.stock_quantity, image_url: item.image_url });
       }
       await AsyncStorage.setItem(CART_KEY, JSON.stringify(cart));
       Alert.alert("Added to Cart", `${item.name} added to your cart!`);

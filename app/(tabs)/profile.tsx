@@ -414,7 +414,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.7.0</Text>
+        <Text style={styles.version}>Version 2.8.0</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
@@ -461,6 +461,10 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
               {scanImage && <Image source={{ uri: scanImage }} style={styles.scanImg} contentFit="cover" />}
+              <View style={styles.aiDisclaimer}>
+                <Ionicons name="warning-outline" size={13} color="#B07820" />
+                <Text style={styles.aiDisclaimerText}>AI results are estimates and may not be 100% accurate. Nutritional values are approximate.</Text>
+              </View>
               {scanning ? (
                 <View style={{ alignItems: "center", padding: 20 }}>
                   <ActivityIndicator size="large" color="#F25C05" />
@@ -621,4 +625,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F39C12", borderRadius: 12, paddingVertical: 12, marginTop: 10,
   },
   suggestDishBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
+  aiDisclaimer: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#FFF8E1", borderRadius: 8, padding: 8, marginBottom: 10 },
+  aiDisclaimerText: { flex: 1, fontSize: 11, color: "#B07820", lineHeight: 15 },
 });

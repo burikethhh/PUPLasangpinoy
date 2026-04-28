@@ -9,6 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { OrderStatus } from "../../constants/order";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUSES } from "../../constants/order";
 import { getOrders, updateOrderStatus, type Order } from "../../lib/firebase-store";
+import { notifyDeliveryStarted } from "../../lib/notifications";
 
 const FILTER_OPTIONS: (OrderStatus | "all" | "archived")[] = ["all", ...ORDER_STATUSES, "archived"];
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
@@ -56,6 +57,7 @@ export default function AdminOrders() {
       {
         text: "Confirm", onPress: async () => {
           await updateOrderStatus(order.id, next);
+          if (next === "out_for_delivery") notifyDeliveryStarted(order.order_number);
           fetchOrders(true);
         },
       },
@@ -144,8 +146,16 @@ export default function AdminOrders() {
                     <Text style={styles.orderNum}>{item.order_number}</Text>
                     <Text style={styles.orderDate}>{date}</Text>
                   </View>
-                  <View style={[styles.badge, { backgroundColor: color + "22" }]}>
-                    <Text style={[styles.badgeText, { color }]}>{ORDER_STATUS_LABELS[item.status]}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {item.status === "out_for_delivery" && (
+                      <View style={styles.liveIndicator}>
+                        <Ionicons name="location" size={11} color="#3498DB" />
+                        <Text style={styles.liveIndicatorText}>Live</Text>
+                      </View>
+                    )}
+                    <View style={[styles.badge, { backgroundColor: color + "22" }]}>
+                      <Text style={[styles.badgeText, { color }]}>{ORDER_STATUS_LABELS[item.status]}</Text>
+                    </View>
                   </View>
                 </View>
                 <Text style={styles.customerName}>{item.customer_name} - {item.customer_phone}</Text>
@@ -301,4 +311,6 @@ const styles = StyleSheet.create({
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
   modalCancel: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#eee" },
   modalConfirm: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#E74C3C" },
+  liveIndicator: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#EBF5FB", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
+  liveIndicatorText: { fontSize: 10, fontWeight: "bold", color: "#3498DB" },
 });
