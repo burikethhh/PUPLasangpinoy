@@ -2,13 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    ScrollView, StyleSheet, Text,
-    TouchableOpacity, View
+  ActivityIndicator, Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView, StyleSheet, Text, TextInput,
+  TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCurrentUser, getProfile, logOut } from "../../lib/firebase";
-import { type LiveLocation, type Order } from "../../lib/firebase-store";
+import { getOrders, onLocationUpdate, type LiveLocation, type Order } from "../../lib/firebase-store";
 
 export default function StaffProfileScreen() {
   const [username, setUsername] = useState("");

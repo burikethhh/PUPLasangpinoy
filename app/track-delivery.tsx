@@ -3,19 +3,19 @@ import * as ExpoLocation from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal,
-    Platform, ScrollView, StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity, View,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal,
+  Platform, ScrollView, StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { getCurrentUser } from "../lib/firebase";
 import {
-    onLocationUpdate, onOrderUpdate,
-    setLocationOptIn, updateOrderStatus, upsertLocation,
-    type LiveLocation, type Order
+  onLocationUpdate, onOrderUpdate,
+  setLocationOptIn, updateOrderStatus, upsertLocation,
+  type LiveLocation, type Order
 } from "../lib/firebase-store";
 import { startDeliveryTracking, stopDeliveryTracking } from "../lib/location-task";
 import { notifyBothOptedIn } from "../lib/notifications";
@@ -154,6 +154,7 @@ export default function TrackDeliveryScreen() {
   }, [isCustomer, orderId, user]);
 
   // Re-send location data when WebView finishes loading (fixes race condition)
+  // Also re-sends whenever driverLoc/customerLoc updates arrive after WebView is already ready
   useEffect(() => {
     if (!webViewReady || !webViewRef.current) return;
     if (driverLoc) {
@@ -162,7 +163,7 @@ export default function TrackDeliveryScreen() {
     if (customerLoc) {
       webViewRef.current.postMessage(JSON.stringify({ type: "customerUpdate", lat: customerLoc.lat, lng: customerLoc.lng }));
     }
-  }, [webViewReady]);
+  }, [webViewReady, driverLoc, customerLoc]);
 
   // Cleanup on unmount
   useEffect(() => {

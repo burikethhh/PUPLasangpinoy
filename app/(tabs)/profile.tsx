@@ -2,21 +2,24 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator, Alert,
-    Modal,
-    ScrollView, StyleSheet, Text, TextInput,
-    TouchableOpacity, View
+  ActivityIndicator, Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView, StyleSheet, Text, TextInput,
+  TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MENU_CATEGORIES } from "../../constants/order";
 import {
-    deleteMyAccount,
-    getCategories as getCategoriesDoc,
-    getCurrentUser, getProfile as getFirebaseProfile,
-    logOut, updateMyProfile, type Category, type Profile,
+  deleteMyAccount,
+  getCategories as getCategoriesDoc,
+  getCurrentUser, getProfile as getFirebaseProfile,
+  logOut, updateMyProfile, type Category, type Profile,
 } from "../../lib/firebase";
+import { getOrdersByUser, onLocationUpdate, type LiveLocation, type Order } from "../../lib/firebase-store";
 import { analyzeImageWithQwen } from "../../lib/qwen-ai";
 
 const FIRESTORE_DATABASE_ID =
@@ -169,8 +172,8 @@ export default function ProfileScreen() {
     }
     
     const q = question.toLowerCase();
-    const destLat = aiOrder.customer_lat ?? STORE_LAT_AI;
-    const destLng = aiOrder.customer_lng ?? STORE_LNG_AI;
+    const destLat = STORE_LAT_AI;
+    const destLng = STORE_LNG_AI;
     const dist = calcDistance(aiDriverLoc.lat, aiDriverLoc.lng, destLat, destLng);
     const speedKmh = aiDriverLoc.speed && aiDriverLoc.speed > 2 ? aiDriverLoc.speed : 25;
     const mins = Math.round((dist / speedKmh) * 60);
@@ -557,7 +560,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.9.3</Text>
+        <Text style={styles.version}>Version 2.9.4</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>
