@@ -41,6 +41,8 @@ export default function TrackDeliveryScreen() {
   const unsubRef = useRef<(() => void) | null>(null);
   const orderUnsubRef = useRef<(() => void) | null>(null);
   const chatScrollRef = useRef<ScrollView>(null);
+  const customerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const staffIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isCustomer = role === "customer";
   const user = getCurrentUser();
@@ -91,48 +93,51 @@ export default function TrackDeliveryScreen() {
     return () => unsub?.();
   }, [orderId, isCustomer]);
 
-  // Auto-opt-in on screen open + Customer foreground location push every 5s
+  // Auto-opt-in on screen open (runs once per orderId/user/isCustomer)
   useEffect(() => {
     if (!orderId || !user) return;
-    
-    // Auto opt-in when screen opens
     (async () => {
       const field = isCustomer ? "customer_location_opt_in" : "staff_location_opt_in";
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-      if (status === "granted" && !myOptIn) {
-        await setLocationOptIn(orderId, field, true);
+      if (status === "granted") {
+        await setLocationOptIn(orderId, field, true).catch(() => {});
         setMyOptIn(true);
       }
     })();
-    
-    // Customer pushes location every 5 seconds
-    let customerInterval: ReturnType<typeof setInterval>;
-    if (isCustomer) {
-      (async () => {
-        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
-        const push = async () => {
-          const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
-          if (loc) {
-            await upsertLocation(orderId, user.uid, "customer", {
-              lat: loc.coords.latitude, lng: loc.coords.longitude,
-              accuracy: loc.coords.accuracy ?? undefined,
-            }).catch(() => {});
-          }
-        };
-        await push();
-        customerInterval = setInterval(push, 5000);
-      })();
-    }
-    
-    return () => clearInterval(customerInterval);
-  }, [orderId, user, isCustomer, myOptIn]);
+  }, [orderId, user, isCustomer]); // intentionally excludes myOptIn — runs once on mount
 
-  // Staff foreground location push every 5 seconds (complements background task)
+  // Customer foreground location push every 5s — stable interval, never restarts
+  useEffect(() => {
+    if (!isCustomer || !orderId || !user) return;
+    // Clear any existing interval before starting
+    if (customerIntervalRef.current) clearInterval(customerIntervalRef.current);
+
+    (async () => {
+      const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const push = async () => {
+        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
+        if (loc) {
+          await upsertLocation(orderId, user.uid, "customer", {
+            lat: loc.coords.latitude, lng: loc.coords.longitude,
+            accuracy: loc.coords.accuracy ?? undefined,
+          }).catch(() => {});
+        }
+      };
+      await push(); // push immediately on mount
+      customerIntervalRef.current = setInterval(push, 5000);
+    })();
+
+    return () => {
+      if (customerIntervalRef.current) { clearInterval(customerIntervalRef.current); customerIntervalRef.current = null; }
+    };
+  }, [isCustomer, orderId, user]); // stable — does NOT include myOptIn
+
+  // Staff foreground location push every 5s — stable interval, never restarts
   useEffect(() => {
     if (isCustomer || !orderId || !user) return;
-    
-    let staffInterval: ReturnType<typeof setInterval>;
+    if (staffIntervalRef.current) clearInterval(staffIntervalRef.current);
+
     (async () => {
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
@@ -146,12 +151,14 @@ export default function TrackDeliveryScreen() {
           }).catch(() => {});
         }
       };
-      await push();
-      staffInterval = setInterval(push, 5000);
+      await push(); // push immediately on mount
+      staffIntervalRef.current = setInterval(push, 5000);
     })();
-    
-    return () => clearInterval(staffInterval);
-  }, [isCustomer, orderId, user]);
+
+    return () => {
+      if (staffIntervalRef.current) { clearInterval(staffIntervalRef.current); staffIntervalRef.current = null; }
+    };
+  }, [isCustomer, orderId, user]); // stable
 
   // Re-send location data when WebView finishes loading (fixes race condition)
   // Also re-sends whenever driverLoc/customerLoc updates arrive after WebView is already ready
@@ -167,9 +174,11 @@ export default function TrackDeliveryScreen() {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { 
-      unsubRef.current?.(); 
+    return () => {
+      unsubRef.current?.();
       orderUnsubRef.current?.();
+      if (customerIntervalRef.current) clearInterval(customerIntervalRef.current);
+      if (staffIntervalRef.current) clearInterval(staffIntervalRef.current);
     };
   }, []);
 
