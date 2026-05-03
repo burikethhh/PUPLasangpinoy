@@ -29,6 +29,7 @@ export default function AdminMoreScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [saving, setSaving] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState("");
+  const [deliveryRadius, setDeliveryRadius] = useState("");
   const [gcashNumber, setGcashNumber] = useState("");
   const [gcashEnabled, setGcashEnabled] = useState(false);
   const [staffModal, setStaffModal] = useState(false);
@@ -55,6 +56,7 @@ export default function AdminMoreScreen() {
         getSettings(), getAllUsers(), getOrders(),
       ]);
       setDeliveryFee(s.delivery_fee.toString());
+      setDeliveryRadius((s.delivery_radius_km || 10).toString());
       setGcashEnabled(s.gcash_enabled);
       setGcashNumber(s.gcash_number || "");
       const staffUsers = u.filter((x) => x.role === "staff");
@@ -70,6 +72,7 @@ export default function AdminMoreScreen() {
     try {
       await updateSettings({
         delivery_fee: parseFloat(deliveryFee) || 50,
+        delivery_radius_km: parseFloat(deliveryRadius) || 10,
         gcash_enabled: gcashEnabled,
         gcash_number: gcashNumber.trim(),
       });
@@ -335,6 +338,12 @@ export default function AdminMoreScreen() {
           <Text style={styles.label}>Delivery Fee (PHP)</Text>
           <TextInput style={styles.input} value={deliveryFee} keyboardType="numeric"
             onChangeText={setDeliveryFee} placeholder="50" placeholderTextColor="#aaa" />
+          <Text style={styles.label}>Delivery Radius (km)</Text>
+          <TextInput style={styles.input} value={deliveryRadius} keyboardType="numeric"
+            onChangeText={setDeliveryRadius} placeholder="10" placeholderTextColor="#aaa" />
+          <Text style={{ fontSize: 11, color: "#888", marginTop: 2, marginLeft: 2 }}>
+            Orders outside this radius will be automatically rejected.
+          </Text>
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>GCash Payment</Text>
             <Switch value={gcashEnabled} onValueChange={setGcashEnabled}

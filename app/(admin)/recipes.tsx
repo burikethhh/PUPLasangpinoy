@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView,
+    ActivityIndicator, Alert, FlatList, Modal, RefreshControl,
     StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,6 +24,7 @@ export default function AdminOrders() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [archived, setArchived] = useState<Set<string>>(new Set());
+  const [filterDropdown, setFilterDropdown] = useState(false);
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -103,24 +104,38 @@ export default function AdminOrders() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Order Management</Text>
 
-      {/* Filter Chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0 }} contentContainerStyle={styles.filterRow}>
-        {FILTER_OPTIONS.map((f) => {
-          const active = filter === f;
-          const color = f === "all" ? "#F25C05" : f === "archived" ? "#888" : ORDER_STATUS_COLORS[f];
-          const label = f === "all" ? "All" : f === "archived" ? `Archived (${archived.size})` : f === "out_for_delivery" ? "Delivering" : ORDER_STATUS_LABELS[f];
-          return (
-            <TouchableOpacity key={f}
-              style={[styles.filterChip, active && { backgroundColor: color + "22", borderColor: color }]}
-              onPress={() => setFilter(f)}>
-              <Text style={[styles.filterText, active && { color, fontWeight: "bold" }]} numberOfLines={1}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Filter Dropdown */}
+      <TouchableOpacity style={styles.filterDropdownBtn} onPress={() => setFilterDropdown(true)}>
+        <Ionicons name="filter" size={16} color="#F25C05" />
+        <Text style={styles.filterDropdownText}>
+          {filter === "all" ? "All Orders" : filter === "archived" ? `Archived (${archived.size})` : filter === "out_for_delivery" ? "Delivering" : ORDER_STATUS_LABELS[filter]}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color="#888" />
+      </TouchableOpacity>
+
+      <Modal visible={filterDropdown} transparent animationType="fade" onRequestClose={() => setFilterDropdown(false)}>
+        <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setFilterDropdown(false)}>
+          <View style={styles.dropdownMenu}>
+            <Text style={styles.dropdownTitle}>Filter Orders</Text>
+            {FILTER_OPTIONS.map((f) => {
+              const active = filter === f;
+              const color = f === "all" ? "#F25C05" : f === "archived" ? "#888" : ORDER_STATUS_COLORS[f];
+              const label = f === "all" ? "All Orders" : f === "archived" ? `Archived (${archived.size})` : f === "out_for_delivery" ? "Delivering" : ORDER_STATUS_LABELS[f];
+              return (
+                <TouchableOpacity key={f}
+                  style={[styles.dropdownItem, active && { backgroundColor: color + "15" }]}
+                  onPress={() => { setFilter(f); setFilterDropdown(false); }}>
+                  <View style={[styles.dropdownDot, { backgroundColor: color }]} />
+                  <Text style={[styles.dropdownItemText, active && { color, fontWeight: "bold" }]}>
+                    {label}
+                  </Text>
+                  {active && <Ionicons name="checkmark" size={18} color={color} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {loading ? (
         <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
@@ -263,12 +278,25 @@ export default function AdminOrders() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
   title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
-  filterRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
-  filterChip: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    borderWidth: 1.5, borderColor: "#E8D8A0", backgroundColor: "#fff",
+  filterDropdownBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    marginHorizontal: 16, marginBottom: 10, backgroundColor: "#fff",
+    borderRadius: 12, padding: 12, borderWidth: 1.5, borderColor: "#E8D8A0", elevation: 1,
   },
-  filterText: { fontSize: 13, color: "#888", fontWeight: "600" },
+  filterDropdownText: { flex: 1, fontSize: 14, fontWeight: "600", color: "#2E1A06" },
+  dropdownOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center",
+  },
+  dropdownMenu: {
+    backgroundColor: "#fff", borderRadius: 20, padding: 8, width: "80%", maxHeight: "70%", elevation: 10,
+  },
+  dropdownTitle: { fontSize: 16, fontWeight: "bold", color: "#2E1A06", padding: 12, paddingBottom: 8 },
+  dropdownItem: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, marginHorizontal: 4,
+  },
+  dropdownDot: { width: 10, height: 10, borderRadius: 5 },
+  dropdownItemText: { flex: 1, fontSize: 14, color: "#555" },
   card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12, elevation: 2 },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   orderNum: { fontSize: 16, fontWeight: "bold", color: "#2E1A06" },

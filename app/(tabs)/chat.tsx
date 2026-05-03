@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentUser, getProfile } from '../../lib/firebase';
-import { deleteMessage, getMessages, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
+import { deleteMessage, deleteConversation, getMessages, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -76,6 +76,20 @@ export default function ChatScreen() {
     ]);
   }
 
+  function handleClearChat() {
+    const user = getCurrentUser();
+    if (!user) return;
+    Alert.alert('Clear Chat', 'Delete all messages in this conversation? This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear All', style: 'destructive', onPress: async () => {
+        try {
+          await deleteConversation(user.uid);
+          setMessages([]);
+        } catch (e) { console.error(e); }
+      }},
+    ]);
+  }
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isMe = item.sender_id === userId;
     return (
@@ -113,9 +127,16 @@ export default function ChatScreen() {
             <Text style={styles.headerSub}>Message the store</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={loadMessages} style={{ padding: 8 }}>
-          <Ionicons name="refresh" size={20} color="#888" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {messages.length > 0 && (
+            <TouchableOpacity onPress={handleClearChat} style={{ padding: 8 }}>
+              <Ionicons name="trash-outline" size={20} color="#E74C3C" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={loadMessages} style={{ padding: 8 }}>
+            <Ionicons name="refresh" size={20} color="#888" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (

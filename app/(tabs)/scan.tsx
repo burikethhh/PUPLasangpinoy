@@ -14,7 +14,7 @@ import { WebView } from "react-native-webview";
 import type { OrderType, PaymentMethod } from "../../constants/order";
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
-import { createOrder, getSettings, type AppSettings } from "../../lib/firebase-store";
+import { createOrder, getSettings, validateStock, type AppSettings } from "../../lib/firebase-store";
 
 const CART_KEY = "@foodfix_cart";
 
@@ -234,6 +234,18 @@ function confirmLocation(){
   const deliveryFee = (orderType === "delivery_now" || orderType === "delivery_later") ? (settings?.delivery_fee || 50) : 0;
   const total = subtotal + deliveryFee;
 
+  const STORE_LAT = 14.5995;
+  const STORE_LNG = 120.9842;
+
+  function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
   async function handleCheckout() {
     const user = getCurrentUser();
     if (!user) return Alert.alert("Sign In", "Please sign in to place an order.");
@@ -245,15 +257,45 @@ function confirmLocation(){
     if (orderType === "delivery_later" && (!scheduledDate || !scheduledTime))
       return Alert.alert("Schedule Required", "Please set date and time for later delivery.");
 
+    // Check delivery coverage for delivery orders
+    if ((orderType === "delivery_now" || orderType === "delivery_later") && coords) {
+      const radiusKm = settings?.delivery_radius_km || 10;
+      const distance = calcDistance(STORE_LAT, STORE_LNG, coords.lat, coords.lng);
+      if (distance > radiusKm) {
+        return Alert.alert(
+          "Out of Delivery Area",
+          `Your location is ${distance.toFixed(1)} km away. We currently deliver within ${radiusKm} km of our store. Please choose a closer address or select Pick Up / Dine In.`
+        );
+      }
+    }
+
+    // Validate stock availability before placing order
+    setPlacing(true);
+    try {
+      const stockCheck = await validateStock(cart.map((c) => ({
+        menu_item_id: c.menu_item_id,
+        name: c.name,
+        quantity: c.quantity,
+      })));
+      if (!stockCheck.valid) {
+        setPlacing(false);
+        return Alert.alert("Stock Issue", stockCheck.issues.join("\n\nPlease adjust your cart and try again."));
+      }
+    } catch (e) {
+      // If stock validation fails, continue with order (graceful degradation)
+      console.error("Stock validation error:", e);
+    }
+
     const profile = await getProfile(user.uid);
 
-    setPlacing(true);
     try {
       const result = await createOrder({
         customer_id: user.uid,
         customer_name: profile?.username || "Customer",
         customer_phone: phone.trim(),
         customer_address: address.trim(),
+        customer_lat: coords?.lat,
+        customer_lng: coords?.lng,
         items: cart.map((c) => ({
           menu_item_id: c.menu_item_id,
           name: c.name,

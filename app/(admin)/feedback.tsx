@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
 import {
-    deleteMessage, getConversations, getMessages, markMessagesRead,
+    deleteMessage, deleteConversation, getConversations, getMessages, markMessagesRead,
     sendMessage as sendMsg, type Message,
 } from "../../lib/firebase-store";
 
@@ -65,6 +65,33 @@ export default function AdminMessages() {
     ]);
   }
 
+  function handleDeleteConversation(convo: Convo) {
+    Alert.alert("Delete Conversation", `Delete entire conversation with ${convo.customer_name}? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try {
+          await deleteConversation(convo.customer_id);
+          await loadConvos();
+        } catch (e) { console.error(e); }
+      }},
+    ]);
+  }
+
+  function handleClearChat() {
+    if (!selected) return;
+    Alert.alert("Clear Chat", `Delete all messages with ${selected.customer_name}? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Clear All", style: "destructive", onPress: async () => {
+        try {
+          await deleteConversation(selected.customer_id);
+          setMessages([]);
+          setSelected(null);
+          await loadConvos();
+        } catch (e) { console.error(e); }
+      }},
+    ]);
+  }
+
   async function send() {
     if (!input.trim() || !selected) return;
     const u = getCurrentUser();
@@ -101,7 +128,8 @@ export default function AdminMessages() {
           <FlatList data={convos} keyExtractor={(i) => i.customer_id}
             contentContainerStyle={{ padding: 16 }}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.convoCard} onPress={() => openConvo(item)}>
+              <TouchableOpacity style={styles.convoCard} onPress={() => openConvo(item)}
+                onLongPress={() => handleDeleteConversation(item)}>
                 <View style={styles.convoAvatar}>
                   <Text style={styles.convoAvatarText}>{item.customer_name.charAt(0).toUpperCase()}</Text>
                 </View>
@@ -130,6 +158,9 @@ export default function AdminMessages() {
           <Ionicons name="arrow-back" size={22} color="#2E1A06" />
         </TouchableOpacity>
         <Text style={styles.chatTitle}>{selected.customer_name}</Text>
+        <TouchableOpacity onPress={handleClearChat} style={{ padding: 4, marginLeft: "auto" }}>
+          <Ionicons name="trash-outline" size={20} color="#E74C3C" />
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>

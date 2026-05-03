@@ -54,6 +54,8 @@ export interface Order {
   customer_name: string;
   customer_phone: string;
   customer_address: string;
+  customer_lat?: number;
+  customer_lng?: number;
   items: OrderItem[];
   subtotal: number;
   delivery_fee: number;
@@ -65,6 +67,8 @@ export interface Order {
   scheduled_time?: string;
   reject_reason?: string;
   prepared_by?: string;
+  driver_name?: string;
+  driver_phone?: string;
   location_sharing_enabled?: boolean;
   customer_location_opt_in?: boolean;
   staff_location_opt_in?: boolean;
@@ -117,6 +121,7 @@ export interface Favorite {
 
 export interface AppSettings {
   delivery_fee: number;
+  delivery_radius_km: number;
   gcash_enabled: boolean;
   gcash_number?: string;
   store_name: string;
@@ -230,6 +235,8 @@ export async function createOrder(data: {
   customer_name: string;
   customer_phone: string;
   customer_address: string;
+  customer_lat?: number;
+  customer_lng?: number;
   items: OrderItem[];
   subtotal: number;
   delivery_fee: number;
@@ -316,7 +323,7 @@ export async function getOrder(id: string): Promise<Order | null> {
 export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,
-  extra?: { reject_reason?: string; prepared_by?: string },
+  extra?: { reject_reason?: string; prepared_by?: string; driver_name?: string; driver_phone?: string },
 ): Promise<void> {
   const data: any = { status, updated_at: new Date(), ...extra };
   return firestoreOp(
@@ -450,6 +457,39 @@ export async function markMessagesRead(conversationId: string, readerRole: strin
       );
     }
   }
+}
+
+export async function deleteConversation(conversationId: string): Promise<void> {
+  const messages = await getMessages(conversationId);
+  for (const msg of messages) {
+    await firestoreOp(
+      async () => { await deleteDoc(doc(db, "messages", msg.id)); },
+      async () => { await RestApi.deleteDocument("messages", msg.id); },
+    );
+  }
+}
+
+export async function validateStock(items: { menu_item_id: string; name: string; quantity: number }[]): Promise<{ valid: boolean; issues: string[] }> {
+  const issues: string[] = [];
+  for (const item of items) {
+    try {
+      const menuItem = await getMenuItem(item.menu_item_id);
+      if (!menuItem) {
+        issues.push(`${item.name} is no longer available.`);
+      } else if (!menuItem.available) {
+        issues.push(`${item.name} is currently unavailable.`);
+      } else if (menuItem.stock_quantity < item.quantity) {
+        if (menuItem.stock_quantity === 0) {
+          issues.push(`${item.name} is out of stock.`);
+        } else {
+          issues.push(`${item.name}: only ${menuItem.stock_quantity} left (you have ${item.quantity}).`);
+        }
+      }
+    } catch {
+      issues.push(`Could not verify stock for ${item.name}.`);
+    }
+  }
+  return { valid: issues.length === 0, issues };
 }
 
 // ==================== REVIEWS ====================
@@ -623,6 +663,7 @@ const SETTINGS_DOC = "app_settings";
 export async function getSettings(): Promise<AppSettings> {
   const defaults: AppSettings = {
     delivery_fee: 50,
+    delivery_radius_km: 10,
     gcash_enabled: false,
     gcash_number: "",
     store_name: "FOODFIX",

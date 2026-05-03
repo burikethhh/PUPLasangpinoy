@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator, Alert, FlatList, RefreshControl,
+    ActivityIndicator, Alert, FlatList, Modal, RefreshControl,
     StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,13 +17,18 @@ export default function StaffOrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<OrderStatus | "all" | "archived">("all");
   const [staffName, setStaffName] = useState("");
+  const [staffPhone, setStaffPhone] = useState("");
   const [archived, setArchived] = useState<Set<string>>(new Set());
+  const [filterDropdown, setFilterDropdown] = useState(false);
 
   useEffect(() => {
     const user = getCurrentUser();
     if (user) {
       getProfile(user.uid).then((p) => {
-        if (p) setStaffName(p.username);
+        if (p) {
+          setStaffName(p.username);
+          if (p.phone) setStaffPhone(p.phone);
+        }
       });
     }
   }, []);
@@ -62,7 +67,7 @@ export default function StaffOrdersScreen() {
         text: "Confirm",
         onPress: async () => {
           try {
-            await updateOrderStatus(order.id, "out_for_delivery", { prepared_by: staffName });
+            await updateOrderStatus(order.id, "out_for_delivery", { prepared_by: staffName, driver_name: staffName, driver_phone: staffPhone });
             Alert.alert("Done", "Order marked as prepared and out for delivery!");
             fetchOrders(true);
           } catch (e: any) {
@@ -193,25 +198,35 @@ export default function StaffOrdersScreen() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Orders</Text>
 
-      {/* Filter pills */}
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={filters}
-        keyExtractor={(i) => i}
-        style={{ flexGrow: 0 }}
-        contentContainerStyle={styles.filterRow}
-        renderItem={({ item: f }) => (
-          <TouchableOpacity
-            style={[styles.filterPill, filter === f && styles.filterPillActive]}
-            onPress={() => setFilter(f)}
-          >
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]} numberOfLines={1}>
-              {filterLabel(f)}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
+      {/* Filter Dropdown */}
+      <TouchableOpacity style={styles.filterDropdownBtn} onPress={() => setFilterDropdown(true)}>
+        <Ionicons name="filter" size={16} color="#3498DB" />
+        <Text style={styles.filterDropdownText}>{filterLabel(filter)}</Text>
+        <Ionicons name="chevron-down" size={16} color="#888" />
+      </TouchableOpacity>
+
+      <Modal visible={filterDropdown} transparent animationType="fade" onRequestClose={() => setFilterDropdown(false)}>
+        <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setFilterDropdown(false)}>
+          <View style={styles.dropdownMenu}>
+            <Text style={styles.dropdownTitle}>Filter Orders</Text>
+            {filters.map((f) => {
+              const active = filter === f;
+              const color = f === "all" ? "#3498DB" : f === "archived" ? "#888" : ORDER_STATUS_COLORS[f] || "#888";
+              return (
+                <TouchableOpacity key={f}
+                  style={[styles.dropdownItem, active && { backgroundColor: color + "15" }]}
+                  onPress={() => { setFilter(f); setFilterDropdown(false); }}>
+                  <View style={[styles.dropdownDot, { backgroundColor: color }]} />
+                  <Text style={[styles.dropdownItemText, active && { color, fontWeight: "bold" }]}>
+                    {filterLabel(f)}
+                  </Text>
+                  {active && <Ionicons name="checkmark" size={18} color={color} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {loading ? (
         <ActivityIndicator size="large" color="#3498DB" style={{ marginTop: 40 }} />
@@ -237,14 +252,25 @@ export default function StaffOrdersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
   title: { fontSize: 24, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
-  filterRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
-  filterPill: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E8D8A0",
+  filterDropdownBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    marginHorizontal: 16, marginBottom: 10, backgroundColor: "#fff",
+    borderRadius: 12, padding: 12, borderWidth: 1.5, borderColor: "#E8D8A0", elevation: 1,
   },
-  filterPillActive: { backgroundColor: "#3498DB", borderColor: "#3498DB" },
-  filterText: { fontSize: 13, color: "#777", fontWeight: "600" },
-  filterTextActive: { color: "#fff", fontWeight: "bold" },
+  filterDropdownText: { flex: 1, fontSize: 14, fontWeight: "600", color: "#2E1A06" },
+  dropdownOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center",
+  },
+  dropdownMenu: {
+    backgroundColor: "#fff", borderRadius: 20, padding: 8, width: "80%", maxHeight: "70%", elevation: 10,
+  },
+  dropdownTitle: { fontSize: 16, fontWeight: "bold", color: "#2E1A06", padding: 12, paddingBottom: 8 },
+  dropdownItem: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, marginHorizontal: 4,
+  },
+  dropdownDot: { width: 10, height: 10, borderRadius: 5 },
+  dropdownItemText: { flex: 1, fontSize: 14, color: "#555" },
   card: {
     backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12,
     elevation: 2,

@@ -244,9 +244,10 @@ export default function TrackDeliveryScreen() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // Use customer's live location for ETA if available, else fall back to store
+  // Use customer's live location for ETA if available, else fall back to saved order coords, then store
   function getDestCoords() {
     if (customerLoc) return { lat: customerLoc.lat, lng: customerLoc.lng };
+    if (order?.customer_lat && order?.customer_lng) return { lat: order.customer_lat, lng: order.customer_lng };
     return { lat: STORE_LAT, lng: STORE_LNG };
   }
 
@@ -352,7 +353,7 @@ export default function TrackDeliveryScreen() {
     }, 700);
   }
 
-  function getMapHtml(customerLat = customerLoc?.lat ?? STORE_LAT, customerLng = customerLoc?.lng ?? STORE_LNG) {
+  function getMapHtml(customerLat = customerLoc?.lat ?? order?.customer_lat ?? STORE_LAT, customerLng = customerLoc?.lng ?? order?.customer_lng ?? STORE_LNG) {
     const dLat = driverLoc?.lat ?? STORE_LAT;
     const dLng = driverLoc?.lng ?? STORE_LNG;
     const centerLat = isCustomer ? (customerLat + dLat) / 2 : dLat;
@@ -602,6 +603,19 @@ function handleMsg(raw){
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Rider info for customer */}
+      {isCustomer && order.driver_name && (
+        <View style={styles.riderInfoBar}>
+          <Ionicons name="bicycle" size={16} color="#3498DB" />
+          <Text style={styles.riderInfoText}>Rider: {order.driver_name}</Text>
+          {order.driver_phone ? (
+            <TouchableOpacity onPress={() => Linking.openURL(`tel:${order.driver_phone}`)}>
+              <Ionicons name="call-outline" size={18} color="#27AE60" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      )}
+
       {/* Waiting for other party to share location */}
       {myOptIn && !otherOptIn && (
         <View style={styles.waitingBar}>
@@ -668,6 +682,8 @@ const styles = StyleSheet.create({
   etaText: { fontSize: 14, fontWeight: "600", color: "#2E1A06" },
   waitingBar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFF9E6", paddingHorizontal: 16, paddingVertical: 12 },
   waitingText: { fontSize: 13, color: "#B07820" },
+  riderInfoBar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#EBF5FB", paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#D6EAF8" },
+  riderInfoText: { flex: 1, fontSize: 14, fontWeight: "600", color: "#2E1A06" },
   staffControls: { backgroundColor: "#fff", padding: 16, borderTopWidth: 1, borderTopColor: "#E8D8A0" },
   custInfo: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
   custInfoText: { flex: 1, fontSize: 14, fontWeight: "600", color: "#2E1A06" },

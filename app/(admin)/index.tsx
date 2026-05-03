@@ -95,31 +95,36 @@ export default function AdminDashboard() {
             {/* Stats */}
             <View style={styles.statsRow}>
               {[
-                { label: "Total Orders", value: stats.totalOrders, color: "#F25C05", icon: "receipt" },
-                { label: "Pending", value: stats.pendingOrders, color: "#F39C12", icon: "time" },
-                { label: "Today", value: stats.todayOrders, color: "#27AE60", icon: "today" },
-                { label: "Menu Items", value: stats.menuItems, color: "#9B59B6", icon: "restaurant" },
+                { label: "Total Orders", value: stats.totalOrders, color: "#F25C05", icon: "receipt", route: "/(admin)/recipes" },
+                { label: "Pending", value: stats.pendingOrders, color: "#F39C12", icon: "time", route: "/(admin)/recipes" },
+                { label: "Today", value: stats.todayOrders, color: "#27AE60", icon: "today", route: "/(admin)/recipes" },
+                { label: "Menu Items", value: stats.menuItems, color: "#9B59B6", icon: "restaurant", route: "/(admin)/categories" },
               ].map((s) => (
-                <View key={s.label} style={styles.statCard}>
+                <TouchableOpacity key={s.label} style={styles.statCard} activeOpacity={0.7}
+                  onPress={() => router.push(s.route as any)}>
                   <View style={[styles.statIcon, { backgroundColor: s.color + "22" }]}>
                     <Ionicons name={s.icon as any} size={20} color={s.color} />
                   </View>
                   <Text style={[styles.statNum, { color: s.color }]}>{s.value}</Text>
                   <Text style={styles.statLbl}>{s.label}</Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 
             {/* Quick Info */}
             <View style={styles.quickRow}>
-              <View style={styles.quickCard}>
+              <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
+                onPress={() => router.push("/(admin)/feedback" as any)}>
                 <Ionicons name="chatbubbles" size={18} color="#3498DB" />
                 <Text style={styles.quickText}>{stats.unreadMessages} unread messages</Text>
-              </View>
+                <Ionicons name="chevron-forward" size={16} color="#bbb" />
+              </TouchableOpacity>
             </View>
 
             {/* Orders by Status */}
-            <Text style={styles.sectionTitle}>Orders by Status</Text>
+            <TouchableOpacity onPress={() => router.push("/(admin)/recipes" as any)} activeOpacity={0.7}>
+              <Text style={styles.sectionTitle}>Orders by Status <Ionicons name="chevron-forward" size={13} color="#888" /></Text>
+            </TouchableOpacity>
             <View style={styles.card}>
               {(["pending", "accepted", "preparing", "out_for_delivery", "delivered", "rejected", "cancelled"] as OrderStatus[]).map((s) => {
                 const count = ordersByStatus[s] || 0;
@@ -136,7 +141,9 @@ export default function AdminDashboard() {
             </View>
 
             {/* Active / In-progress Orders */}
-            <Text style={styles.sectionTitle}>Active Orders</Text>
+            <TouchableOpacity onPress={() => router.push("/(admin)/recipes" as any)} activeOpacity={0.7}>
+              <Text style={styles.sectionTitle}>Active Orders <Ionicons name="chevron-forward" size={13} color="#888" /></Text>
+            </TouchableOpacity>
             <View style={styles.card}>
               {activeOrders.length === 0 ? (
                 <Text style={styles.emptyText}>No active orders.</Text>
@@ -162,7 +169,9 @@ export default function AdminDashboard() {
             {/* Finished Orders */}
             {finishedOrders.length > 0 && (
               <>
-                <Text style={styles.sectionTitle}>Completed / Cancelled</Text>
+                <TouchableOpacity onPress={() => router.push("/(admin)/recipes" as any)} activeOpacity={0.7}>
+                  <Text style={styles.sectionTitle}>Completed / Cancelled <Ionicons name="chevron-forward" size={13} color="#888" /></Text>
+                </TouchableOpacity>
                 <View style={[styles.card, { opacity: 0.85 }]}>
                   {finishedOrders.map((o: Order) => {
                     const color = ORDER_STATUS_COLORS[o.status as keyof typeof ORDER_STATUS_COLORS] || "#888";
@@ -206,14 +215,14 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: "#fff", borderRadius: 14, padding: 12, alignItems: "center", elevation: 2,
   },
   statIcon: { width: 38, height: 38, borderRadius: 10, justifyContent: "center", alignItems: "center", marginBottom: 6 },
-  statNum: { fontSize: 18, fontWeight: "bold" },
-  statLbl: { fontSize: 10, color: "#888", marginTop: 2 },
+  statNum: { fontSize: 20, fontWeight: "bold" },
+  statLbl: { fontSize: 12, color: "#888", marginTop: 2 },
   quickRow: { flexDirection: "row", marginHorizontal: 16, gap: 10, marginBottom: 12 },
   quickCard: {
     flex: 1, flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: "#fff", borderRadius: 12, padding: 12, elevation: 1,
   },
-  quickText: { fontSize: 12, color: "#555" },
+  quickText: { fontSize: 13, color: "#555", flex: 1 },
   sectionTitle: { fontSize: 15, fontWeight: "bold", color: "#2E1A06", marginHorizontal: 16, marginBottom: 8, marginTop: 4 },
   card: { backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 16, marginBottom: 12, padding: 16, elevation: 2 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
@@ -221,10 +230,10 @@ const styles = StyleSheet.create({
   statusLabel: { flex: 1, fontSize: 13, color: "#555" },
   statusCount: { fontSize: 15, fontWeight: "bold" },
   orderRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
-  orderNum: { fontSize: 13, fontWeight: "bold", color: "#2E1A06" },
-  orderCustomer: { fontSize: 11, color: "#888" },
+  orderNum: { fontSize: 14, fontWeight: "bold", color: "#2E1A06" },
+  orderCustomer: { fontSize: 12, color: "#888" },
   orderBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  orderBadgeText: { fontSize: 10, fontWeight: "bold" },
+  orderBadgeText: { fontSize: 11, fontWeight: "bold" },
   orderTotal: { fontSize: 14, fontWeight: "bold", color: "#F25C05" },
   emptyText: { textAlign: "center", color: "#aaa", fontSize: 13 },
 });

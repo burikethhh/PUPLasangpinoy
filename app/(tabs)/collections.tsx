@@ -102,6 +102,15 @@ export default function OrdersScreen() {
         {/* Payment row */}
         <Text style={styles.paymentText}>{PAYMENT_METHOD_LABELS[item.payment_method]}</Text>
 
+        {/* Rider info */}
+        {item.driver_name && (item.status === "out_for_delivery" || item.status === "delivered") && (
+          <View style={styles.riderInfo}>
+            <Ionicons name="bicycle" size={14} color="#3498DB" />
+            <Text style={styles.riderText}>Rider: {item.driver_name}</Text>
+            {item.driver_phone ? <Text style={styles.riderPhone}>{item.driver_phone}</Text> : null}
+          </View>
+        )}
+
         {item.reject_reason && (
           <View style={styles.rejectBox}>
             <Ionicons name="alert-circle" size={12} color="#E74C3C" />
@@ -220,6 +229,9 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 10, color: "#aaa", flexShrink: 0 },
   itemsSummary: { fontSize: 11, color: "#666", flex: 1 },
   paymentText: { fontSize: 10, color: "#aaa", marginBottom: 4 },
+  riderInfo: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EBF5FB", borderRadius: 8, padding: 8, marginBottom: 4 },
+  riderText: { fontSize: 12, fontWeight: "600", color: "#2E1A06" },
+  riderPhone: { fontSize: 11, color: "#3498DB", marginLeft: "auto" },
   rejectBox: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, padding: 6, backgroundColor: "#FFF5F5", borderRadius: 6 },
   rejectText: { fontSize: 11, color: "#E74C3C", flex: 1 },
   trackerWrap: { marginTop: 8, paddingTop: 6 },
