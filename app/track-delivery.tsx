@@ -518,7 +518,7 @@ function handleMsg(raw){
           <Ionicons name="time-outline" size={16} color="#2E1A06" />
           <Text style={styles.etaText}>{getETA()}</Text>
           <TouchableOpacity style={styles.aiChatBtn} onPress={() => setChatVisible(true)}>
-            <Text style={styles.aiChatBtnText}>Ask AI</Text>
+            <Text style={styles.aiChatBtnText}>Ask FOFI</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -539,7 +539,7 @@ function handleMsg(raw){
               <View style={styles.chatHeaderLeft}>
                 <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
                 <View>
-                  <Text style={styles.chatTitle}>AI Delivery Assistant</Text>
+                  <Text style={styles.chatTitle}>FOFI - Delivery Assistant</Text>
                   <Text style={styles.chatSub}>{isCustomer ? "Track your driver's location" : "Track your customer's location"}</Text>
                 </View>
               </View>

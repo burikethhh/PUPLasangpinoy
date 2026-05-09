@@ -10,6 +10,8 @@ import type { OrderStatus } from "../../constants/order";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "../../constants/order";
 import { logOut } from "../../lib/firebase";
 import {
+    cleanupArchivedMessages,
+    cleanupArchivedOrders,
     getConversations,
     getMenuItems,
     getOrders,
@@ -38,6 +40,12 @@ export default function AdminDashboard() {
   async function fetchData(silent = false) {
     if (!silent) setLoading(true);
     try {
+      // Run 30-day auto-cleanup in background (non-blocking)
+      if (!silent) {
+        cleanupArchivedMessages().catch(() => {});
+        cleanupArchivedOrders().catch(() => {});
+      }
+
       const [orders, menu, convos] = await Promise.all([
         getOrders(), getMenuItems(), getConversations(),
       ]);

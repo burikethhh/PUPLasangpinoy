@@ -179,7 +179,7 @@ export default function StaffProfileScreen() {
 
         <TouchableOpacity style={styles.aiBtn} onPress={handleAskAiOpen}>
           <Ionicons name="chatbubble-ellipses" size={20} color="#F25C05" />
-          <Text style={styles.aiBtnText}>Ask AI About Delivery</Text>
+          <Text style={styles.aiBtnText}>Ask FOFI About Delivery</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -197,7 +197,7 @@ export default function StaffProfileScreen() {
               <View style={styles.aiHeaderLeft}>
                 <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
                 <View>
-                  <Text style={styles.aiTitle}>AI Delivery Assistant</Text>
+                  <Text style={styles.aiTitle}>FOFI - Delivery Assistant</Text>
                   <Text style={styles.aiSub}>Ask about your customer's location</Text>
                 </View>
               </View>

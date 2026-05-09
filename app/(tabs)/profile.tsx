@@ -12,18 +12,13 @@ import {
   TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MENU_CATEGORIES } from "../../constants/order";
 import {
   deleteMyAccount,
-  getCategories as getCategoriesDoc,
   getCurrentUser, getProfile as getFirebaseProfile,
-  logOut, updateMyProfile, type Category, type Profile,
+  logOut, updateMyProfile, type Profile,
 } from "../../lib/firebase";
 import { getOrdersByUser, onLocationUpdate, type LiveLocation, type Order } from "../../lib/firebase-store";
 import { analyzeImageWithQwen } from "../../lib/qwen-ai";
-
-const FIRESTORE_DATABASE_ID =
-  process.env.EXPO_PUBLIC_FIREBASE_DATABASE_ID || "default";
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -33,12 +28,6 @@ export default function ProfileScreen() {
   const [scanImage, setScanImage] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [scannedDishName, setScannedDishName] = useState("");
-  const [submitModal, setSubmitModal] = useState(false);
-  const [suggestionCategories, setSuggestionCategories] = useState<string[]>([...MENU_CATEGORIES]);
-  const [submitForm, setSubmitForm] = useState({ name: "", description: "", category: MENU_CATEGORIES[0] as string });
-  const [mySuggestions, setMySuggestions] = useState<{ id: string; name: string; category: string; description: string; status: string; created_at: string }[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   // Ask AI state
   const [aiVisible, setAiVisible] = useState(false);
@@ -53,29 +42,16 @@ export default function ProfileScreen() {
   const STORE_LAT_AI = 14.5995;
   const STORE_LNG_AI = 120.9842;
 
-  useFocusEffect(useCallback(() => { loadProfile(); loadMySuggestions(); }, []));
+  useFocusEffect(useCallback(() => { loadProfile(); }, []));
 
   async function loadProfile() {
     const user = getCurrentUser();
     if (!user) return;
-    const [p, categoryDocs] = await Promise.all([
-      getFirebaseProfile(user.uid),
-      getCategoriesDoc().catch(() => []),
-    ]);
+    const p = await getFirebaseProfile(user.uid);
 
     if (p) {
       setProfile(p);
       setEditFields({ username: p.username, phone: p.phone || "", address: p.address || "" });
-    }
-
-    const categoryNames = Array.from(
-      new Set([
-        ...MENU_CATEGORIES,
-        ...(categoryDocs as Category[]).map((c) => c.name).filter(Boolean),
-      ]),
-    );
-    if (categoryNames.length > 0) {
-      setSuggestionCategories(categoryNames);
     }
   }
 
@@ -244,7 +220,6 @@ export default function ProfileScreen() {
     const base64 = result.assets[0].base64 || "";
     setScanImage(uri);
     setScanResult(null);
-    setScannedDishName("");
     setScanModal(true);
     setScanning(true);
 
@@ -255,7 +230,6 @@ export default function ProfileScreen() {
       // Format the result for display
       let resultText = "";
       if (analysis.type === "dish") {
-        setScannedDishName(analysis.dishName || "");
         resultText = `**${analysis.dishName}**\n\n`;
         if (analysis.isFilipino) {
           resultText += `Filipino Dish\n`;
@@ -311,123 +285,11 @@ export default function ProfileScreen() {
     }
   }
 
-  function handleSubmitMenu() {
-    setSubmitForm({
-      name: "",
-      description: "",
-      category: suggestionCategories[0] || (MENU_CATEGORIES[0] as string),
-    });
-    setSubmitModal(true);
-  }
 
-  async function loadMySuggestions() {
-    const user = getCurrentUser();
-    if (!user) return;
-    setLoadingSuggestions(true);
-    try {
-      const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
-      if (!projectId) return;
-      const token = await user.getIdToken();
-      const res = await fetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            structuredQuery: {
-              from: [{ collectionId: "menu_suggestions" }],
-              where: {
-                fieldFilter: {
-                  field: { fieldPath: "user_id" },
-                  op: "EQUAL",
-                  value: { stringValue: user.uid },
-                },
-              },
-              // No orderBy — avoids requiring a composite index; sort client-side below
-            },
-          }),
-        }
-      );
-      const rows = await res.json();
-      const parsed = (Array.isArray(rows) ? rows : [])
-        .filter((r: any) => r.document)
-        .map((r: any) => ({
-          id: r.document.name.split("/").pop(),
-          name: r.document.fields?.name?.stringValue || "",
-          category: r.document.fields?.category?.stringValue || "",
-          description: r.document.fields?.description?.stringValue || "",
-          status: r.document.fields?.status?.stringValue || "pending",
-          created_at: r.document.fields?.created_at?.timestampValue || "",
-        }))
-        // Sort newest first client-side
-        .sort((a: any, b: any) => (b.created_at > a.created_at ? 1 : -1));
-      setMySuggestions(parsed);
-    } catch (e) { console.error("loadMySuggestions", e); }
-    setLoadingSuggestions(false);
-  }
 
-  async function submitMenuSuggestion() {
-    if (!submitForm.name.trim()) return Alert.alert("Error", "Please enter a dish name.");
-    try {
-      const user = getCurrentUser();
-      if (!user) return Alert.alert("Error", "You must be logged in to submit suggestions.");
-      const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
-      if (!projectId) throw new Error("Missing EXPO_PUBLIC_FIREBASE_PROJECT_ID");
-      const token = await user.getIdToken();
 
-      // Save to Firestore menu_suggestions collection
-      const suggestionData = {
-        name: submitForm.name.trim(),
-        description: submitForm.description.trim(),
-        category: submitForm.category,
-        user_id: user.uid,
-        user_email: user.email || "",
-        user_name: profile?.username || "Anonymous",
-        status: "pending",
-        created_at: new Date(),
-      };
 
-      // Use REST API to create the suggestion
-      const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DATABASE_ID}/documents/menu_suggestions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          fields: {
-            name: { stringValue: suggestionData.name },
-            description: { stringValue: suggestionData.description },
-            category: { stringValue: suggestionData.category },
-            user_id: { stringValue: suggestionData.user_id },
-            user_email: { stringValue: suggestionData.user_email },
-            user_name: { stringValue: suggestionData.user_name },
-            status: { stringValue: suggestionData.status },
-            created_at: { timestampValue: new Date().toISOString() },
-          },
-        }),
-      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Failed to submit suggestion (${response.status}): ${errorText}`,
-        );
-      }
-
-      Alert.alert("Submitted!", `Thank you for suggesting "${submitForm.name}"! Our team will review it.`);
-      setSubmitModal(false);
-      setSubmitForm({
-        name: "",
-        description: "",
-        category: suggestionCategories[0] || (MENU_CATEGORIES[0] as string),
-      });
-      loadMySuggestions();
-    } catch (error: any) {
-      console.error("Submit menu suggestion error:", error);
-      Alert.alert("Error", "Failed to submit suggestion. Please try again.");
-    }
-  }
 
   const user = getCurrentUser();
   const initial = (profile?.username || "C").charAt(0).toUpperCase();
@@ -489,67 +351,19 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.exploreRow} onPress={handleAskAiOpen}>
+          <TouchableOpacity style={[styles.exploreRow, { borderBottomWidth: 0 }]} onPress={handleAskAiOpen}>
             <View style={[styles.exploreIcon, { backgroundColor: "#F25C0522" }]}>
               <Ionicons name="chatbubble-ellipses" size={20} color="#F25C05" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.exploreName}>Ask AI About Delivery</Text>
-              <Text style={styles.exploreSub}>Chat with AI about your driver's location & ETA</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#ccc" />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.exploreRow, { borderBottomWidth: 0 }]} onPress={handleSubmitMenu}>
-            <View style={[styles.exploreIcon, { backgroundColor: "#F39C1222" }]}>
-              <Ionicons name="add-circle" size={20} color="#F39C12" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.exploreName}>Suggest a Dish</Text>
-              <Text style={styles.exploreSub}>Submit a menu item idea to the store</Text>
+              <Text style={styles.exploreName}>Ask FOFI About Delivery</Text>
+              <Text style={styles.exploreSub}>Chat with FOFI about your driver's location & ETA</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
         </View>
 
-        {/* My Submissions */}
-        <View style={styles.card}>
-          <View style={styles.suggestionHeader}>
-            <Text style={styles.sectionTitle}>My Submissions</Text>
-            <TouchableOpacity onPress={handleSubmitMenu} style={styles.newSuggestionBtn}>
-              <Ionicons name="add" size={14} color="#F39C12" />
-              <Text style={styles.newSuggestionText}>New</Text>
-            </TouchableOpacity>
-          </View>
-          {loadingSuggestions ? (
-            <ActivityIndicator size="small" color="#F39C12" style={{ marginVertical: 12 }} />
-          ) : mySuggestions.length === 0 ? (
-            <View style={styles.suggestionEmpty}>
-              <Ionicons name="bulb-outline" size={32} color="#ddd" />
-              <Text style={styles.suggestionEmptyText}>No submissions yet</Text>
-              <Text style={styles.suggestionEmptySub}>Tap "New" to suggest a dish!</Text>
-            </View>
-          ) : (
-            mySuggestions.map((s, idx) => {
-              const statusColor = s.status === "approved" ? "#27AE60" : s.status === "rejected" ? "#E74C3C" : "#F39C12";
-              const statusLabel = s.status === "approved" ? "Approved" : s.status === "rejected" ? "Rejected" : "Pending";
-              const isLast = idx === mySuggestions.length - 1;
-              return (
-                <View key={s.id} style={[styles.suggestionRow, isLast && { borderBottomWidth: 0 }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.suggestionName} numberOfLines={1}>{s.name}</Text>
-                    <Text style={styles.suggestionCategory}>{s.category}</Text>
-                    {s.description ? (
-                      <Text style={styles.suggestionDesc} numberOfLines={2}>{s.description}</Text>
-                    ) : null}
-                  </View>
-                  <View style={[styles.suggestionBadge, { backgroundColor: statusColor + "18" }]}>
-                    <Text style={[styles.suggestionBadgeText, { color: statusColor }]}>{statusLabel}</Text>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
+
 
         {/* Actions */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -623,64 +437,8 @@ export default function ProfileScreen() {
                   <ScrollView style={styles.scanResultScroll} showsVerticalScrollIndicator>
                     <Text style={styles.scanResultText}>{scanResult}</Text>
                   </ScrollView>
-                  {scannedDishName ? (
-                    <TouchableOpacity
-                      style={styles.suggestDishBtn}
-                      onPress={() => {
-                        setScanModal(false);
-                        setSubmitForm({
-                          name: scannedDishName,
-                          description: scanResult?.replace(/[*#]/g, "").slice(0, 200) || "",
-                          category: suggestionCategories[0] || (MENU_CATEGORIES[0] as string),
-                        });
-                        setSubmitModal(true);
-                      }}>
-                      <Ionicons name="bulb" size={16} color="#fff" />
-                      <Text style={styles.suggestDishBtnText}>Suggest This Dish</Text>
-                    </TouchableOpacity>
-                  ) : null}
                 </>
               ) : null}
-            </View>
-          </View>
-        </Modal>
-
-        {/* Submit Menu Modal */}
-        <Modal visible={submitModal} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Suggest a Dish</Text>
-                <TouchableOpacity onPress={() => setSubmitModal(false)}>
-                  <Ionicons name="close" size={24} color="#888" />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.inputLabel}>Dish Name *</Text>
-              <TextInput style={styles.input} value={submitForm.name}
-                onChangeText={(v) => setSubmitForm((f) => ({ ...f, name: v }))}
-                placeholder="e.g. Chicken Adobo" placeholderTextColor="#aaa" />
-              <Text style={styles.inputLabel}>Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.chipRow}>
-                {suggestionCategories.map((c) => (
-                  <TouchableOpacity key={c}
-                    style={[styles.chip, submitForm.category === c && styles.chipActive]}
-                    onPress={() => setSubmitForm((f) => ({ ...f, category: c }))}>
-                    <Text style={[styles.chipText, submitForm.category === c && styles.chipTextActive]} numberOfLines={1}>{c}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <Text style={styles.inputLabel}>Description / Notes</Text>
-              <TextInput style={[styles.input, { minHeight: 60 }]} value={submitForm.description}
-                onChangeText={(v) => setSubmitForm((f) => ({ ...f, description: v }))}
-                placeholder="What makes this dish special?" multiline placeholderTextColor="#aaa" />
-              <View style={styles.modalBtns}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setSubmitModal(false)}>
-                  <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={submitMenuSuggestion}>
-                  <Text style={{ color: "#fff", fontWeight: "bold" }}>Submit</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </View>
         </Modal>
@@ -694,7 +452,7 @@ export default function ProfileScreen() {
                 <View style={styles.aiHeaderLeft}>
                   <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
                   <View>
-                    <Text style={styles.aiTitle}>AI Delivery Assistant</Text>
+                    <Text style={styles.aiTitle}>FOFI - Delivery Assistant</Text>
                     <Text style={styles.aiSub}>Ask about your driver's location</Text>
                   </View>
                 </View>
@@ -813,35 +571,6 @@ const styles = StyleSheet.create({
   scanImg: { width: "100%", height: 200, borderRadius: 12, marginBottom: 12 },
   scanResultScroll: { maxHeight: 280 },
   scanResultText: { fontSize: 14, color: "#333", lineHeight: 20 },
-  chipRow: { gap: 8, marginBottom: 8, paddingVertical: 2 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "#ddd", backgroundColor: "#fff" },
-  chipActive: { borderColor: "#F25C05", backgroundColor: "#FEF3EC" },
-  chipText: { fontSize: 12, color: "#888" },
-  chipTextActive: { color: "#F25C05", fontWeight: "bold" },
-  suggestionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  newSuggestionBtn: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    backgroundColor: "#F39C1218", borderRadius: 12,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  newSuggestionText: { fontSize: 12, color: "#F39C12", fontWeight: "700" },
-  suggestionEmpty: { alignItems: "center", paddingVertical: 18 },
-  suggestionEmptyText: { fontSize: 13, color: "#bbb", fontWeight: "600", marginTop: 8 },
-  suggestionEmptySub: { fontSize: 11, color: "#ccc", marginTop: 3 },
-  suggestionRow: {
-    flexDirection: "row", alignItems: "flex-start", gap: 10,
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f5f0e5",
-  },
-  suggestionName: { fontSize: 13, fontWeight: "bold", color: "#2E1A06" },
-  suggestionCategory: { fontSize: 11, color: "#F25C05", fontWeight: "600", marginTop: 2 },
-  suggestionDesc: { fontSize: 11, color: "#888", marginTop: 3, lineHeight: 15 },
-  suggestionBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: "flex-start", marginTop: 2 },
-  suggestionBadgeText: { fontSize: 11, fontWeight: "bold" },
-  suggestDishBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: "#F39C12", borderRadius: 12, paddingVertical: 12, marginTop: 10,
-  },
-  suggestDishBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
   aiDisclaimer: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#FFF8E1", borderRadius: 8, padding: 8, marginBottom: 10 },
   aiDisclaimerText: { flex: 1, fontSize: 11, color: "#B07820", lineHeight: 15 },
   // AI Chat styles

@@ -23,11 +23,11 @@ service cloud.firestore {
       allow delete: if isOwner(userId) || isAdmin();
     }
     
-    // ==================== MENU ITEMS (Admin only) ====================
+    // ==================== MENU ITEMS ====================
     match /menu_items/{itemId} {
       allow read: if true;
       allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).changedKeys().hasOnly(['stock_quantity']));
       allow delete: if isAdmin();
     }
     
@@ -35,8 +35,14 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isSignedIn() && (resource.data.customer_id == request.auth.uid || isAdmin() || isStaff());
       allow create: if isSignedIn() && request.resource.data.customer_id == request.auth.uid;
-      allow update: if isAdmin() || isStaff();
+      allow update: if isAdmin() || isStaff() || (isSignedIn() && resource.data.customer_id == request.auth.uid);
       allow delete: if isAdmin();
+      
+      // Live location subcollection
+      match /locations/{locationId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn();
+      }
     }
     
     // ==================== MESSAGES ====================
@@ -49,7 +55,7 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && (resource.data.conversation_id == request.auth.uid || isAdmin() || isStaff())
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read']);
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn() && (resource.data.conversation_id == request.auth.uid || isAdmin());
     }
     
     // ==================== REVIEWS ====================

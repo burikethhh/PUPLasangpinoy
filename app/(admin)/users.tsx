@@ -282,21 +282,6 @@ export default function AdminMoreScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>Quick Access</Text>
-        <View style={styles.card}>
-          <TouchableOpacity
-            style={[styles.quickRow, { borderBottomWidth: 0 }]}
-            onPress={() => router.push("/(admin)/submissions" as any)}
-          >
-            <View style={[styles.quickIcon, { backgroundColor: "#F39C1222" }]}>
-              <Ionicons name="bulb" size={18} color="#F39C12" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.quickTitle}>Review Dish Suggestions</Text>
-              <Text style={styles.quickSub}>Approve or reject customer suggested dishes</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#bbb" />
-          </TouchableOpacity>
-        </View>
 
         {/* Users Management */}
         <TouchableOpacity style={[styles.collapseHeader, { marginHorizontal: 16, marginTop: 12, marginBottom: 8 }]} onPress={() => setUsersExpanded((v) => !v)}>

@@ -383,7 +383,7 @@ export async function sendMessage(data: {
 }
 
 export async function getMessages(conversationId: string): Promise<Message[]> {
-  return firestoreOp(
+  const messages = await firestoreOp(
     async () => {
       const q = query(
         collection(db, "messages"),
@@ -402,6 +402,8 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
       });
     },
   );
+  // Filter out archived messages
+  return messages.filter((m: any) => !m.archived);
 }
 
 export async function getConversations(): Promise<{ customer_id: string; customer_name: string; last_message: string; unread: number }[]> {
@@ -461,11 +463,39 @@ export async function markMessagesRead(conversationId: string, readerRole: strin
 
 export async function deleteConversation(conversationId: string): Promise<void> {
   const messages = await getMessages(conversationId);
+  const archivedAt = new Date().toISOString();
   for (const msg of messages) {
     await firestoreOp(
-      async () => { await deleteDoc(doc(db, "messages", msg.id)); },
-      async () => { await RestApi.deleteDocument("messages", msg.id); },
+      async () => { await updateDoc(doc(db, "messages", msg.id), { archived: true, archived_at: archivedAt }); },
+      async () => { await RestApi.updateDocument("messages", msg.id, { archived: true, archived_at: archivedAt }); },
     );
+  }
+}
+
+export async function cleanupArchivedMessages(): Promise<void> {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoff = thirtyDaysAgo.toISOString();
+
+  const allMessages = await firestoreOp(
+    async () => {
+      const q = query(collection(db, "messages"), where("archived", "==", true));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as (Message & { archived_at?: string })[];
+    },
+    async () => {
+      const data = await RestApi.queryCollection("messages", "archived", "==", true);
+      return data as (Message & { archived_at?: string })[];
+    },
+  );
+
+  for (const msg of allMessages) {
+    if (msg.archived_at && msg.archived_at < cutoff) {
+      await firestoreOp(
+        async () => { await deleteDoc(doc(db, "messages", msg.id)); },
+        async () => { await RestApi.deleteDocument("messages", msg.id); },
+      );
+    }
   }
 }
 
@@ -850,4 +880,35 @@ export async function setLocationOptIn(
     async () => { await updateDoc(doc(db, "orders", orderId), { [field]: value }); },
     async () => { await RestApi.updateDocument("orders", orderId, { [field]: value }); },
   );
+}
+
+export async function archiveOrder(orderId: string): Promise<void> {
+  const archivedAt = new Date().toISOString();
+  return firestoreOp(
+    async () => { await updateDoc(doc(db, "orders", orderId), { archived: true, archived_at: archivedAt }); },
+    async () => { await RestApi.updateDocument("orders", orderId, { archived: true, archived_at: archivedAt }); },
+  );
+}
+
+export async function unarchiveOrder(orderId: string): Promise<void> {
+  return firestoreOp(
+    async () => { await updateDoc(doc(db, "orders", orderId), { archived: false, archived_at: null }); },
+    async () => { await RestApi.updateDocument("orders", orderId, { archived: false, archived_at: null }); },
+  );
+}
+
+export async function cleanupArchivedOrders(): Promise<void> {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoff = thirtyDaysAgo.toISOString();
+
+  const orders = await getOrders();
+  for (const order of orders) {
+    if ((order as any).archived && (order as any).archived_at && (order as any).archived_at < cutoff) {
+      await firestoreOp(
+        async () => { await deleteDoc(doc(db, "orders", order.id)); },
+        async () => { await RestApi.deleteDocument("orders", order.id); },
+      );
+    }
+  }
 }

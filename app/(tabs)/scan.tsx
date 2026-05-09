@@ -63,9 +63,11 @@ export default function CartScreen() {
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
-    const hh = String(now.getHours()).padStart(2, "0");
+    const hh24 = now.getHours();
+    const hh12 = hh24 % 12 || 12;
+    const ampm = hh24 >= 12 ? "PM" : "AM";
     setScheduledDate(`${yyyy}-${mm}-${dd}`);
-    setScheduledTime(`${hh}:00`);
+    setScheduledTime(`${hh12}:00 ${ampm}`);
   }, []));
 
   async function loadCart() {
@@ -107,9 +109,11 @@ export default function CartScreen() {
     setShowTimePicker(Platform.OS === "ios");
     if (selected) {
       setPickerDate(selected);
-      const hh = String(selected.getHours()).padStart(2, "0");
+      let hours = selected.getHours();
       const min = String(selected.getMinutes()).padStart(2, "0");
-      setScheduledTime(`${hh}:${min}`);
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12 || 12;
+      setScheduledTime(`${hours}:${min} ${ampm}`);
     }
   }
 
@@ -414,7 +418,7 @@ function confirmLocation(){
             )}
             {showTimePicker && (
               <DateTimePicker value={pickerDate} mode="time"
-                display="spinner" is24Hour minuteInterval={15} onChange={onTimeChange} />
+                display="spinner" is24Hour={false} minuteInterval={15} onChange={onTimeChange} />
             )}
 
             {/* Payment Method */}
