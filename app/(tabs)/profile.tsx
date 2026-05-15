@@ -4,18 +4,18 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView, StyleSheet, Text, TextInput,
-  TouchableOpacity, View
+    ActivityIndicator, Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView, StyleSheet, Text, TextInput,
+    TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  deleteMyAccount,
-  getCurrentUser, getProfile as getFirebaseProfile,
-  logOut, updateMyProfile, type Profile,
+    deleteMyAccount,
+    getCurrentUser, getProfile as getFirebaseProfile,
+    logOut, updateMyProfile, type Profile,
 } from "../../lib/firebase";
 import { getOrdersByUser, onLocationUpdate, type LiveLocation, type Order } from "../../lib/firebase-store";
 import { analyzeImageWithQwen } from "../../lib/qwen-ai";
@@ -38,9 +38,6 @@ export default function ProfileScreen() {
   const [aiDriverLoc, setAiDriverLoc] = useState<LiveLocation | null>(null);
   const aiScrollRef = useRef<ScrollView>(null);
   const aiUnsubRef = useRef<(() => void) | null>(null);
-
-  const STORE_LAT_AI = 14.5995;
-  const STORE_LNG_AI = 120.9842;
 
   useFocusEffect(useCallback(() => { loadProfile(); }, []));
 
@@ -127,7 +124,7 @@ export default function ProfileScreen() {
         setAiDriverLoc(loc);
       });
       aiUnsubRef.current = unsub;
-    } catch (e) {
+    } catch {
       setAiMessages([{ role: "ai", text: "Could not fetch delivery info. Please try again." }]);
     }
     setAiThinking(false);
@@ -142,41 +139,59 @@ export default function ProfileScreen() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
+  function toMillis(ts: any): number {
+    if (!ts) return 0;
+    if (typeof ts?.seconds === "number") return ts.seconds * 1000;
+    if (typeof ts === "string") {
+      const ms = Date.parse(ts);
+      return Number.isNaN(ms) ? 0 : ms;
+    }
+    const ms = new Date(ts).getTime();
+    return Number.isNaN(ms) ? 0 : ms;
+  }
+
   function generateDeliveryAiResponse(question: string): string {
     if (!aiDriverLoc || !aiOrder) {
       return "I'm waiting for the driver to start sharing their location. Once they begin tracking, I can give you live updates!";
     }
     
     const q = question.toLowerCase();
-    const destLat = STORE_LAT_AI;
-    const destLng = STORE_LNG_AI;
+    const destLat = aiOrder.customer_lat;
+    const destLng = aiOrder.customer_lng;
+    if (typeof destLat !== "number" || typeof destLng !== "number") {
+      return "I can see your driver location, but your delivery pin is missing. Please update your address location for more accurate ETA.";
+    }
+
     const dist = calcDistance(aiDriverLoc.lat, aiDriverLoc.lng, destLat, destLng);
     const speedKmh = aiDriverLoc.speed && aiDriverLoc.speed > 2 ? aiDriverLoc.speed : 25;
     const mins = Math.round((dist / speedKmh) * 60);
     const distStr = dist < 1 ? `${(dist * 1000).toFixed(0)} meters` : `${dist.toFixed(1)} km`;
+    const ageMs = Date.now() - toMillis(aiDriverLoc.updated_at);
+    const isStale = ageMs > 5 * 60 * 1000;
+    const staleNote = isStale ? `\n\nNote: driver's location update is ${Math.floor(ageMs / 60000)} min old.` : "";
 
     if (q.includes("where") || q.includes("location") || q.includes("driver") || q.includes("rider")) {
-      if (dist < 0.3) return `Your driver is almost at your door — less than 300 meters away! Get ready!`;
-      if (dist < 1) return `Your driver is very close, only ${distStr} away. Should arrive in ~${mins} minute${mins === 1 ? "" : "s"}!`;
-      return `Your driver is currently ${distStr} away, moving at ~${speedKmh} km/h.`;
+      if (dist < 0.3) return `Your driver is almost at your door — less than 300 meters away! Get ready!${staleNote}`;
+      if (dist < 1) return `Your driver is very close, only ${distStr} away. Should arrive in ~${mins} minute${mins === 1 ? "" : "s"}!${staleNote}`;
+      return `Your driver is currently ${distStr} away, moving at ~${speedKmh} km/h.${staleNote}`;
     }
     if (q.includes("how long") || q.includes("when") || q.includes("eta") || q.includes("arrive") || q.includes("time")) {
-      if (mins <= 1) return `Your order should arrive any moment now!`;
-      if (mins <= 5) return `Almost there — estimated arrival in about ${mins} minutes!`;
-      return `Estimated arrival in ~${mins} minutes based on current speed and distance (${distStr}).`;
+      if (mins <= 1) return `Your order should arrive any moment now!${staleNote}`;
+      if (mins <= 5) return `Almost there — estimated arrival in about ${mins} minutes!${staleNote}`;
+      return `Estimated arrival in ~${mins} minutes based on current speed and distance (${distStr}).${staleNote}`;
     }
     if (q.includes("near") || q.includes("close")) {
-      if (dist < 0.5) return `Very close! The driver is only ${distStr} away — ~${mins} min.`;
-      if (dist < 2) return `Getting there! Driver is ${distStr} away, ~${mins} minutes to go.`;
-      return `The driver is still ${distStr} out. Estimated ~${mins} minutes.`;
+      if (dist < 0.5) return `Very close! The driver is only ${distStr} away — ~${mins} min.${staleNote}`;
+      if (dist < 2) return `Getting there! Driver is ${distStr} away, ~${mins} minutes to go.${staleNote}`;
+      return `The driver is still ${distStr} out. Estimated ~${mins} minutes.${staleNote}`;
     }
     if (q.includes("order") || q.includes("status")) {
-      return `Your order ${aiOrder.order_number} is ${aiOrder.status}. Driver is ${distStr} away, ETA ~${mins} min.`;
+      return `Your order ${aiOrder.order_number} is ${aiOrder.status}. Mode: ${aiOrder.order_type}. Payment: ${aiOrder.payment_method}. Driver is ${distStr} away, ETA ~${mins} min.${staleNote}`;
     }
     if (q.includes("hello") || q.includes("hi") || q.includes("hey")) {
-      return `Hi! I'm your delivery assistant. Your driver is ${distStr} away with an ETA of ~${mins} minutes. Ask me anything about your delivery!`;
+      return `Hi! I'm your delivery assistant. Your driver is ${distStr} away with an ETA of ~${mins} minutes. Ask me anything about your delivery!${staleNote}`;
     }
-    return `Your driver is currently ${distStr} away at ~${speedKmh} km/h — estimated arrival in ~${mins} minutes.\n\nAsk me: "Where is my driver?", "How long until delivery?", or "Is my order nearby?"`;
+    return `Your driver is currently ${distStr} away at ~${speedKmh} km/h — estimated arrival in ~${mins} minutes.${staleNote}\n\nAsk me: "Where is my driver?", "How long until delivery?", or "Is my order nearby?"`;
   }
 
   function handleAiQuery(question: string) {
@@ -205,6 +220,12 @@ export default function ProfileScreen() {
   useEffect(() => {
     return () => { aiUnsubRef.current?.(); };
   }, []);
+
+  useEffect(() => {
+    if (!aiVisible) return;
+    const t = setTimeout(() => aiScrollRef.current?.scrollToEnd({ animated: true }), 60);
+    return () => clearTimeout(t);
+  }, [aiMessages, aiThinking, aiVisible]);
 
   async function handleScanFood() {
     // Request camera permission explicitly
@@ -331,6 +352,16 @@ export default function ProfileScreen() {
         {/* Explore / Engagement */}
         <View style={styles.card} >
           <Text style={styles.sectionTitle}>Explore</Text>
+          <TouchableOpacity style={styles.exploreRow} onPress={() => router.push("/(tabs)/submit")}>
+            <View style={[styles.exploreIcon, { backgroundColor: "#FF408122" }]}>
+              <Ionicons name="heart" size={20} color="#FF4081" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.exploreName}>My Favorites</Text>
+              <Text style={styles.exploreSub}>View and manage your favorite dishes</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.exploreRow} onPress={handleScanFood}>
             <View style={[styles.exploreIcon, { backgroundColor: "#E91E8C22" }]}>
               <Ionicons name="scan" size={20} color="#E91E8C" />
@@ -347,7 +378,7 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.exploreName}>Live Delivery Tracker</Text>
-              <Text style={styles.exploreSub}>Track your order's real-time location</Text>
+              <Text style={styles.exploreSub}>Track your order&apos;s real-time location</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
@@ -357,7 +388,7 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.exploreName}>Ask FOFI About Delivery</Text>
-              <Text style={styles.exploreSub}>Chat with FOFI about your driver's location & ETA</Text>
+              <Text style={styles.exploreSub}>Chat with FOFI about your driver&apos;s location & ETA</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
@@ -453,7 +484,7 @@ export default function ProfileScreen() {
                   <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
                   <View>
                     <Text style={styles.aiTitle}>FOFI - Delivery Assistant</Text>
-                    <Text style={styles.aiSub}>Ask about your driver's location</Text>
+                    <Text style={styles.aiSub}>Ask about your driver&apos;s location</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={handleCloseAi}>
@@ -463,7 +494,7 @@ export default function ProfileScreen() {
 
               {/* Quick question chips */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.aiChipsScroll} contentContainerStyle={styles.aiChipsRow}>
-                {["Where is my driver?", "How long until delivery?", "Is my order close?"].map((q) => (
+                {["Where is my driver?", "How long until delivery?", "Is my order close?", "Order status update"].map((q) => (
                   <TouchableOpacity key={q} style={styles.aiChip} onPress={() => handleAiQuery(q)}>
                     <Text style={styles.aiChipText}>{q}</Text>
                   </TouchableOpacity>
@@ -475,7 +506,7 @@ export default function ProfileScreen() {
                 {aiMessages.length === 0 && (
                   <View style={styles.aiEmpty}>
                     <Ionicons name="navigate-outline" size={36} color="#ddd" />
-                    <Text style={styles.aiEmptyText}>Ask me about your driver's location and ETA!</Text>
+                    <Text style={styles.aiEmptyText}>Ask me about your driver&apos;s location and ETA!</Text>
                   </View>
                 )}
                 {aiMessages.map((msg, i) => (
@@ -518,20 +549,20 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
-  title: { fontSize: 24, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
+  title: { fontSize: 24, fontWeight: "bold", color: "#2E1A06", padding: 12, paddingBottom: 8 },
   profileCard: {
-    backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 16, marginBottom: 12,
-    padding: 20, alignItems: "center", elevation: 2,
+    backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 12, marginBottom: 10,
+    padding: 16, alignItems: "center", elevation: 2,
   },
   card: {
-    backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 16, marginBottom: 12,
-    padding: 14, elevation: 2,
+    backgroundColor: "#fff", borderRadius: 16, marginHorizontal: 12, marginBottom: 10,
+    padding: 12, elevation: 2,
   },
   avatar: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: "#F25C05",
-    justifyContent: "center", alignItems: "center", marginBottom: 10,
+    width: 60, height: 60, borderRadius: 30, backgroundColor: "#F25C05",
+    justifyContent: "center", alignItems: "center", marginBottom: 8,
   },
-  avatarText: { color: "#fff", fontWeight: "bold", fontSize: 30 },
+  avatarText: { color: "#fff", fontWeight: "bold", fontSize: 26 },
   name: { fontSize: 20, fontWeight: "bold", color: "#2E1A06", marginBottom: 4 },
   email: { fontSize: 13, color: "#888", marginBottom: 6 },
   roleBadge: { backgroundColor: "#F25C0522", paddingHorizontal: 14, paddingVertical: 4, borderRadius: 12, marginBottom: 10 },

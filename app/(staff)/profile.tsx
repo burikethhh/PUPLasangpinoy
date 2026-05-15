@@ -2,12 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView, StyleSheet, Text, TextInput,
-  TouchableOpacity, View
+    ActivityIndicator, Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView, StyleSheet, Text, TextInput,
+    TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCurrentUser, getProfile, logOut } from "../../lib/firebase";
@@ -24,7 +24,7 @@ export default function StaffProfileScreen() {
   const [aiThinking, setAiThinking] = useState(false);
   const [aiOrder, setAiOrder] = useState<Order | null>(null);
   const [aiCustomerLoc, setAiCustomerLoc] = useState<LiveLocation | null>(null);
-  const [aiDriverLoc, setAiDriverLoc] = useState<LiveLocation | null>(null);
+  const [aiDriverLoc] = useState<LiveLocation | null>(null);
   const aiScrollRef = useRef<ScrollView>(null);
   const aiUnsubRef = useRef<(() => void) | null>(null);
 
@@ -86,7 +86,7 @@ export default function StaffProfileScreen() {
         setAiCustomerLoc(loc);
       });
       aiUnsubRef.current = unsub;
-    } catch (e) {
+    } catch {
       setAiMessages([{ role: "ai", text: "Could not fetch delivery info. Please try again." }]);
     }
     setAiThinking(false);
@@ -198,7 +198,7 @@ export default function StaffProfileScreen() {
                 <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
                 <View>
                   <Text style={styles.aiTitle}>FOFI - Delivery Assistant</Text>
-                  <Text style={styles.aiSub}>Ask about your customer's location</Text>
+                  <Text style={styles.aiSub}>Ask about your customer&apos;s location</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={handleCloseAi}>
@@ -220,7 +220,7 @@ export default function StaffProfileScreen() {
               {aiMessages.length === 0 && (
                 <View style={styles.aiEmpty}>
                   <Ionicons name="navigate-outline" size={36} color="#ddd" />
-                  <Text style={styles.aiEmptyText}>Ask me about your customer's location and ETA!</Text>
+                  <Text style={styles.aiEmptyText}>Ask me about your customer&apos;s location and ETA!</Text>
                 </View>
               )}
               {aiMessages.map((msg, i) => (

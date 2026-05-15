@@ -7,6 +7,7 @@ import {
     ActivityIndicator,
     Alert,
     Dimensions,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
@@ -36,6 +37,11 @@ export default function MenuScreen() {
   const [activeCategory, setActiveCategory] = useState("");
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORIES);
+
+  // New states for phase 2 modals
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [selectedQty, setSelectedQty] = useState(1);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -117,22 +123,37 @@ export default function MenuScreen() {
     if (!silent) setLoading(false);
   }
 
-  async function addToCart(item: MenuItem) {
+  function handleOpenModal(item: MenuItem) {
+    if (!item.available || item.stock_quantity <= 0) return;
+    setSelectedItem(item);
+    setSelectedQty(1);
+  }
+
+  async function handleAddToCart() {
+    if (!selectedItem) return;
     try {
       const raw = await AsyncStorage.getItem(CART_KEY);
       const cart: { menu_item_id: string; name: string; price: number; quantity: number; stock_quantity: number; image_url?: string }[] = raw ? JSON.parse(raw) : [];
-      const existing = cart.find((c) => c.menu_item_id === item.id);
+      const existing = cart.find((c) => c.menu_item_id === selectedItem.id);
+      
+      const newQty = (existing?.quantity || 0) + selectedQty;
+      
       if (existing) {
-        if (existing.quantity >= item.stock_quantity) {
-          Alert.alert("Stock Limit", `Only ${item.stock_quantity} left in stock.`);
+        if (newQty > selectedItem.stock_quantity) {
+          Alert.alert("Stock Limit", `Only ${selectedItem.stock_quantity} left in stock.`);
           return;
         }
-        existing.quantity += 1;
+        existing.quantity = newQty;
       } else {
-        cart.push({ menu_item_id: item.id, name: item.name, price: item.price, quantity: 1, stock_quantity: item.stock_quantity, image_url: item.image_url });
+        if (newQty > selectedItem.stock_quantity) {
+          Alert.alert("Stock Limit", `Only ${selectedItem.stock_quantity} left in stock.`);
+          return;
+        }
+        cart.push({ menu_item_id: selectedItem.id, name: selectedItem.name, price: selectedItem.price, quantity: selectedQty, stock_quantity: selectedItem.stock_quantity, image_url: selectedItem.image_url });
       }
       await AsyncStorage.setItem(CART_KEY, JSON.stringify(cart));
-      Alert.alert("Added to Cart", `${item.name} added to your cart!`);
+      setSelectedItem(null);
+      Alert.alert("Added to Cart", `${selectedItem.name} added to your cart!`);
     } catch (e) {
       console.error("Cart error:", e);
     }
@@ -177,19 +198,18 @@ export default function MenuScreen() {
           )}
         </View>
 
-        {/* CATEGORY FILTER */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.catRow}>
-          {categoryOptions.map((cat) => {
-            const isActive = activeCategory === cat.value;
-            return (
-              <TouchableOpacity key={cat.value}
-                style={[styles.catBtn, isActive && { backgroundColor: cat.color, borderColor: cat.color }]}
-                onPress={() => setActiveCategory(cat.value)}>
-                <Text style={[styles.catText, isActive && { color: "#fff" }]}>{cat.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        {/* CATEGORY FILTER - DROPDOWN TRIGGER */}
+        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+          <TouchableOpacity 
+            style={styles.dropdownBtn} 
+            onPress={() => setDropdownVisible(true)}
+          >
+            <Text style={styles.dropdownText}>
+              {activeCategory ? `Category: ${activeCategory}` : "All Categories"}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color="#2E1A06" />
+          </TouchableOpacity>
+        </View>
 
         {/* MENU GRID */}
         <Text style={styles.sectionTitle}>
@@ -259,7 +279,7 @@ export default function MenuScreen() {
                     </View>
                     <TouchableOpacity
                       style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
-                      onPress={() => addToCart(item)}
+                      onPress={() => handleOpenModal(item)}
                       disabled={unavailable}
                     >
                       <Ionicons name="cart-outline" size={14} color="#fff" />
@@ -272,6 +292,81 @@ export default function MenuScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Category Dropdown Modal */}
+      <Modal visible={dropdownVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.dropdownModal}>
+            <Text style={styles.modalTitle}>Select Category</Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {categoryOptions.map((cat) => (
+                <TouchableOpacity
+                  key={cat.value}
+                  style={[styles.dropdownOption, activeCategory === cat.value && { backgroundColor: "#FFF5EE" }]}
+                  onPress={() => {
+                    setActiveCategory(cat.value);
+                    setDropdownVisible(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownOptionText, activeCategory === cat.value && { color: "#F25C05", fontWeight: "bold" }]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setDropdownVisible(false)}>
+              <Text style={styles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Item Preview & Quantity Modal */}
+      <Modal visible={!!selectedItem} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.itemModal}>
+            {selectedItem?.image_url && (
+              <Image source={{ uri: selectedItem.image_url }} style={styles.itemModalImg} contentFit="cover" />
+            )}
+            <View style={styles.itemModalBody}>
+              <Text style={styles.itemModalName}>{selectedItem?.name}</Text>
+              {selectedItem?.description && (
+                <Text style={styles.itemModalDesc}>{selectedItem.description}</Text>
+              )}
+              <Text style={styles.itemModalPrice}>P{selectedItem?.price?.toFixed(2)}</Text>
+              
+              <View style={styles.qtyContainer}>
+                <Text style={styles.qtyLabel}>Quantity:</Text>
+                <View style={styles.qtySelector}>
+                  <TouchableOpacity 
+                    style={styles.qtyBtn} 
+                    onPress={() => setSelectedQty(Math.max(1, selectedQty - 1))}
+                  >
+                    <Ionicons name="remove" size={20} color="#F25C05" />
+                  </TouchableOpacity>
+                  <Text style={styles.qtyVal}>{selectedQty}</Text>
+                  <TouchableOpacity 
+                    style={styles.qtyBtn} 
+                    onPress={() => setSelectedQty(Math.min(selectedItem?.stock_quantity || 999, selectedQty + 1))}
+                  >
+                    <Ionicons name="add" size={20} color="#F25C05" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSelectedItem(null)}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalAddBtn} onPress={handleAddToCart}>
+                  <Text style={styles.modalAddText}>Add to Cart</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -293,12 +388,11 @@ const styles = StyleSheet.create({
     fontSize: 16, fontWeight: "bold", color: "#2E1A06",
     marginHorizontal: 16, marginBottom: 10, marginTop: 4,
   },
-  catRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
-  catBtn: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E8D8A0",
+  dropdownBtn: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: "#fff", padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#E8D8A0", elevation: 1
   },
-  catText: { fontSize: 13, fontWeight: "600", color: "#888" },
+  dropdownText: { fontSize: 14, fontWeight: "600", color: "#2E1A06" },
   grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 12 },
   menuCard: {
     width: CARD_SIZE, backgroundColor: "#fff", borderRadius: 16,
@@ -339,4 +433,30 @@ const styles = StyleSheet.create({
   addBtnDisabled: { backgroundColor: "#BDBDBD" },
   addBtnText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
   noResults: { textAlign: "center", color: "#aaa", marginTop: 8 },
+  
+  // MODALS
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  dropdownModal: { width: "80%", backgroundColor: "#fff", borderRadius: 16, padding: 16, paddingBottom: 8 },
+  modalTitle: { fontSize: 16, fontWeight: "bold", color: "#2E1A06", marginBottom: 12, textAlign: "center" },
+  dropdownOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
+  dropdownOptionText: { fontSize: 14, color: "#333", textAlign: "center" },
+  modalCloseBtn: { marginTop: 12, paddingVertical: 10 },
+  modalCloseText: { fontSize: 14, fontWeight: "600", color: "#888", textAlign: "center" },
+  
+  itemModal: { width: "85%", backgroundColor: "#fff", borderRadius: 16, overflow: "hidden" },
+  itemModalImg: { width: "100%", height: 200 },
+  itemModalBody: { padding: 16 },
+  itemModalName: { fontSize: 18, fontWeight: "bold", color: "#2E1A06", marginBottom: 4 },
+  itemModalDesc: { fontSize: 13, color: "#666", marginBottom: 8 },
+  itemModalPrice: { fontSize: 18, fontWeight: "bold", color: "#F25C05", marginBottom: 16 },
+  qtyContainer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
+  qtyLabel: { fontSize: 14, fontWeight: "600", color: "#333" },
+  qtySelector: { flexDirection: "row", alignItems: "center", gap: 16 },
+  qtyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#FFF5EE", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "#F25C05" },
+  qtyVal: { fontSize: 18, fontWeight: "bold", color: "#333", minWidth: 20, textAlign: "center" },
+  modalActionRow: { flexDirection: "row", gap: 10 },
+  modalCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: "#f0f0f0", justifyContent: "center", alignItems: "center" },
+  modalCancelText: { fontSize: 14, fontWeight: "bold", color: "#555" },
+  modalAddBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: "#F25C05", justifyContent: "center", alignItems: "center" },
+  modalAddText: { fontSize: 14, fontWeight: "bold", color: "#fff" }
 });

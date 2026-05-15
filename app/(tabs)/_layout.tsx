@@ -87,6 +87,7 @@ export default function TabLayout() {
         name="submit"
         options={{
           title: "Favorites",
+          href: null,
           tabBarIcon: ({ color }) => (
             <Ionicons name="heart" size={22} color={color} />
           ),

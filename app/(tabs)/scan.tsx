@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { Image } from "expo-image";
 import * as ExpoLocation from "expo-location";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
     ActivityIndicator, Alert, Modal, Platform,
     ScrollView, StyleSheet,
-    Text, TextInput, TouchableOpacity, View,
+    Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
@@ -360,6 +361,13 @@ function confirmLocation(){
             {/* Cart Items */}
             {cart.map((item, idx) => (
               <View key={idx} style={styles.cartItem}>
+                {item.image_url ? (
+                  <Image source={{ uri: item.image_url }} style={styles.cartImage} />
+                ) : (
+                  <View style={[styles.cartImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                    <Ionicons name="fast-food" size={24} color="#ccc" />
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemName}>{item.name}</Text>
                   <Text style={styles.itemPrice}>P{item.price.toFixed(2)}</Text>
@@ -562,6 +570,9 @@ const styles = StyleSheet.create({
   cartItem: {
     flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
     marginHorizontal: 16, marginBottom: 8, padding: 14, borderRadius: 14, elevation: 1,
+  },
+  cartImage: {
+    width: 50, height: 50, borderRadius: 10, marginRight: 12,
   },
   itemName: { fontSize: 14, fontWeight: "bold", color: "#2E1A06" },
   itemPrice: { fontSize: 13, color: "#F25C05", marginTop: 2 },

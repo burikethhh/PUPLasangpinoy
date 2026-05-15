@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentUser, getProfile } from '../../lib/firebase';
-import { deleteMessage, deleteConversation, getMessages, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
+import { deleteConversation, deleteMessage, getMessages, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -139,27 +139,28 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(i) => i.id}
-          contentContainerStyle={styles.list}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="chatbubbles-outline" size={48} color="#ddd" />
-              <Text style={styles.emptyText}>No messages yet</Text>
-              <Text style={styles.emptySubtext}>Send a message to the store!</Text>
-            </View>
-          }
-        />
-      )}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={90}>
+        {loading ? (
+          <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(i) => i.id}
+            contentContainerStyle={styles.list}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Ionicons name="chatbubbles-outline" size={48} color="#ddd" />
+                <Text style={styles.emptyText}>No messages yet</Text>
+                <Text style={styles.emptySubtext}>Send a message to the store!</Text>
+              </View>
+            }
+          />
+        )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
         <View style={styles.inputRow}>
           <TextInput style={styles.input} placeholder="Type a message..."
             placeholderTextColor="#aaa" value={inputText} onChangeText={setInputText}
