@@ -121,14 +121,19 @@ export default function AdminDashboard() {
 
             {/* Quick Info */}
             <View style={styles.quickRow}>
-              <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
+              <TouchableOpacity style={[styles.quickCard, { marginBottom: 10 }]} activeOpacity={0.7}
                 onPress={() => router.push("/(admin)/feedback" as any)}>
                 <Ionicons name="chatbubbles" size={18} color="#3498DB" />
                 <Text style={styles.quickText}>{stats.unreadMessages} unread messages</Text>
                 <Ionicons name="chevron-forward" size={16} color="#bbb" />
               </TouchableOpacity>
+              <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
+                onPress={() => router.push("/(admin)/banners" as any)}>
+                <Ionicons name="images" size={18} color="#9B59B6" />
+                <Text style={styles.quickText}>Manage Banners</Text>
+                <Ionicons name="chevron-forward" size={16} color="#bbb" />
+              </TouchableOpacity>
             </View>
-
             {/* Orders by Status */}
             <TouchableOpacity onPress={() => router.push("/(admin)/recipes" as any)} activeOpacity={0.7}>
               <Text style={styles.sectionTitle}>Orders by Status <Ionicons name="chevron-forward" size={13} color="#888" /></Text>

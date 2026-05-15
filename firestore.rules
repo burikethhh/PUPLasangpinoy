@@ -90,6 +90,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     
+    // ==================== BANNERS ====================
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
     // ==================== MENU SUGGESTIONS ====================
     match /menu_suggestions/{suggestionId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.user_id == request.auth.uid);

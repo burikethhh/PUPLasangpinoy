@@ -912,3 +912,45 @@ export async function cleanupArchivedOrders(): Promise<void> {
     }
   }
 }
+export interface Banner {
+  id: string;
+  name: string;
+  imageUrl: string;
+  active: boolean;
+  createdAt: Date;
+}
+
+export async function getBanners(): Promise<Banner[]> {
+  try {
+    const raw = await firestoreOp(
+      async () => {
+        const q = query(collection(db, "banners"), where("active", "==", true));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: data.name || "",
+            imageUrl: data.imageUrl || "",
+            active: data.active ?? true,
+            createdAt: data.createdAt?.toDate?.() || new Date(),
+          };
+        });
+      },
+      async () => {
+        const data = await RestApi.getCollection("banners");
+        return data.map((d: any) => ({
+          id: d.id,
+          name: d.name || "",
+          imageUrl: d.imageUrl || "",
+          active: d.active ?? true,
+          createdAt: d.createdAt ? new Date(d.createdAt) : new Date(),
+        })).filter((b: any) => b.active === true);
+      }
+    );
+    return raw as Banner[];
+  } catch (error) {
+    console.error("Error fetching banners:", error);
+    return [];
+  }
+}
