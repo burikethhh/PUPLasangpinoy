@@ -103,6 +103,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="submit-dish"
+        options={{
+          title: "Submit Dish",
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",

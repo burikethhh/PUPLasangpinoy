@@ -12,12 +12,12 @@ const { width } = Dimensions.get("window");
 export default function Homepage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [greeting, setGreeting] = useState("Welcome to LasangPinoy!");
+  const [greeting, setGreeting] = useState("Welcome to FoodFix!");
 
   useFocusEffect(
     useCallback(() => {
       const user = getCurrentUser();
-      setGreeting(user?.displayName ? `Hello, ${user.displayName}!` : "Welcome to LasangPinoy!");
+      setGreeting(user?.displayName ? `Hello, ${user.displayName}!` : "Welcome to FoodFix!");
       
       const fetchBanners = async () => {
         try {

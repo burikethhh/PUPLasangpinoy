@@ -3,21 +3,26 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator, Alert, RefreshControl, SectionList,
-    StyleSheet, Text, TouchableOpacity, View
+    StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser } from "../../lib/firebase";
-import { getOrdersByUser, type Order } from "../../lib/firebase-store";
+import { getOrdersByUser, requestRefund, type Order } from "../../lib/firebase-store";
 
-const FINISHED_STATUSES = ["delivered", "rejected", "cancelled"];
+const ACTIVE_STATUSES = ["accepted", "preparing", "out_for_delivery"];
+const PENDING_STATUS = "pending";
+const DONE_STATUSES = ["delivered", "rejected", "cancelled"];
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [archived, setArchived] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
+  const [tabState, setTabState] = useState<"active" | "pending" | "done">("active");
+  const [refundOrderId, setRefundOrderId] = useState<string | null>(null);
+  const [refundReason, setRefundReason] = useState("");
+  const [refunding, setRefunding] = useState(false);
 
   useFocusEffect(useCallback(() => { fetchOrders(); }, []));
 
@@ -60,19 +65,28 @@ export default function OrdersScreen() {
 
   const archivedOrders = orders.filter((o) => archived.has(o.id));
   const visible = orders.filter((o) => !archived.has(o.id));
-  const active = visible.filter((o) => !FINISHED_STATUSES.includes(o.status));
-  const finished = visible.filter((o) => FINISHED_STATUSES.includes(o.status));
 
-  const sections = showArchived
-    ? (archivedOrders.length > 0 ? [{ title: `Archived (${archivedOrders.length})`, data: archivedOrders }] : [])
-    : [
-        ...(active.length > 0 ? [{ title: "Active Orders", data: active }] : []),
-        ...(finished.length > 0 ? [{ title: "Order History", data: finished }] : []),
-      ];
+  function sortNewest(arr: Order[]) {
+    return [...arr].sort((a, b) => {
+      const ta = a.created_at?.seconds ? a.created_at.seconds * 1000 : new Date(a.created_at || 0).getTime();
+      const tb = b.created_at?.seconds ? b.created_at.seconds * 1000 : new Date(b.created_at || 0).getTime();
+      return tb - ta;
+    });
+  }
+
+  const activeOrders = sortNewest(visible.filter((o) => ACTIVE_STATUSES.includes(o.status)));
+  const pendingOrders = sortNewest(visible.filter((o) => o.status === PENDING_STATUS));
+  const doneOrders = sortNewest(visible.filter((o) => DONE_STATUSES.includes(o.status)));
+
+  const sections = tabState === "active"
+    ? (activeOrders.length > 0 ? [{ title: `Active (${activeOrders.length})`, data: activeOrders }] : [])
+    : tabState === "pending"
+    ? (pendingOrders.length > 0 ? [{ title: `Pending (${pendingOrders.length})`, data: pendingOrders }] : [])
+    : (doneOrders.length > 0 ? [{ title: `Done (${doneOrders.length})`, data: doneOrders }] : []);
 
   function renderOrder({ item }: { item: Order }) {
     const color = ORDER_STATUS_COLORS[item.status] || "#888";
-    const isFinished = FINISHED_STATUSES.includes(item.status);
+    const isFinished = DONE_STATUSES.includes(item.status);
     const steps = ["pending", "accepted", "preparing", "out_for_delivery", "delivered"];
     const currentIdx = steps.indexOf(item.status);
 
@@ -118,6 +132,28 @@ export default function OrdersScreen() {
           </View>
         )}
 
+        {/* Refund Status / Request Refund */}
+        {item.refund_status && item.refund_status !== "none" && (
+          <View style={[styles.refundBox, item.refund_status === "rejected" && { backgroundColor: "#FFF5F5" }]}>
+            <Ionicons
+              name={item.refund_status === "rejected" ? "close-circle" : "refresh-circle"}
+              size={14} color={item.refund_status === "approved" || item.refund_status === "completed" ? "#27AE60" : item.refund_status === "rejected" ? "#E74C3C" : "#F39C12"}
+            />
+            <Text style={[
+              styles.refundText,
+              item.refund_status === "approved" || item.refund_status === "completed" ? { color: "#27AE60" } : item.refund_status === "rejected" ? { color: "#E74C3C" } : { color: "#F39C12" },
+            ]}>
+              Refund: {item.refund_status.toUpperCase()}
+            </Text>
+          </View>
+        )}
+        {isFinished && item.payment_method === "gcash" && (item.status === "rejected" || item.status === "cancelled") && (!item.refund_status || item.refund_status === "none") && (
+          <TouchableOpacity style={styles.refundBtn} onPress={() => { setRefundOrderId(item.id); setRefundReason(""); }}>
+            <Ionicons name="cash-outline" size={14} color="#fff" />
+            <Text style={styles.refundBtnText}>Request Refund</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Live tracking button */}
         {(item.status === "out_for_delivery" || item.status === "accepted" || item.status === "preparing") && (
           <TouchableOpacity
@@ -147,17 +183,11 @@ export default function OrdersScreen() {
           </View>
         )}
 
-        {/* Archive / Unarchive button */}
-        {isFinished && !showArchived && (
+        {/* Archive button (on done tab only) */}
+        {isFinished && tabState === "done" && (
           <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(item.id)}>
             <Ionicons name="archive-outline" size={14} color="#888" />
             <Text style={styles.archiveBtnText}>Archive</Text>
-          </TouchableOpacity>
-        )}
-        {showArchived && (
-          <TouchableOpacity style={styles.archiveBtn} onPress={() => handleUnarchive(item.id)}>
-            <Ionicons name="arrow-undo-outline" size={14} color="#F25C05" />
-            <Text style={[styles.archiveBtnText, { color: "#F25C05" }]}>Unarchive</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -168,23 +198,28 @@ export default function OrdersScreen() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>My Orders</Text>
 
-      {/* Tab pills */}
+      {/* Tab pills: Active / Pending / Done */}
       <View style={styles.tabRow}>
         <TouchableOpacity
-          style={[styles.tabPill, !showArchived && styles.tabPillActive]}
-          onPress={() => setShowArchived(false)}>
-          <Text style={[styles.tabPillText, !showArchived && styles.tabPillTextActive]}>Active</Text>
+          style={[styles.tabPill, tabState === "active" && styles.tabPillActive]}
+          onPress={() => setTabState("active")}>
+          <Text style={[styles.tabPillText, tabState === "active" && styles.tabPillTextActive]}>Active ({activeOrders.length})</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabPill, showArchived && styles.tabPillActive]}
-          onPress={() => setShowArchived(true)}>
-          <Text style={[styles.tabPillText, showArchived && styles.tabPillTextActive]}>Archived ({archived.size})</Text>
+          style={[styles.tabPill, tabState === "pending" && styles.tabPillActive]}
+          onPress={() => setTabState("pending")}>
+          <Text style={[styles.tabPillText, tabState === "pending" && styles.tabPillTextActive]}>Pending ({pendingOrders.length})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabPill, tabState === "done" && styles.tabPillActive]}
+          onPress={() => setTabState("done")}>
+          <Text style={[styles.tabPillText, tabState === "done" && styles.tabPillTextActive]}>Done ({doneOrders.length})</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
-      ) : sections.length === 0 ? (
+      ) : sections.length === 0 && archivedOrders.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="receipt-outline" size={64} color="#ddd" />
           <Text style={styles.emptyText}>No orders yet</Text>
@@ -200,7 +235,79 @@ export default function OrdersScreen() {
             <Text style={styles.sectionHeader}>{title}</Text>
           )}
           renderItem={renderOrder}
+          ListFooterComponent={tabState === "done" && archivedOrders.length > 0 ? (
+            <View>
+              <Text style={styles.sectionHeader}>Archived ({archivedOrders.length})</Text>
+              {archivedOrders.map((item) => (
+                <View key={item.id} style={[styles.card, styles.cardFinished]}>
+                  <View style={styles.headerRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.customerName} numberOfLines={1}>{item.customer_name || "Customer"}</Text>
+                      <Text style={styles.orderNum} numberOfLines={1}>{item.order_number}</Text>
+                    </View>
+                    <Text style={styles.typeChip} numberOfLines={1}>{ORDER_TYPE_LABELS[item.order_type]}</Text>
+                    <View style={[styles.badge, { backgroundColor: "#88822" }]}>
+                      <Text style={[styles.badgeText, { color: "#888" }]}>{ORDER_STATUS_LABELS[item.status]}</Text>
+                    </View>
+                    <Text style={styles.totalInline}>P{item.total?.toFixed(0)}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
+                    <Text style={styles.itemsSummary} numberOfLines={1}>
+                      {(item.items || []).map((i) => `${i.quantity}× ${i.name}`).join("  •  ")}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.archiveBtn} onPress={() => handleUnarchive(item.id)}>
+                    <Ionicons name="arrow-undo-outline" size={14} color="#F25C05" />
+                    <Text style={[styles.archiveBtnText, { color: "#F25C05" }]}>Unarchive</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : null}
         />
+      )}
+      {/* Refund Request Modal */}
+      {refundOrderId && (
+        <View style={styles.overlay}>
+          <View style={styles.refundModal}>
+            <Text style={styles.refundModalTitle}>Request Refund</Text>
+            <Text style={styles.refundModalSub}>Please provide a reason for your refund request.</Text>
+            <TextInput
+              style={styles.refundModalInput}
+              placeholder="Reason for refund..."
+              placeholderTextColor="#aaa"
+              value={refundReason}
+              onChangeText={setRefundReason}
+              multiline
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setRefundOrderId(null)}>
+                <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmRefund, (!refundReason.trim() || refunding) && { opacity: 0.6 }]}
+                onPress={async () => {
+                  if (!refundReason.trim()) return;
+                  setRefunding(true);
+                  try {
+                    await requestRefund(refundOrderId, refundReason.trim());
+                    Alert.alert("Refund Requested", "Your refund request has been submitted. The store will review it shortly.");
+                    setRefundOrderId(null);
+                    setRefundReason("");
+                    fetchOrders(true);
+                  } catch (e: any) {
+                    Alert.alert("Error", e.message || "Failed to submit refund request.");
+                  }
+                  setRefunding(false);
+                }}
+                disabled={!refundReason.trim() || refunding}
+              >
+                {refunding ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "bold" }}>Submit</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -262,4 +369,29 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", marginTop: 80 },
   emptyText: { fontSize: 18, fontWeight: "bold", color: "#aaa", marginTop: 12 },
   emptySubtext: { fontSize: 13, color: "#bbb", marginTop: 4 },
+  refundBox: {
+    flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4,
+    padding: 6, backgroundColor: "#FFF8E1", borderRadius: 6,
+  },
+  refundText: { fontSize: 11, flex: 1 },
+  refundBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#F25C05", borderRadius: 10, paddingVertical: 10, marginTop: 8,
+  },
+  refundBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
+  overlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center",
+    zIndex: 999,
+  },
+  refundModal: { backgroundColor: "#fff", borderRadius: 20, padding: 20, width: "85%" },
+  refundModalTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06", marginBottom: 4 },
+  refundModalSub: { fontSize: 12, color: "#888", marginBottom: 12 },
+  refundModalInput: {
+    backgroundColor: "#F9F5EF", borderRadius: 12, padding: 12, fontSize: 14,
+    color: "#333", minHeight: 80, textAlignVertical: "top",
+  },
+  modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
+  modalCancel: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#eee" },
+  modalConfirmRefund: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#F25C05" },
 });

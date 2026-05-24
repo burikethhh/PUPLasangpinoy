@@ -1,5 +1,5 @@
 /**
- * Centralized structured logger for LasangPinoy Mobile.
+ * Centralized structured logger for FoodFix Mobile.
  *
  * Usage:
  *   import { createLogger } from './logger';

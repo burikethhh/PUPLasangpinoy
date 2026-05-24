@@ -7,8 +7,10 @@ import {
     doc,
     getDoc,
     getDocs,
+    increment,
     orderBy,
     query,
+    runTransaction,
     setDoc,
     updateDoc,
     where,
@@ -36,6 +38,9 @@ export interface MenuItem {
   image_url: string;
   stock_quantity: number;
   available: boolean;
+  is_made_to_order?: boolean;
+  nutrients?: { calories?: number; protein?: number; carbs?: number; fat?: number; fiber?: number; sodium?: number };
+  batch_date?: string; // ISO date string for daily batch tracking (shelf life)
   created_at: Timestamp | { seconds: number };
 }
 
@@ -73,6 +78,9 @@ export interface Order {
   customer_location_opt_in?: boolean;
   staff_location_opt_in?: boolean;
   driver_id?: string;
+  refund_status?: "none" | "pending" | "approved" | "completed" | "rejected";
+  refund_amount?: number;
+  refund_reason?: string;
   created_at: Timestamp | { seconds: number };
   updated_at?: Timestamp | { seconds: number };
 }
@@ -124,6 +132,7 @@ export interface AppSettings {
   delivery_radius_km: number;
   gcash_enabled: boolean;
   gcash_number?: string;
+  gcash_qr_image?: string;
   store_name: string;
   store_address: string;
   store_phone: string;
@@ -135,7 +144,7 @@ function generateOrderNumber(): string {
   const now = new Date();
   const date = now.toISOString().slice(0, 10).replace(/-/g, "");
   const rand = Math.floor(1000 + Math.random() * 9000);
-  return `LP-${date}-${rand}`;
+  return `FF-${date}-${rand}`;
 }
 
 async function firestoreOp<T>(
@@ -159,6 +168,7 @@ export async function getMenuItems(filters?: {
   category?: string;
   search?: string;
   availableOnly?: boolean;
+  autoExpireDaily?: boolean;
 }): Promise<MenuItem[]> {
   let items: MenuItem[] = [];
 
@@ -185,6 +195,11 @@ export async function getMenuItems(filters?: {
     items = items.filter(
       (i) => i.name.toLowerCase().includes(s) || i.description?.toLowerCase().includes(s),
     );
+  }
+
+  if (filters?.autoExpireDaily) {
+    const today = new Date().toISOString().slice(0, 10);
+    items = items.filter((i) => !i.batch_date || i.batch_date === today);
   }
 
   return items;
@@ -265,19 +280,6 @@ export async function createOrder(data: {
       return { id };
     },
   );
-
-  // Deduct stock for each item
-  for (const item of data.items) {
-    try {
-      const menuItem = await getMenuItem(item.menu_item_id);
-      if (menuItem) {
-        const newQty = Math.max(0, menuItem.stock_quantity - item.quantity);
-        await updateMenuItem(item.menu_item_id, { stock_quantity: newQty });
-      }
-    } catch (e) {
-      log.warn("Could not deduct stock for " + item.menu_item_id, e);
-    }
-  }
 
   return { id: result.id, order_number };
 }
@@ -501,24 +503,77 @@ export async function cleanupArchivedMessages(): Promise<void> {
 
 export async function validateStock(items: { menu_item_id: string; name: string; quantity: number }[]): Promise<{ valid: boolean; issues: string[] }> {
   const issues: string[] = [];
-  for (const item of items) {
-    try {
-      const menuItem = await getMenuItem(item.menu_item_id);
-      if (!menuItem) {
-        issues.push(`${item.name} is no longer available.`);
-      } else if (!menuItem.available) {
-        issues.push(`${item.name} is currently unavailable.`);
-      } else if (menuItem.stock_quantity < item.quantity) {
-        if (menuItem.stock_quantity === 0) {
-          issues.push(`${item.name} is out of stock.`);
-        } else {
-          issues.push(`${item.name}: only ${menuItem.stock_quantity} left (you have ${item.quantity}).`);
+
+  await firestoreOp(
+    async () => {
+      try {
+        await runTransaction(db, async (transaction) => {
+          const refs = items.map((item) => doc(db, "menu_items", item.menu_item_id));
+          const snaps = await Promise.all(refs.map((ref) => transaction.get(ref)));
+
+          const localIssues: string[] = [];
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const snap = snaps[i];
+            if (!snap.exists()) {
+              localIssues.push(`${item.name} is no longer available.`);
+            } else {
+              const data = snap.data();
+              if (!data.available) {
+                localIssues.push(`${item.name} is currently unavailable.`);
+              } else if ((data.stock_quantity || 0) < item.quantity) {
+                const qty = data.stock_quantity || 0;
+                if (qty === 0) {
+                  localIssues.push(`${item.name} is out of stock.`);
+                } else {
+                  localIssues.push(`${item.name}: only ${qty} left (you have ${item.quantity}).`);
+                }
+              }
+            }
+          }
+
+          if (localIssues.length > 0) {
+            issues.push(...localIssues);
+            return;
+          }
+
+          for (let i = 0; i < items.length; i++) {
+            transaction.update(doc(db, "menu_items", items[i].menu_item_id), {
+              stock_quantity: increment(-items[i].quantity),
+            });
+          }
+        });
+      } catch {
+        issues.push("Stock verification failed. Please try again.");
+      }
+    },
+    async () => {
+      for (const item of items) {
+        try {
+          const menuItem = await RestApi.getDocument("menu_items", item.menu_item_id) as MenuItem | null;
+          if (!menuItem) {
+            issues.push(`${item.name} is no longer available.`);
+          } else if (!menuItem.available) {
+            issues.push(`${item.name} is currently unavailable.`);
+          } else if (menuItem.stock_quantity < item.quantity) {
+            if (menuItem.stock_quantity === 0) {
+              issues.push(`${item.name} is out of stock.`);
+            } else {
+              issues.push(`${item.name}: only ${menuItem.stock_quantity} left (you have ${item.quantity}).`);
+            }
+          } else {
+            await RestApi.updateDocument("menu_items", item.menu_item_id, {
+              stock_quantity: menuItem.stock_quantity - item.quantity,
+              last_verified: new Date().toISOString(),
+            });
+          }
+        } catch {
+          issues.push(`Could not verify stock for ${item.name}.`);
         }
       }
-    } catch {
-      issues.push(`Could not verify stock for ${item.name}.`);
-    }
-  }
+    },
+  );
+
   return { valid: issues.length === 0, issues };
 }
 
@@ -696,8 +751,9 @@ export async function getSettings(): Promise<AppSettings> {
     delivery_radius_km: 10,
     gcash_enabled: false,
     gcash_number: "",
-    store_name: "FOODFIX",
-    store_address: "",
+    gcash_qr_image: "",
+    store_name: "FoodFix",
+    store_address: "P. Herrera St, Batangas City, 4200 Batangas",
     store_phone: "",
   };
 
@@ -912,6 +968,62 @@ export async function cleanupArchivedOrders(): Promise<void> {
     }
   }
 }
+// ==================== SAVED ADDRESSES ====================
+
+export interface SavedAddress {
+  id: string;
+  label: string;
+  address: string;
+  phone: string;
+  lat?: number;
+  lng?: number;
+}
+
+export async function getSavedAddresses(userId: string): Promise<SavedAddress[]> {
+  return firestoreOp(
+    async () => {
+      const q = query(
+        collection(db, "profiles", userId, "saved_addresses"),
+        orderBy("created_at", "desc"),
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as SavedAddress[];
+    },
+    async () => {
+      const data = await RestApi.getCollection(`profiles/${userId}/saved_addresses`, "created_at");
+      return data as SavedAddress[];
+    },
+  );
+}
+
+export async function saveAddress(
+  userId: string,
+  address: Omit<SavedAddress, "id">,
+): Promise<{ id: string }> {
+  const payload = { ...address, created_at: new Date() };
+  return firestoreOp(
+    async () => {
+      const ref = await addDoc(collection(db, "profiles", userId, "saved_addresses"), payload);
+      return { id: ref.id };
+    },
+    async () => {
+      const id = await RestApi.createDocument(`profiles/${userId}/saved_addresses`, payload);
+      return { id };
+    },
+  );
+}
+
+export async function deleteSavedAddress(userId: string, addressId: string): Promise<void> {
+  return firestoreOp(
+    async () => {
+      await deleteDoc(doc(db, "profiles", userId, "saved_addresses", addressId));
+    },
+    async () => {
+      await RestApi.deleteDocument(`profiles/${userId}/saved_addresses`, addressId);
+    },
+  );
+}
+
 export interface Banner {
   id: string;
   name: string;
@@ -953,4 +1065,63 @@ export async function getBanners(): Promise<Banner[]> {
     console.error("Error fetching banners:", error);
     return [];
   }
+}
+
+// ==================== GCASH NOTIFICATIONS ====================
+
+export async function notifyGcashPayment(
+  orderId: string,
+  customerName: string,
+  amount: number,
+): Promise<void> {
+  const payload = {
+    type: "gcash_payment",
+    order_id: orderId,
+    customer_name: customerName,
+    amount,
+    paid: false,
+    created_at: new Date(),
+  };
+  return firestoreOp(
+    async () => { await addDoc(collection(db, "notifications"), payload); },
+    async () => { await RestApi.createDocument("notifications", payload); },
+  );
+}
+
+// ==================== REFUND SYSTEM ====================
+
+export async function requestRefund(orderId: string, reason: string): Promise<void> {
+  const updates: any = {
+    refund_status: "pending",
+    refund_reason: reason,
+    updated_at: new Date(),
+  };
+  await firestoreOp(
+    async () => { await updateDoc(doc(db, "orders", orderId), updates); },
+    async () => { await RestApi.updateDocument("orders", orderId, updates); },
+  );
+  const notifPayload = {
+    type: "refund_request",
+    order_id: orderId,
+    reason,
+    created_at: new Date(),
+  };
+  return firestoreOp(
+    async () => { await addDoc(collection(db, "notifications"), notifPayload); },
+    async () => { await RestApi.createDocument("notifications", notifPayload); },
+  );
+}
+
+export async function processRefund(
+  orderId: string,
+  status: "approved" | "completed" | "rejected",
+): Promise<void> {
+  const updates: any = {
+    refund_status: status,
+    updated_at: new Date(),
+  };
+  return firestoreOp(
+    async () => { await updateDoc(doc(db, "orders", orderId), updates); },
+    async () => { await RestApi.updateDocument("orders", orderId, updates); },
+  );
 }

@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { OrderStatus } from "../../constants/order";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "../../constants/order";
-import { logOut } from "../../lib/firebase";
+import { db, logOut, RestApi, shouldUseRest } from "../../lib/firebase";
 import {
     cleanupArchivedMessages,
     cleanupArchivedOrders,
@@ -17,6 +17,7 @@ import {
     getOrders,
     type Order,
 } from "../../lib/firebase-store";
+import { collection, getDocs, query, where } from "firebase/firestore";
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [finishedOrders, setFinishedOrders] = useState<Order[]>([]);
   const [ordersByStatus, setOrdersByStatus] = useState<Record<string, number>>({});
+  const [gcashPayments, setGcashPayments] = useState<any[]>([]);
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
 
@@ -49,6 +51,25 @@ export default function AdminDashboard() {
       const [orders, menu, convos] = await Promise.all([
         getOrders(), getMenuItems(), getConversations(),
       ]);
+
+      // Fetch GCash notifications
+      try {
+        let notifs: any[] = [];
+        if (shouldUseRest()) {
+          const data = await RestApi.queryCollection("notifications", "type", "==", "gcash_payment");
+          notifs = (data as any[]).filter((n: any) => n.paid === false || n.paid === undefined);
+        } else {
+          try {
+            const q = query(collection(db, "notifications"), where("type", "==", "gcash_payment"));
+            const snap = await getDocs(q);
+            notifs = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n: any) => n.paid === false || n.paid === undefined);
+          } catch {
+            const data = await RestApi.queryCollection("notifications", "type", "==", "gcash_payment");
+            notifs = (data as any[]).filter((n: any) => n.paid === false || n.paid === undefined);
+          }
+        }
+        setGcashPayments(notifs);
+      } catch { setGcashPayments([]); }
 
       const today = new Date().toISOString().slice(0, 10);
       const todayOrderCount = orders.filter((o) => {
@@ -127,6 +148,16 @@ export default function AdminDashboard() {
                 <Text style={styles.quickText}>{stats.unreadMessages} unread messages</Text>
                 <Ionicons name="chevron-forward" size={16} color="#bbb" />
               </TouchableOpacity>
+              {gcashPayments.length > 0 && (
+                <TouchableOpacity style={[styles.quickCard, { marginBottom: 10, borderColor: "#F25C05", borderWidth: 1 }]} activeOpacity={0.7}
+                  onPress={() => router.push("/(admin)/recipes" as any)}>
+                  <Ionicons name="phone-portrait-outline" size={18} color="#F25C05" />
+                  <Text style={styles.quickText}>GCash: {gcashPayments.length} pending</Text>
+                  <View style={styles.gcashBadge}>
+                    <Text style={styles.gcashBadgeText}>{gcashPayments.length}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
                 onPress={() => router.push("/(admin)/banners" as any)}>
                 <Ionicons name="images" size={18} color="#9B59B6" />
@@ -249,4 +280,9 @@ const styles = StyleSheet.create({
   orderBadgeText: { fontSize: 11, fontWeight: "bold" },
   orderTotal: { fontSize: 14, fontWeight: "bold", color: "#F25C05" },
   emptyText: { textAlign: "center", color: "#aaa", fontSize: 13 },
+  gcashBadge: {
+    backgroundColor: "#F25C05", borderRadius: 10, minWidth: 20, height: 20,
+    justifyContent: "center", alignItems: "center", paddingHorizontal: 6,
+  },
+  gcashBadgeText: { color: "#fff", fontSize: 11, fontWeight: "bold" },
 });

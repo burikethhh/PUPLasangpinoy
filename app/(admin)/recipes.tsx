@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { OrderStatus } from "../../constants/order";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUSES } from "../../constants/order";
-import { getOrders, updateOrderStatus, type Order } from "../../lib/firebase-store";
+import { getOrders, processRefund, updateOrderStatus, type Order } from "../../lib/firebase-store";
 import { notifyDeliveryStarted } from "../../lib/notifications";
 
 const FILTER_OPTIONS: (OrderStatus | "all" | "archived")[] = ["all", ...ORDER_STATUSES, "archived"];
@@ -25,12 +25,14 @@ export default function AdminOrders() {
   const [rejectReason, setRejectReason] = useState("");
   const [archived, setArchived] = useState<Set<string>>(new Set());
   const [filterDropdown, setFilterDropdown] = useState(false);
+  const [pendingRefundCount, setPendingRefundCount] = useState(0);
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const data = await getOrders(filter === "all" || filter === "archived" ? undefined : { status: filter });
       setOrders(data);
+      setPendingRefundCount(data.filter((o: any) => o.refund_status === "pending").length);
     } catch (e) { console.error(e); }
     if (!silent) setLoading(false);
   }, [filter]);
@@ -102,7 +104,15 @@ export default function AdminOrders() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Order Management</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Order Management</Text>
+        {pendingRefundCount > 0 && (
+          <View style={styles.refundNotifBadge}>
+            <Ionicons name="refresh-circle" size={16} color="#fff" />
+            <Text style={styles.refundNotifBadgeText}>{pendingRefundCount} refund{pendingRefundCount > 1 ? "s" : ""}</Text>
+          </View>
+        )}
+      </View>
 
       {/* Filter Dropdown */}
       <TouchableOpacity style={styles.filterDropdownBtn} onPress={() => setFilterDropdown(true)}>
@@ -191,6 +201,76 @@ export default function AdminOrders() {
                 {item.payment_method && (
                   <Text style={styles.paymentText}>Payment: {item.payment_method.toUpperCase()}</Text>
                 )}
+                {item.refund_status && item.refund_status !== "none" && (
+                  <View style={[styles.refundBadge,
+                    item.refund_status === "approved" || item.refund_status === "completed" ? { backgroundColor: "#27AE6018" } :
+                    item.refund_status === "rejected" ? { backgroundColor: "#E74C3C18" } : { backgroundColor: "#F39C1218" }
+                  ]}>
+                    <Ionicons
+                      name={item.refund_status === "rejected" ? "close-circle" : "refresh-circle"}
+                      size={14}
+                      color={item.refund_status === "approved" || item.refund_status === "completed" ? "#27AE60" : item.refund_status === "rejected" ? "#E74C3C" : "#F39C12"}
+                    />
+                    <Text style={[styles.refundBadgeText,
+                      item.refund_status === "approved" || item.refund_status === "completed" ? { color: "#27AE60" } :
+                      item.refund_status === "rejected" ? { color: "#E74C3C" } : { color: "#F39C12" }
+                    ]}>
+                      Refund: {item.refund_status.toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                {item.refund_reason && (
+                  <Text style={styles.refundReasonText}>Refund reason: {item.refund_reason}</Text>
+                )}
+                {item.refund_status === "pending" && (
+                  <View style={styles.refundActions}>
+                    <TouchableOpacity style={[styles.refundActionBtn, { backgroundColor: "#27AE60" }]}
+                      onPress={async () => {
+                        Alert.alert("Approve Refund", `Approve refund for order ${item.order_number}?`, [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Approve", onPress: async () => {
+                              await processRefund(item.id, "approved");
+                              fetchOrders(true);
+                            },
+                          },
+                        ]);
+                      }}>
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                      <Text style={styles.refundActionText}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.refundActionBtn, { backgroundColor: "#E74C3C" }]}
+                      onPress={async () => {
+                        Alert.alert("Reject Refund", `Reject refund for order ${item.order_number}?`, [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Reject", style: "destructive", onPress: async () => {
+                              await processRefund(item.id, "rejected");
+                              fetchOrders(true);
+                            },
+                          },
+                        ]);
+                      }}>
+                      <Ionicons name="close" size={14} color="#fff" />
+                      <Text style={styles.refundActionText}>Reject</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.refundActionBtn, { backgroundColor: "#3498DB" }]}
+                      onPress={async () => {
+                        Alert.alert("Complete Refund", `Mark refund as completed for order ${item.order_number}?`, [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Complete", onPress: async () => {
+                              await processRefund(item.id, "completed");
+                              fetchOrders(true);
+                            },
+                          },
+                        ]);
+                      }}>
+                      <Ionicons name="checkmark-done" size={14} color="#fff" />
+                      <Text style={styles.refundActionText}>Complete</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 {item.reject_reason && (
                   <Text style={styles.rejectText}>Rejected: {item.reject_reason}</Text>
                 )}
@@ -277,7 +357,7 @@ export default function AdminOrders() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
-  title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
+  title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06" },
   filterDropdownBtn: {
     flexDirection: "row", alignItems: "center", gap: 8,
     marginHorizontal: 16, marginBottom: 10, backgroundColor: "#fff",
@@ -341,4 +421,22 @@ const styles = StyleSheet.create({
   modalConfirm: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#E74C3C" },
   liveIndicator: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#EBF5FB", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
   liveIndicatorText: { fontSize: 10, fontWeight: "bold", color: "#3498DB" },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 16, paddingBottom: 8 },
+  refundNotifBadge: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "#F39C12", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  refundNotifBadgeText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+  refundBadge: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 4,
+  },
+  refundBadgeText: { fontSize: 11, fontWeight: "bold" },
+  refundReasonText: { fontSize: 11, color: "#888", marginTop: 2, fontStyle: "italic" },
+  refundActions: { flexDirection: "row", gap: 6, marginTop: 8 },
+  refundActionBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 4, borderRadius: 8, paddingVertical: 8,
+  },
+  refundActionText: { color: "#fff", fontWeight: "bold", fontSize: 11 },
 });

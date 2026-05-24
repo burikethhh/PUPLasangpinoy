@@ -1,4 +1,4 @@
-// LasangPinoy AI Integration
+// FoodFix AI Integration
 // Vision/Scanner: Gemini Flash (primary) → OpenRouter → DashScope (fallbacks)
 // Chat (Chef Pinoy): DashScope basic models only
 
@@ -6,6 +6,13 @@ import { Platform } from "react-native";
 import { createLogger } from "./logger";
 
 const log = createLogger("QwenAI");
+
+const scanCache = new Map<string, { result: ScanResult; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000;
+
+function getCacheKey(base64Image: string, scanMode: string): string {
+  return scanMode + ":" + base64Image.slice(0, 100);
+}
 
 const FALLBACK_DASHSCOPE_KEY = process.env.EXPO_PUBLIC_QWEN_API_KEY || "";
 const FALLBACK_OPENROUTER_KEY =
@@ -35,6 +42,7 @@ async function callGeminiVision(
   userText: string,
   base64Image: string,
   maxTokens: number = 1500,
+  timeoutMs: number = 15000,
 ): Promise<string> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) throw new Error("Gemini API key not configured");
@@ -42,7 +50,7 @@ async function callGeminiVision(
   const url = `${GEMINI_BASE_URL}/models/${GEMINI_VISION_MODEL}:generateContent?key=${apiKey}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -256,12 +264,13 @@ async function callProvider(
   model: string,
   messages: QwenMessage[],
   maxTokens: number,
+  customTimeoutMs?: number,
 ): Promise<string> {
   const resolvedModel = provider.modelMap[model] ?? model;
 
   // Vision models need more time (large image payloads)
   const isVisionModel = model.includes('vl');
-  const timeoutMs = isVisionModel ? 60_000 : 30_000;
+  const timeoutMs = customTimeoutMs ?? (isVisionModel ? 60_000 : 30_000);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -273,8 +282,8 @@ async function callProvider(
     };
     // OpenRouter requires these for attribution
     if (provider.name === "OpenRouter") {
-      headers["HTTP-Referer"] = "https://lasangpinoy.app";
-      headers["X-Title"] = "LasangPinoy";
+      headers["HTTP-Referer"] = "https://foodfix.app";
+      headers["X-Title"] = "FoodFix";
     }
 
     const response = await fetch(`${provider.baseUrl}/chat/completions`, {
@@ -337,6 +346,7 @@ async function callQwenAPI(
   messages: QwenMessage[],
   maxTokens: number,
   providerOrder: "vision" | "chat" = "chat",
+  customTimeoutMs?: number,
 ): Promise<string> {
   if (Platform.OS === "web") {
     throw new Error(
@@ -357,7 +367,7 @@ async function callQwenAPI(
   for (const provider of availableProviders) {
     try {
       log.debug(`Trying provider: ${provider.name} (model: ${model})`);
-      const result = await callProvider(provider, model, messages, maxTokens);
+      const result = await callProvider(provider, model, messages, maxTokens, customTimeoutMs);
       if (provider.name !== availableProviders[0].name) {
         log.info(`Fell back to ${provider.name} successfully.`);
       }
@@ -387,6 +397,12 @@ export async function analyzeImageWithQwen(
   base64Image: string,
   scanMode: "dish" | "ingredients",
 ): Promise<ScanResult> {
+  const cacheKey = getCacheKey(base64Image, scanMode);
+  const cached = scanCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    log.debug("Returning cached scan result");
+    return cached.result;
+  }
   const systemPrompt =
     scanMode === "dish"
       ? `You are an expert Filipino cuisine identifier and nutritionist. Analyze the food image provided and respond ONLY with valid JSON (no markdown, no code fences):
@@ -444,7 +460,7 @@ Suggest 2-4 Filipino recipes that can realistically be cooked with the identifie
   if (getGeminiApiKey()) {
     try {
       log.debug("Trying Gemini Flash for vision...");
-      content = await callGeminiVision(systemPrompt, userText, base64Image, 1500);
+      content = await callGeminiVision(systemPrompt, userText, base64Image, 1500, 15000);
       log.info("Gemini vision succeeded.");
     } catch (err: any) {
       log.warn(`Gemini failed: ${err.message} — falling back.`);
@@ -482,7 +498,7 @@ Suggest 2-4 Filipino recipes that can realistically be cooked with the identifie
     for (const model of visionModels) {
       try {
         log.debug(`Trying vision model: ${model}`);
-        content = await callQwenAPI(model, messages, 1500, "vision");
+        content = await callQwenAPI(model, messages, 1500, "vision", 15000);
         log.info(`Vision succeeded with: ${model}`);
         break;
       } catch (err: any) {
@@ -493,17 +509,23 @@ Suggest 2-4 Filipino recipes that can realistically be cooked with the identifie
   }
 
   if (!content) {
-    return { type: "unknown", description: "No response from AI." };
+    const fallback: ScanResult = { type: "unknown", description: "No response from AI." };
+    scanCache.set(cacheKey, { result: fallback, timestamp: Date.now() });
+    return fallback;
   }
 
   const jsonStr = extractJSON(content);
   if (jsonStr) {
     try {
-      return JSON.parse(jsonStr) as ScanResult;
+      const parsed = JSON.parse(jsonStr) as ScanResult;
+      scanCache.set(cacheKey, { result: parsed, timestamp: Date.now() });
+      return parsed;
     } catch {}
   }
 
-  return { type: "unknown", description: content };
+  const fallback: ScanResult = { type: "unknown", description: content };
+  scanCache.set(cacheKey, { result: fallback, timestamp: Date.now() });
+  return fallback;
 }
 
 // ──────────────────────────────────────────────

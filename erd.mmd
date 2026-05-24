@@ -1,144 +1,166 @@
-%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '24px', 'fontFamily': 'arial'}}}%%
-erDiagram
-    %% ============================================================
-    %% LasangPinoy Food Ordering System — Firebase Firestore Schema
-    %% ERD version: 1.2.0 (updated 2026-04-17)
-    %% Note: Staff attendance and customer ingredients-browsing feature paths
-    %% were removed in app release v2.2.4. No attendance entity remains.
-    %% Collection: profiles (Document ID = Firebase Auth UID)
-    %% ============================================================
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '11px', 'fontFamily': 'Consolas, monospace', 'lineColor': '#2c3e50'}, 'flowchart': {'curve': 'linear'}}}%%
+flowchart LR
+    classDef table fill:#fff8e7,stroke:#d4a373,stroke-width:2px,font-family:Consolas
 
-    PROFILES {
-        string id PK "Document ID (Firebase Auth UID)"
-        string email "User email (unique)"
-        string username "Display name"
-        boolean is_admin "Admin access flag"
-        string role "admin | staff | customer"
-        string phone "Contact number (optional)"
-        string address "Delivery address (optional)"
-        timestamp created_at "Account creation date"
-    }
+    BANNERS["<b>BANNERS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | name
+string | image_url
+boolean | active
+timestamp | created_at"]
 
-    %% Collection: menu_items
-    MENU_ITEMS {
-        string id PK "Auto-generated document ID"
-        string name "Dish / item name"
-        string description "Item description"
-        number price "Price in PHP"
-        string category "Menu category (e.g. Main Dish, Soup)"
-        string image_url "Image URL (Cloudinary or device URI)"
-        number stock_quantity "Available stock count"
-        boolean available "Whether item can be ordered"
-        timestamp created_at "Creation timestamp"
-    }
+    APP_SETTINGS["<b>APP_SETTINGS</b>
+━━━━━━━━━━━━━━━━━━━━
+number | delivery_fee
+number | delivery_radius_km
+boolean | gcash_enabled
+string | gcash_number
+string | store_name
+string | store_address
+string | store_phone"]
 
-    %% Collection: orders
-    ORDERS {
-        string id PK "Auto-generated document ID"
-        string order_number "Formatted order number (LP-YYYYMMDD-XXXX)"
-        string customer_id FK "FK to profiles.id"
-        string customer_name "Customer display name"
-        string customer_phone "Customer contact number"
-        string customer_address "Delivery address"
-        array items "Array of OrderItem (embedded)"
-        number subtotal "Sum of item prices"
-        number delivery_fee "Delivery charge"
-        number total "subtotal + delivery_fee"
-        string status "pending | accepted | preparing | out_for_delivery | delivered | rejected | cancelled"
-        string order_type "delivery_now | delivery_later | dine_in | pick_up"
-        string payment_method "cod | gcash"
-        string scheduled_date "Scheduled delivery date (optional)"
-        string scheduled_time "Scheduled delivery time (optional)"
-        string reject_reason "Reason if rejected (optional)"
-        string prepared_by "Staff UID who prepared (optional)"
-        timestamp created_at "Order placement timestamp"
-        timestamp updated_at "Last status update (optional)"
-    }
+    PROFILES["<b>PROFILES</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | email
+string | username
+boolean | is_admin
+string | role
+string | phone
+string | address
+timestamp | created_at"]
 
-    %% Embedded sub-document inside orders.items[]
-    ORDER_ITEMS {
-        string menu_item_id FK "FK to menu_items.id"
-        string name "Item name snapshot"
-        number price "Item price snapshot"
-        number quantity "Quantity ordered"
-        string image_url "Item image URL (optional)"
-    }
+    MENU_ITEMS["<b>MENU_ITEMS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | name
+string | description
+number | price
+string | category
+string | image_url
+number | stock_quantity
+boolean | available
+timestamp | created_at"]
 
-    %% Collection: messages
-    MESSAGES {
-        string id PK "Auto-generated document ID"
-        string conversation_id "Chat thread ID (customer UID)"
-        string sender_id FK "FK to profiles.id"
-        string sender_name "Sender display name"
-        string sender_role "admin | staff | customer"
-        string content "Message text"
-        boolean read "Read receipt flag"
-        timestamp created_at "Message timestamp"
-    }
+    ORDERS["<b>ORDERS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | order_number
+string | customer_id | FK
+string | customer_name
+string | customer_phone
+string | customer_address
+number | customer_lat
+number | customer_lng
+array | items
+number | subtotal
+number | delivery_fee
+number | total
+string | status
+string | order_type
+string | payment_method
+string | scheduled_date
+string | scheduled_time
+string | reject_reason
+string | prepared_by
+string | driver_name
+string | driver_phone
+string | driver_id
+boolean | location_sharing_enabled
+boolean | customer_location_opt_in
+boolean | staff_location_opt_in
+timestamp | created_at
+timestamp | updated_at"]
 
-    %% Collection: reviews
-    REVIEWS {
-        string id PK "Auto-generated document ID"
-        string user_id FK "FK to profiles.id"
-        string username "Reviewer display name"
-        string order_id FK "FK to orders.id"
-        string menu_item_id FK "FK to menu_items.id"
-        string menu_item_name "Item name snapshot"
-        number rating "Star rating 1-5"
-        string comment "Review text"
-        timestamp created_at "Review timestamp"
-    }
+    MESSAGES["<b>MESSAGES</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | conversation_id
+string | sender_id | FK
+string | sender_name
+string | sender_role
+string | content
+boolean | read
+boolean | archived
+string | archived_at
+timestamp | created_at"]
 
-    %% Collection: favorites
-    FAVORITES {
-        string id PK "Auto-generated document ID"
-        string user_id FK "FK to profiles.id"
-        string menu_item_id FK "FK to menu_items.id"
-        string collection_id FK "FK to favorite_collections.id (optional)"
-        timestamp created_at "Favorited timestamp"
-    }
+    MENU_SUGGESTIONS["<b>MENU_SUGGESTIONS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | name
+string | description
+string | category
+string | user_id | FK
+string | user_email
+string | user_name
+string | status
+string | reject_reason
+timestamp | created_at"]
 
-    %% Collection: favorite_collections
-    FAVORITE_COLLECTIONS {
-        string id PK "Auto-generated document ID"
-        string user_id FK "FK to profiles.id"
-        string name "Folder / collection name"
-        timestamp created_at "Creation timestamp"
-    }
+    FAVORITE_COLLECTIONS["<b>FAVORITE_COLLECTIONS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | user_id | FK
+string | name
+timestamp | created_at"]
 
-    %% Singleton document: settings/app_settings
-    APP_SETTINGS {
-        number delivery_fee "Default delivery fee in PHP"
-        boolean gcash_enabled "Whether GCash payments are accepted"
-        string gcash_number "GCash account number (optional)"
-        string store_name "Store display name"
-        string store_address "Store physical address"
-        string store_phone "Store contact number"
-    }
+    ORDER_ITEMS["<b>ORDER_ITEMS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | menu_item_id | FK
+string | name
+number | price
+number | quantity
+string | image_url"]
 
-    %% ==================== Relationships ====================
+    REVIEWS["<b>REVIEWS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | user_id | FK
+string | username
+string | order_id | FK
+string | menu_item_id | FK
+string | menu_item_name
+number | rating
+string | comment
+timestamp | created_at"]
 
-    %% A profile (customer) places many orders
-    PROFILES ||--o{ ORDERS : ""
-    %% A profile (customer) sends/receives many messages
-    PROFILES ||--o{ MESSAGES : ""
-    %% A profile (customer) writes many reviews
-    PROFILES ||--o{ REVIEWS : ""
-    %% A profile (customer) has many favorites
-    PROFILES ||--o{ FAVORITES : ""
-    %% A profile (customer) creates many favorite collections
-    PROFILES ||--o{ FAVORITE_COLLECTIONS : ""
-    %% An order contains many order items (embedded)
-    ORDERS ||--|{ ORDER_ITEMS : ""
-    %% A menu item appears in many order items
-    MENU_ITEMS ||--o{ ORDER_ITEMS : ""
-    %% A menu item can be reviewed many times
-    MENU_ITEMS ||--o{ REVIEWS : ""
-    %% A menu item can be favorited many times
-    MENU_ITEMS ||--o{ FAVORITES : ""
+    FAVORITES["<b>FAVORITES</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | user_id | FK
+string | menu_item_id | FK
+string | collection_id | FK
+timestamp | created_at"]
 
-    %% An order can have many reviews (one per item)
-    ORDERS ||--o{ REVIEWS : ""
+    LIVE_LOCATIONS["<b>LIVE_LOCATIONS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | order_id | FK
+string | user_id
+string | role
+number | lat
+number | lng
+number | heading
+number | speed
+number | accuracy
+timestamp | updated_at"]
 
-    %% A favorite optionally belongs to a collection
-    FAVORITE_COLLECTIONS ||--o{ FAVORITES : ""
+    PROFILES --> ORDERS
+    PROFILES --> MESSAGES
+    PROFILES --> REVIEWS
+    PROFILES --> FAVORITES
+    PROFILES --> FAVORITE_COLLECTIONS
+    PROFILES --> MENU_SUGGESTIONS
+    PROFILES --> LIVE_LOCATIONS
+    ORDERS --> ORDER_ITEMS
+    ORDERS --> REVIEWS
+    ORDERS --> LIVE_LOCATIONS
+    MENU_ITEMS --> ORDER_ITEMS
+    MENU_ITEMS --> REVIEWS
+    MENU_ITEMS --> FAVORITES
+    FAVORITE_COLLECTIONS --> FAVORITES
+
+    class BANNERS,APP_SETTINGS,PROFILES,MENU_ITEMS,ORDERS,MESSAGES,MENU_SUGGESTIONS,FAVORITE_COLLECTIONS,ORDER_ITEMS,REVIEWS,FAVORITES,LIVE_LOCATIONS table
+    linkStyle default stroke:#2c3e50,stroke-width:2px

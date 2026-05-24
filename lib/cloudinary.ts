@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  Cloudinary Image Upload — LasangPinoy
+//  Cloudinary Image Upload — FoodFix
 //  Free tier: 25 GB storage · 25 GB bandwidth/mo · No credit card
 //
 //  ONE-TIME CLOUDINARY SETUP:
@@ -7,11 +7,11 @@
 //  2. Copy your Cloud Name from the dashboard (top-left)
 //  3. Settings → Upload → Upload Presets → Add upload preset
 //       · Signing mode: Unsigned
-//       · Folder: lasangpinoy/recipes
+//       · Folder: foodfix/recipes
 //       · Save → copy the preset name
 //  4. Add to .env:
 //       EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
-//       EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET=lasangpinoy_unsigned
+//       EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET=foodfix_unsigned
 //
 //  HOW IT INTEGRATES WITH FIRESTORE:
 //  · Firestore schema does NOT change at all.
@@ -19,7 +19,7 @@
 //    the Cloudinary CDN URL instead of a Firebase Storage URL.
 //  · Example stored value:
 //    "https://res.cloudinary.com/yourcloud/image/upload/f_auto,q_auto/
-//     lasangpinoy/recipes/recipe_1714000000.jpg"
+//     foodfix/recipes/recipe_1714000000.jpg"
 // ─────────────────────────────────────────────────────────────
 
 const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -39,11 +39,11 @@ export interface CloudinaryUploadResult {
  * Returns the optimised CDN URL ready to store as `image_url` in Firestore.
  *
  * @param localUri  file:// URI from expo-image-picker
- * @param folder    Cloudinary sub-folder (default: lasangpinoy/recipes)
+ * @param folder    Cloudinary sub-folder (default: foodfix/recipes)
  */
 export async function uploadToCloudinary(
   localUri: string,
-  folder = "lasangpinoy/recipes",
+  folder = "foodfix/recipes",
 ): Promise<string> {
   if (!CLOUD_NAME || !UPLOAD_PRESET) {
     throw new Error(

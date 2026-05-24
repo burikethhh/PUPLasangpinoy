@@ -28,7 +28,6 @@ const DEFAULT_CATEGORIES = [
 const { width } = Dimensions.get("window");
 const CARD_SIZE = (width - 48) / 2;
 const CART_KEY = "@foodfix_cart";
-const OLD_CART_KEY = "@lasangpinoy_cart";
 
 export default function MenuScreen() {
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -44,18 +43,6 @@ export default function MenuScreen() {
   const [selectedQty, setSelectedQty] = useState(1);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Migrate old cart key to new one
-  useEffect(() => {
-    (async () => {
-      const old = await AsyncStorage.getItem(OLD_CART_KEY);
-      if (old) {
-        const existing = await AsyncStorage.getItem(CART_KEY);
-        if (!existing) await AsyncStorage.setItem(CART_KEY, old);
-        await AsyncStorage.removeItem(OLD_CART_KEY);
-      }
-    })();
-  }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => { fetchMenu(); }, []));
@@ -334,6 +321,41 @@ export default function MenuScreen() {
                 <Text style={styles.itemModalDesc}>{selectedItem.description}</Text>
               )}
               <Text style={styles.itemModalPrice}>P{selectedItem?.price?.toFixed(2)}</Text>
+
+              {selectedItem?.is_made_to_order && (
+                <View style={styles.madeToOrderTag}>
+                  <Text style={styles.madeToOrderText}>Made to Order</Text>
+                </View>
+              )}
+
+              {selectedItem?.nutrients && (selectedItem.nutrients.calories || selectedItem.nutrients.protein || selectedItem.nutrients.carbs || selectedItem.nutrients.fat) && (
+                <View style={styles.nutrientRow}>
+                  {selectedItem.nutrients.calories != null && (
+                    <View style={styles.nutrientBadge}>
+                      <Text style={styles.nutrientVal}>{selectedItem.nutrients.calories}</Text>
+                      <Text style={styles.nutrientLabel}>Cal</Text>
+                    </View>
+                  )}
+                  {selectedItem.nutrients.protein != null && (
+                    <View style={styles.nutrientBadge}>
+                      <Text style={styles.nutrientVal}>{selectedItem.nutrients.protein}g</Text>
+                      <Text style={styles.nutrientLabel}>Protein</Text>
+                    </View>
+                  )}
+                  {selectedItem.nutrients.carbs != null && (
+                    <View style={styles.nutrientBadge}>
+                      <Text style={styles.nutrientVal}>{selectedItem.nutrients.carbs}g</Text>
+                      <Text style={styles.nutrientLabel}>Carbs</Text>
+                    </View>
+                  )}
+                  {selectedItem.nutrients.fat != null && (
+                    <View style={styles.nutrientBadge}>
+                      <Text style={styles.nutrientVal}>{selectedItem.nutrients.fat}g</Text>
+                      <Text style={styles.nutrientLabel}>Fat</Text>
+                    </View>
+                  )}
+                </View>
+              )}
               
               <View style={styles.qtyContainer}>
                 <Text style={styles.qtyLabel}>Quantity:</Text>
@@ -458,5 +480,17 @@ const styles = StyleSheet.create({
   modalCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: "#f0f0f0", justifyContent: "center", alignItems: "center" },
   modalCancelText: { fontSize: 14, fontWeight: "bold", color: "#555" },
   modalAddBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: "#F25C05", justifyContent: "center", alignItems: "center" },
-  modalAddText: { fontSize: 14, fontWeight: "bold", color: "#fff" }
+  modalAddText: { fontSize: 14, fontWeight: "bold", color: "#fff" },
+  madeToOrderTag: {
+    backgroundColor: "#8B4513", alignSelf: "flex-start",
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 10,
+  },
+  madeToOrderText: { fontSize: 11, color: "#fff", fontWeight: "bold" },
+  nutrientRow: { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
+  nutrientBadge: {
+    backgroundColor: "#F9F0DC", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+    alignItems: "center", minWidth: 56,
+  },
+  nutrientVal: { fontSize: 14, fontWeight: "bold", color: "#2E1A06" },
+  nutrientLabel: { fontSize: 10, color: "#888", marginTop: 1 },
 });

@@ -11,11 +11,10 @@ import {
     Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { WebView } from "react-native-webview";
 import type { OrderType, PaymentMethod } from "../../constants/order";
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
-import { createOrder, getSettings, validateStock, type AppSettings } from "../../lib/firebase-store";
+import { createOrder, deleteSavedAddress, getSavedAddresses, getSettings, notifyGcashPayment, saveAddress, validateStock, type AppSettings, type SavedAddress } from "../../lib/firebase-store";
 
 const CART_KEY = "@foodfix_cart";
 
@@ -26,6 +25,12 @@ interface CartItem {
   quantity: number;
   stock_quantity: number;
   image_url?: string;
+}
+
+interface NominatimSuggestion {
+  display_name: string;
+  lat: string;
+  lon: string;
 }
 
 export default function CartScreen() {
@@ -48,16 +53,32 @@ export default function CartScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
 
-  // Location picker state
-  const [mapModal, setMapModal] = useState(false);
+  // GCash confirmation state
+  const [gcashOrder, setGcashOrder] = useState<{ orderId: string; orderNumber: string; amount: number } | null>(null);
+  const [notifyingGcash, setNotifyingGcash] = useState(false);
+
+  // Location state
   const [locating, setLocating] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const webViewRef = useRef<WebView>(null);
+
+  // Saved addresses
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+
+  // Address autocomplete
+  const [addressSuggestions, setAddressSuggestions] = useState<NominatimSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Save address modal
+  const [saveAddressModal, setSaveAddressModal] = useState(false);
+  const [saveLabel, setSaveLabel] = useState("");
+  const [savingAddress, setSavingAddress] = useState(false);
 
   useFocusEffect(useCallback(() => {
     loadCart();
     loadSettings();
     loadProfile();
+    loadSavedAddresses();
     // Auto-fill scheduled date/time with nearest next hour
     const now = new Date();
     now.setHours(now.getHours() + 1, 0, 0, 0);
@@ -92,6 +113,16 @@ export default function CartScreen() {
         if (p.address) setAddress(p.address);
         if (p.phone) setPhone(p.phone);
       }
+    }
+  }
+
+  async function loadSavedAddresses() {
+    const user = getCurrentUser();
+    if (user) {
+      try {
+        const addrs = await getSavedAddresses(user.uid);
+        setSavedAddresses(addrs);
+      } catch (e) { console.error(e); }
     }
   }
 
@@ -146,66 +177,92 @@ export default function CartScreen() {
     }
   }
 
-  function handleMapMessage(event: any) {
+  async function fetchAddressSuggestions(query: string) {
+    if (!query.trim() || query.trim().length < 3) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
     try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.lat && data.lng) {
-        setCoords({ lat: data.lat, lng: data.lng });
-        if (data.address) setAddress(data.address);
-        setMapModal(false);
-      }
-    } catch {}
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`,
+        { headers: { "User-Agent": "FOODFIX-App/2.3" } }
+      );
+      const data = await res.json();
+      const suggestions: NominatimSuggestion[] = (data || []).map((item: any) => ({
+        display_name: item.display_name || "",
+        lat: item.lat,
+        lon: item.lon,
+      }));
+      setAddressSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+    } catch {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+    }
   }
 
-  function getMapHtml(lat = 14.5995, lng = 120.9842) {
-    return `<!DOCTYPE html>
-<html><head>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>html,body,#map{margin:0;padding:0;height:100%;width:100%}
-.info{position:fixed;bottom:10px;left:10px;right:10px;z-index:999;background:#fff;padding:12px 16px;
-border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.15);font-family:sans-serif;font-size:13px;color:#333}
-.info b{color:#F25C05}
-.btn{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:999;background:#F25C05;
-color:#fff;border:none;padding:14px 32px;border-radius:14px;font-size:15px;font-weight:bold;cursor:pointer;
-box-shadow:0 2px 10px rgba(242,92,5,0.4)}
-</style></head><body>
-<div id="map"></div>
-<div class="info" id="addr">Tap the map to pick a location</div>
-<button class="btn" id="confirm" style="display:none" onclick="confirmLocation()">Confirm Location</button>
-<script>
-var map=L.map('map').setView([${lat},${lng}],15);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'&copy; OSM contributors',maxZoom:19}).addTo(map);
-var marker=null,selectedLat=null,selectedLng=null,selectedAddr='';
-map.on('click',function(e){
-  selectedLat=e.latlng.lat;selectedLng=e.latlng.lng;
-  if(marker)map.removeLayer(marker);
-  marker=L.marker([selectedLat,selectedLng],{draggable:true}).addTo(map);
-  marker.on('dragend',function(ev){
-    var p=ev.target.getLatLng();selectedLat=p.lat;selectedLng=p.lng;reverseGeocode(p.lat,p.lng);
-  });
-  reverseGeocode(selectedLat,selectedLng);
-});
-function reverseGeocode(lat,lng){
-  document.getElementById('addr').innerHTML='<b>Loading address...</b>';
-  fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&addressdetails=1',
-    {headers:{'User-Agent':'FOODFIX-App/2.3'}})
-  .then(r=>r.json()).then(d=>{
-    selectedAddr=d.display_name||(''+lat.toFixed(5)+', '+lng.toFixed(5));
-    document.getElementById('addr').innerHTML='<b>Location: </b>'+selectedAddr;
-    document.getElementById('confirm').style.display='block';
-  }).catch(()=>{
-    selectedAddr=lat.toFixed(5)+', '+lng.toFixed(5);
-    document.getElementById('addr').innerHTML='<b>Location: </b>'+selectedAddr;
-    document.getElementById('confirm').style.display='block';
-  });
-}
-function confirmLocation(){
-  window.ReactNativeWebView.postMessage(JSON.stringify({lat:selectedLat,lng:selectedLng,address:selectedAddr}));
-}
-</script></body></html>`;
+  function handleAddressChange(text: string) {
+    setAddress(text);
+    setShowSuggestions(false);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => fetchAddressSuggestions(text), 300);
+  }
+
+  function handleSelectSuggestion(suggestion: NominatimSuggestion) {
+    setAddress(suggestion.display_name);
+    setCoords({ lat: parseFloat(suggestion.lat), lng: parseFloat(suggestion.lon) });
+    setShowSuggestions(false);
+    setAddressSuggestions([]);
+  }
+
+  async function handleSaveAddress() {
+    if (!saveLabel.trim()) {
+      Alert.alert("Label Required", "Please enter a label for this address (e.g. Home, Office).");
+      return;
+    }
+    const user = getCurrentUser();
+    if (!user) return;
+    setSavingAddress(true);
+    try {
+      await saveAddress(user.uid, {
+        label: saveLabel.trim(),
+        address: address.trim(),
+        phone: phone.trim(),
+        lat: coords?.lat,
+        lng: coords?.lng,
+      });
+      setSaveAddressModal(false);
+      setSaveLabel("");
+      await loadSavedAddresses();
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to save address.");
+    }
+    setSavingAddress(false);
+  }
+
+  async function handleDeleteSavedAddress(addr: SavedAddress) {
+    const user = getCurrentUser();
+    if (!user) return;
+    Alert.alert("Delete Address", `Remove "${addr.label}"?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try {
+          await deleteSavedAddress(user.uid, addr.id);
+          await loadSavedAddresses();
+        } catch (e: any) {
+          Alert.alert("Error", e.message || "Failed to delete address.");
+        }
+      }},
+    ]);
+  }
+
+  function handleSelectSavedAddress(addr: SavedAddress) {
+    setAddress(addr.address);
+    setPhone(addr.phone);
+    if (addr.lat && addr.lng) {
+      setCoords({ lat: addr.lat, lng: addr.lng });
+    }
   }
 
   async function saveCart(items: CartItem[]) {
@@ -239,8 +296,8 @@ function confirmLocation(){
   const deliveryFee = (orderType === "delivery_now" || orderType === "delivery_later") ? (settings?.delivery_fee || 50) : 0;
   const total = subtotal + deliveryFee;
 
-  const STORE_LAT = 14.5995;
-  const STORE_LNG = 120.9842;
+  const STORE_LAT = 13.7565;
+  const STORE_LNG = 121.0583;
 
   function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
@@ -319,7 +376,11 @@ function confirmLocation(){
 
       await AsyncStorage.removeItem(CART_KEY);
       setCart([]);
-      Alert.alert("Order Placed!", `Your order number is:\n\n${result.order_number}\n\nTrack it in the Orders tab.`);
+      if (paymentMethod === "gcash") {
+        setGcashOrder({ orderId: result.id, orderNumber: result.order_number, amount: total });
+      } else {
+        Alert.alert("Order Placed!", `Your order number is:\n\n${result.order_number}\n\nTrack it in the Orders tab.`);
+      }
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to place order.");
     }
@@ -447,37 +508,81 @@ function confirmLocation(){
               ))}
             </ScrollView>
 
-            {/* GCash notice */}
+            {/* GCash QR Code Display */}
             {paymentMethod === "gcash" && (
-              <View style={styles.gcashNotice}>
-                <Ionicons name="information-circle" size={18} color="#3498DB" />
-                <Text style={styles.gcashNoticeText}>
-                  For GCash payments, please use the <Text style={{ fontWeight: "bold" }}>Live Chat</Text> tab to coordinate payment with the store.
-                </Text>
+              <View style={styles.gcashQrSection}>
+                <Text style={styles.gcashQrTitle}>Pay via GCash</Text>
+                {settings?.gcash_qr_image ? (
+                  <Image source={{ uri: settings.gcash_qr_image }} style={styles.gcashQrImage} />
+                ) : (
+                  <View style={styles.gcashQrPlaceholder}>
+                    <Ionicons name="phone-portrait-outline" size={40} color="#F25C05" />
+                    <Text style={styles.gcashQrPlaceholderNumber}>{settings?.gcash_number || "No GCash number set"}</Text>
+                  </View>
+                )}
+                <Text style={styles.gcashQrLabel}>GCash Number: <Text style={{ fontWeight: "bold" }}>{settings?.gcash_number || "N/A"}</Text></Text>
+                <View style={styles.gcashInstructions}>
+                  <Ionicons name="information-circle" size={16} color="#3498DB" />
+                  <Text style={styles.gcashInstructionText}>
+                    Open your GCash app, send payment to the number above, then tap "I Have Paid" below.
+                  </Text>
+                </View>
               </View>
+            )}
+
+            {/* Saved Addresses */}
+            {(orderType === "delivery_now" || orderType === "delivery_later") && savedAddresses.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>Saved Addresses</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.savedAddressesRow}>
+                  {savedAddresses.map((addr) => (
+                    <TouchableOpacity key={addr.id} style={styles.savedAddressCard} onPress={() => handleSelectSavedAddress(addr)}>
+                      <View style={styles.savedAddressCardHeader}>
+                        <Text style={styles.savedAddressLabel}>{addr.label}</Text>
+                        <TouchableOpacity onPress={() => handleDeleteSavedAddress(addr)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name="close-circle" size={16} color="#E74C3C" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.savedAddressText} numberOfLines={2}>{addr.address}</Text>
+                      <Text style={styles.savedAddressPhone}>{addr.phone}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
             )}
 
             {/* Address & Phone */}
             {(orderType === "delivery_now" || orderType === "delivery_later") && (
               <>
                 <Text style={styles.inputLabel}>Delivery Address</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your delivery address"
-                  value={address}
-                  onChangeText={setAddress}
-                  placeholderTextColor="#aaa"
-                  multiline
-                />
+                <View style={styles.addressInputRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1, marginHorizontal: 0 }]}
+                    placeholder="Search for your address..."
+                    value={address}
+                    onChangeText={handleAddressChange}
+                    placeholderTextColor="#aaa"
+                    multiline
+                  />
+                  <TouchableOpacity style={styles.saveAddressBtn} onPress={() => { setSaveLabel(""); setSaveAddressModal(true); }}>
+                    <Ionicons name="bookmark-outline" size={18} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                {showSuggestions && addressSuggestions.length > 0 && (
+                  <View style={styles.suggestionsContainer}>
+                    {addressSuggestions.map((s, i) => (
+                      <TouchableOpacity key={i} style={styles.suggestionItem} onPress={() => handleSelectSuggestion(s)}>
+                        <Ionicons name="location-outline" size={14} color="#F25C05" style={{ marginRight: 6 }} />
+                        <Text style={styles.suggestionText} numberOfLines={2}>{s.display_name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
                 <View style={styles.locationBtns}>
                   <TouchableOpacity style={styles.locationBtn} onPress={useMyLocation} disabled={locating}>
                     {locating ? <ActivityIndicator size="small" color="#F25C05" /> :
                       <Ionicons name="navigate" size={15} color="#F25C05" />}
                     <Text style={styles.locationBtnText}>{locating ? "Locating..." : "Use My Location"}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.locationBtn} onPress={() => setMapModal(true)}>
-                    <Ionicons name="map" size={15} color="#F25C05" />
-                    <Text style={styles.locationBtnText}>Pick on Map</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -528,26 +633,75 @@ function confirmLocation(){
         )}
       </ScrollView>
 
-      {/* Map Picker Modal (OSM + Leaflet) */}
-      <Modal visible={mapModal} animationType="slide" onRequestClose={() => setMapModal(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#F9F0DC" }}>
-          <View style={styles.mapHeader}>
-            <Text style={styles.mapHeaderTitle}>Pick Location</Text>
-            <TouchableOpacity onPress={() => setMapModal(false)} style={{ padding: 4 }}>
-              <Ionicons name="close" size={24} color="#888" />
+      {/* Save Address Modal */}
+      <Modal visible={saveAddressModal} transparent animationType="fade" onRequestClose={() => setSaveAddressModal(false)}>
+        <View style={styles.saveOverlay}>
+          <View style={styles.saveCard}>
+            <Ionicons name="bookmark" size={36} color="#F25C05" />
+            <Text style={styles.saveTitle}>Save Address</Text>
+            <TextInput
+              style={styles.saveInput}
+              placeholder="Label (e.g. Home, Office, Other)"
+              value={saveLabel}
+              onChangeText={setSaveLabel}
+              placeholderTextColor="#aaa"
+              autoFocus
+            />
+            <View style={styles.saveActions}>
+              <TouchableOpacity style={styles.saveCancelBtn} onPress={() => setSaveAddressModal(false)}>
+                <Text style={styles.saveCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveConfirmBtn, savingAddress && { opacity: 0.6 }]} onPress={handleSaveAddress} disabled={savingAddress}>
+                {savingAddress ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveConfirmText}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* GCash Payment Confirmation Modal */}
+      {gcashOrder && (
+        <View style={styles.gcashOverlay}>
+          <View style={styles.gcashConfirmCard}>
+            <Ionicons name="checkmark-circle" size={48} color="#27AE60" />
+            <Text style={styles.gcashConfirmTitle}>Order Placed!</Text>
+            <Text style={styles.gcashConfirmOrder}>#{gcashOrder.orderNumber}</Text>
+            <Text style={styles.gcashConfirmAmount}>Amount Due: P{gcashOrder.amount.toFixed(2)}</Text>
+            <View style={styles.gcashConfirmSep} />
+            <Text style={styles.gcashConfirmLabel}>Pay via GCash</Text>
+            {settings?.gcash_qr_image ? (
+              <Image source={{ uri: settings.gcash_qr_image }} style={styles.gcashConfirmQr} />
+            ) : (
+              <View style={styles.gcashConfirmQrPlaceholder}>
+                <Ionicons name="phone-portrait-outline" size={32} color="#F25C05" />
+                <Text style={styles.gcashConfirmQrNumber}>{settings?.gcash_number || "N/A"}</Text>
+              </View>
+            )}
+            <Text style={styles.gcashConfirmNumber}>Send to: {settings?.gcash_number || "N/A"}</Text>
+            <TouchableOpacity
+              style={[styles.gcashNotifyBtn, notifyingGcash && { opacity: 0.6 }]}
+              onPress={async () => {
+                setNotifyingGcash(true);
+                try {
+                  await notifyGcashPayment(gcashOrder.orderId, "Customer", gcashOrder.amount);
+                  Alert.alert("Notification Sent", "The store has been notified of your payment. Track your order in the Orders tab.");
+                  setGcashOrder(null);
+                } catch (e: any) {
+                  Alert.alert("Error", e.message || "Failed to notify store.");
+                }
+                setNotifyingGcash(false);
+              }}
+              disabled={notifyingGcash}
+            >
+              {notifyingGcash ? <ActivityIndicator color="#fff" /> : <Ionicons name="notifications" size={18} color="#fff" />}
+              <Text style={styles.gcashNotifyBtnText}>Notify Store of Payment</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.gcashConfirmLater} onPress={() => setGcashOrder(null)}>
+              <Text style={styles.gcashConfirmLaterText}>I'll pay later</Text>
             </TouchableOpacity>
           </View>
-          <WebView
-            ref={webViewRef}
-            originWhitelist={["*"]}
-            source={{ html: getMapHtml(coords?.lat ?? 14.5995, coords?.lng ?? 120.9842) }}
-            onMessage={handleMapMessage}
-            javaScriptEnabled
-            domStorageEnabled
-            style={{ flex: 1 }}
-          />
-        </SafeAreaView>
-      </Modal>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -626,16 +780,106 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "#F25C0544",
   },
   locationBtnText: { fontSize: 12, color: "#F25C05", fontWeight: "600" },
-  mapHeader: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    padding: 16, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#E8D8A0",
-  },
-  mapHeaderTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06" },
   phoneError: { color: "#E74C3C", fontSize: 12, marginHorizontal: 16, marginTop: 2 },
-  gcashNotice: {
-    flexDirection: "row", alignItems: "flex-start", gap: 8,
-    backgroundColor: "#EBF5FB", borderRadius: 12, padding: 12, marginHorizontal: 16, marginTop: 8,
-    borderWidth: 1, borderColor: "#3498DB33",
+  gcashQrSection: {
+    marginHorizontal: 16, marginTop: 8, backgroundColor: "#fff",
+    borderRadius: 16, padding: 16, alignItems: "center", borderWidth: 1.5, borderColor: "#E8D8A0",
   },
-  gcashNoticeText: { flex: 1, fontSize: 12, color: "#2E1A06", lineHeight: 18 },
+  gcashQrTitle: { fontSize: 15, fontWeight: "bold", color: "#2E1A06", marginBottom: 12 },
+  gcashQrImage: { width: 160, height: 160, borderRadius: 12, marginBottom: 12 },
+  gcashQrPlaceholder: {
+    width: 160, height: 160, borderRadius: 12, backgroundColor: "#FFF5EE",
+    justifyContent: "center", alignItems: "center", marginBottom: 12,
+    borderWidth: 2, borderColor: "#F25C05", borderStyle: "dashed",
+  },
+  gcashQrPlaceholderNumber: { fontSize: 18, fontWeight: "bold", color: "#F25C05", marginTop: 8 },
+  gcashQrLabel: { fontSize: 13, color: "#555", marginBottom: 8 },
+  gcashInstructions: {
+    flexDirection: "row", alignItems: "flex-start", gap: 6,
+    backgroundColor: "#EBF5FB", borderRadius: 10, padding: 10,
+  },
+  gcashInstructionText: { flex: 1, fontSize: 11, color: "#2E1A06", lineHeight: 16 },
+  gcashOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center",
+    zIndex: 999,
+  },
+  gcashConfirmCard: {
+    backgroundColor: "#fff", borderRadius: 24, padding: 24, width: "85%",
+    alignItems: "center", elevation: 10,
+  },
+  gcashConfirmTitle: { fontSize: 20, fontWeight: "bold", color: "#2E1A06", marginTop: 8 },
+  gcashConfirmOrder: { fontSize: 14, color: "#888", marginTop: 2, fontWeight: "600" },
+  gcashConfirmAmount: { fontSize: 16, fontWeight: "bold", color: "#F25C05", marginTop: 6 },
+  gcashConfirmSep: { width: "60%", height: 1, backgroundColor: "#eee", marginVertical: 14 },
+  gcashConfirmLabel: { fontSize: 13, color: "#888", marginBottom: 8 },
+  gcashConfirmQr: { width: 140, height: 140, borderRadius: 10, marginBottom: 8 },
+  gcashConfirmQrPlaceholder: {
+    width: 140, height: 140, borderRadius: 10, backgroundColor: "#FFF5EE",
+    justifyContent: "center", alignItems: "center", marginBottom: 8,
+    borderWidth: 2, borderColor: "#F25C05", borderStyle: "dashed",
+  },
+  gcashConfirmQrNumber: { fontSize: 16, fontWeight: "bold", color: "#F25C05", marginTop: 6 },
+  gcashConfirmNumber: { fontSize: 13, color: "#555", marginBottom: 14 },
+  gcashNotifyBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#F25C05", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24, width: "100%",
+  },
+  gcashNotifyBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
+  gcashConfirmLater: { marginTop: 12, padding: 8 },
+  gcashConfirmLaterText: { color: "#888", fontSize: 13 },
+  savedAddressesRow: { paddingHorizontal: 16, gap: 8 },
+  savedAddressCard: {
+    backgroundColor: "#fff", borderRadius: 14, padding: 12,
+    minWidth: 180, maxWidth: 220, borderWidth: 1, borderColor: "#E8D8A0", elevation: 1,
+  },
+  savedAddressCardHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6,
+  },
+  savedAddressLabel: { fontSize: 13, fontWeight: "bold", color: "#F25C05" },
+  savedAddressText: { fontSize: 12, color: "#333", lineHeight: 16 },
+  savedAddressPhone: { fontSize: 11, color: "#888", marginTop: 4 },
+  addressInputRow: {
+    flexDirection: "row", alignItems: "flex-start", marginHorizontal: 16, gap: 8,
+  },
+  saveAddressBtn: {
+    backgroundColor: "#F25C05", borderRadius: 12, padding: 14,
+    justifyContent: "center", alignItems: "center",
+  },
+  suggestionsContainer: {
+    backgroundColor: "#fff", marginHorizontal: 16, marginTop: 2,
+    borderRadius: 12, borderWidth: 1, borderColor: "#E8D8A0",
+    elevation: 4, zIndex: 10,
+  },
+  suggestionItem: {
+    flexDirection: "row", alignItems: "center", paddingVertical: 10,
+    paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#f0f0f0",
+  },
+  suggestionText: { fontSize: 13, color: "#333", flex: 1, lineHeight: 18 },
+  saveOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center", alignItems: "center",
+  },
+  saveCard: {
+    backgroundColor: "#fff", borderRadius: 24, padding: 24, width: "80%",
+    alignItems: "center", elevation: 10,
+  },
+  saveTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06", marginTop: 8, marginBottom: 16 },
+  saveInput: {
+    backgroundColor: "#F9F0DC", borderRadius: 12, padding: 14, width: "100%",
+    fontSize: 14, color: "#333", borderWidth: 1, borderColor: "#E8D8A0",
+  },
+  saveActions: {
+    flexDirection: "row", gap: 12, marginTop: 16, width: "100%",
+  },
+  saveCancelBtn: {
+    flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center",
+    backgroundColor: "#f0f0f0",
+  },
+  saveCancelText: { fontSize: 14, color: "#666", fontWeight: "600" },
+  saveConfirmBtn: {
+    flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center",
+    backgroundColor: "#F25C05",
+  },
+  saveConfirmText: { fontSize: 14, color: "#fff", fontWeight: "bold" },
 });

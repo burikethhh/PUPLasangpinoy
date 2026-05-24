@@ -1,4 +1,4 @@
-// Order-related constants for LasangPinoy Food Ordering System
+// Order-related constants for FoodFix Food Ordering System
 
 export const ORDER_STATUSES = [
   "pending",
@@ -80,6 +80,7 @@ export const MENU_CATEGORIES = [
   "Vegetable",
   "Snacks",
   "Beverage",
+  "Made to Order",
 ] as const;
 
 export type MenuCategory = (typeof MENU_CATEGORIES)[number];
@@ -95,4 +96,5 @@ export const MENU_CATEGORY_COLORS: Record<string, string> = {
   Vegetable: "#2E7D32",
   Snacks: "#FF6F61",
   Beverage: "#3F51B5",
+  "Made to Order": "#8B4513",
 };

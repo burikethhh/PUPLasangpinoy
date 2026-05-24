@@ -1,4 +1,4 @@
-// Global Jest setup for LasangPinoy Mobile tests
+// Global Jest setup for FoodFix Mobile tests
 
 // ── Environment variables for modules that read them at load time ──────────
 process.env.EXPO_PUBLIC_QWEN_API_KEY = "sk-test-api-key-for-jest";

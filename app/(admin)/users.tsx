@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator, Alert, ScrollView, StyleSheet, Switch,
+    ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Switch,
     Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { uploadToCloudinary } from "../../lib/cloudinary";
 import {
     createStaffAccount,
     deleteUser,
@@ -32,6 +34,8 @@ export default function AdminMoreScreen() {
   const [deliveryRadius, setDeliveryRadius] = useState("");
   const [gcashNumber, setGcashNumber] = useState("");
   const [gcashEnabled, setGcashEnabled] = useState(false);
+  const [gcashQrImage, setGcashQrImage] = useState("");
+  const [uploadingQr, setUploadingQr] = useState(false);
   const [staffModal, setStaffModal] = useState(false);
   const [staffForm, setStaffForm] = useState({ name: "", email: "", password: "", phone: "" });
   const [creatingStaff, setCreatingStaff] = useState(false);
@@ -59,12 +63,32 @@ export default function AdminMoreScreen() {
       setDeliveryRadius((s.delivery_radius_km || 10).toString());
       setGcashEnabled(s.gcash_enabled);
       setGcashNumber(s.gcash_number || "");
+      setGcashQrImage(s.gcash_qr_image || "");
       const staffUsers = u.filter((x) => x.role === "staff");
       setStaff(staffUsers);
       setUsers(u);
       setOrders(o);
     } catch (e) { console.error(e); }
     setLoading(false);
+  }
+
+  async function pickGcashQrImage() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setUploadingQr(true);
+      try {
+        const url = await uploadToCloudinary(result.assets[0].uri, "foodfix/gcash");
+        setGcashQrImage(url);
+      } catch (e: any) {
+        Alert.alert("Upload Error", e.message || "Failed to upload image.");
+      }
+      setUploadingQr(false);
+    }
   }
 
   async function saveSettings() {
@@ -75,6 +99,7 @@ export default function AdminMoreScreen() {
         delivery_radius_km: parseFloat(deliveryRadius) || 10,
         gcash_enabled: gcashEnabled,
         gcash_number: gcashNumber.trim(),
+        gcash_qr_image: gcashQrImage,
       });
       Alert.alert("Saved", "Settings updated!");
     } catch (e: any) { Alert.alert("Error", e.message); }
@@ -339,6 +364,20 @@ export default function AdminMoreScreen() {
               <Text style={styles.label}>GCash Number</Text>
               <TextInput style={styles.input} value={gcashNumber} keyboardType="phone-pad"
                 onChangeText={setGcashNumber} placeholder="09XX XXX XXXX" placeholderTextColor="#aaa" />
+              <Text style={styles.label}>GCash QR Code Image</Text>
+              {gcashQrImage ? (
+                <View style={{ alignItems: "center", marginVertical: 8 }}>
+                  <Image source={{ uri: gcashQrImage }} style={{ width: 140, height: 140, borderRadius: 12 }} />
+                  <TouchableOpacity onPress={() => setGcashQrImage("")} style={{ marginTop: 4 }}>
+                    <Text style={{ color: "#E74C3C", fontSize: 12 }}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.uploadQrBtn} onPress={pickGcashQrImage} disabled={uploadingQr}>
+                  {uploadingQr ? <ActivityIndicator color="#F25C05" /> : <Ionicons name="cloud-upload-outline" size={18} color="#F25C05" />}
+                  <Text style={styles.uploadQrBtnText}>{uploadingQr ? "Uploading..." : "Upload QR Code"}</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
           <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]}
@@ -550,4 +589,10 @@ const styles = StyleSheet.create({
   roleBtnActive: { borderColor: "#F25C05", backgroundColor: "#FEF3EC" },
   roleBtnText: { fontSize: 12, color: "#888", fontWeight: "600" },
   roleBtnTextActive: { color: "#F25C05", fontWeight: "700" },
+  uploadQrBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#FFF5EE", borderRadius: 12, padding: 12, marginTop: 4,
+    borderWidth: 1.5, borderColor: "#F25C05", borderStyle: "dashed",
+  },
+  uploadQrBtnText: { color: "#F25C05", fontWeight: "600", fontSize: 13 },
 });

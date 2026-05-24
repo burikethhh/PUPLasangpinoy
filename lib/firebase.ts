@@ -1,4 +1,4 @@
-// Firebase Configuration for LasangPinoy Mobile
+// Firebase Configuration for FoodFix Mobile
 // With REST API fallback for web browsers with ad blockers
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApp, getApps, initializeApp } from "firebase/app";
@@ -41,9 +41,9 @@ import { createLogger } from "./logger";
 const log = createLogger("Firebase");
 
 // Cache keys
-const CACHE_KEY_RECIPES = "@lasangpinoy_recipes_cache";
-const CACHE_KEY_REGIONS = "@lasangpinoy_regions_cache";
-const CACHE_KEY_CATEGORIES = "@lasangpinoy_categories_cache";
+const CACHE_KEY_RECIPES = "@foodfix_recipes_cache";
+const CACHE_KEY_REGIONS = "@foodfix_regions_cache";
+const CACHE_KEY_CATEGORIES = "@foodfix_categories_cache";
 
 // Types
 export interface Profile {
@@ -1292,7 +1292,7 @@ export async function uploadRecipeImage(
   _recipeId?: string,
 ): Promise<string> {
   const { uploadToCloudinary } = await import("./cloudinary");
-  return uploadToCloudinary(uri, "lasangpinoy/recipes");
+  return uploadToCloudinary(uri, "foodfix/recipes");
 }
 
 // ==================== ALL FEEDBACK (ADMIN) ====================

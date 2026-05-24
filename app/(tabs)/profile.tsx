@@ -372,6 +372,16 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.exploreRow} onPress={() => router.push("/(tabs)/submit-dish")}>
+            <View style={[styles.exploreIcon, { backgroundColor: "#F25C0522" }]}>
+              <Ionicons name="restaurant" size={20} color="#F25C05" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.exploreName}>Submit a Dish</Text>
+              <Text style={styles.exploreSub}>Suggest a dish to Derick Food House</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.exploreRow} onPress={() => router.push("/(tabs)/collections")}>
             <View style={[styles.exploreIcon, { backgroundColor: "#3498DB22" }]}>
               <Ionicons name="navigate" size={20} color="#3498DB" />
@@ -407,7 +417,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 2.9.6</Text>
+        <Text style={styles.version}>Version 3.0.0</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent>

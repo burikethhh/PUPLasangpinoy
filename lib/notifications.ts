@@ -1,4 +1,4 @@
-// Push Notification Service for LasangPinoy Mobile
+// Push Notification Service for FoodFix Mobile
 // Uses expo-notifications for local and push notifications
 
 import Constants from "expo-constants";

@@ -27,6 +27,9 @@ import {
 const EMPTY_FORM = {
   name: "", description: "", price: "", category: MENU_CATEGORIES[0] as string,
   image_url: "", stock_quantity: "50", available: true,
+  is_made_to_order: false,
+  batch_date: "",
+  calories: "", protein: "", carbs: "", fat: "", fiber: "", sodium: "",
 };
 
 export default function AdminMenuScreen() {
@@ -87,6 +90,14 @@ export default function AdminMenuScreen() {
       price: item.price.toString(), category: item.category,
       image_url: item.image_url || "", stock_quantity: item.stock_quantity.toString(),
       available: item.available,
+      is_made_to_order: item.is_made_to_order || false,
+      batch_date: item.batch_date || "",
+      calories: item.nutrients?.calories?.toString() || "",
+      protein: item.nutrients?.protein?.toString() || "",
+      carbs: item.nutrients?.carbs?.toString() || "",
+      fat: item.nutrients?.fat?.toString() || "",
+      fiber: item.nutrients?.fiber?.toString() || "",
+      sodium: item.nutrients?.sodium?.toString() || "",
     });
     setModalVisible(true);
   }
@@ -96,12 +107,29 @@ export default function AdminMenuScreen() {
       Alert.alert("Error", "Name and price are required."); return;
     }
     setSaving(true);
-    const payload = {
+    const nutrients: Record<string, number | undefined> = {};
+    const cal = parseFloat(form.calories);
+    const pro = parseFloat(form.protein);
+    const carb = parseFloat(form.carbs);
+    const ft = parseFloat(form.fat);
+    const fib = parseFloat(form.fiber);
+    const sod = parseFloat(form.sodium);
+    if (!isNaN(cal)) nutrients.calories = cal;
+    if (!isNaN(pro)) nutrients.protein = pro;
+    if (!isNaN(carb)) nutrients.carbs = carb;
+    if (!isNaN(ft)) nutrients.fat = ft;
+    if (!isNaN(fib)) nutrients.fiber = fib;
+    if (!isNaN(sod)) nutrients.sodium = sod;
+
+    const payload: Record<string, any> = {
       name: form.name.trim(), description: form.description.trim(),
       price: parseFloat(form.price) || 0, category: form.category,
       image_url: form.image_url.trim(), stock_quantity: parseInt(form.stock_quantity) || 0,
       available: form.available,
+      is_made_to_order: form.is_made_to_order,
+      batch_date: form.batch_date.trim() || null,
     };
+    if (Object.keys(nutrients).length > 0) payload.nutrients = nutrients;
     try {
       if (editing) await updateMenuItem(editing.id, payload);
       else await addMenuItem(payload);
@@ -400,6 +428,59 @@ export default function AdminMenuScreen() {
                 <Ionicons name={form.available ? "checkbox" : "square-outline"} size={22} color="#F25C05" />
                 <Text style={styles.toggleText}>Available for ordering</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity style={styles.toggleRow}
+                onPress={() => setForm((f) => ({ ...f, is_made_to_order: !f.is_made_to_order }))}>
+                <Ionicons name={form.is_made_to_order ? "checkbox" : "square-outline"} size={22} color="#8B4513" />
+                <Text style={styles.toggleText}>Made to Order (Bilao items)</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.label}>Batch Date (daily expiry)</Text>
+              <TextInput style={styles.input} value={form.batch_date}
+                onChangeText={(v) => setForm((f) => ({ ...f, batch_date: v }))}
+                placeholder="YYYY-MM-DD (leave empty for permanent items)" placeholderTextColor="#aaa"
+                autoCapitalize="none" />
+
+              <Text style={styles.sectionTitle}>Nutrients (optional)</Text>
+              <View style={styles.nutrientGrid}>
+                <View style={styles.nutrientField}>
+                  <Text style={styles.label}>Calories</Text>
+                  <TextInput style={styles.input} value={form.calories} keyboardType="numeric"
+                    onChangeText={(v) => setForm((f) => ({ ...f, calories: v }))}
+                    placeholder="kcal" placeholderTextColor="#aaa" />
+                </View>
+                <View style={styles.nutrientField}>
+                  <Text style={styles.label}>Protein</Text>
+                  <TextInput style={styles.input} value={form.protein} keyboardType="numeric"
+                    onChangeText={(v) => setForm((f) => ({ ...f, protein: v }))}
+                    placeholder="g" placeholderTextColor="#aaa" />
+                </View>
+                <View style={styles.nutrientField}>
+                  <Text style={styles.label}>Carbs</Text>
+                  <TextInput style={styles.input} value={form.carbs} keyboardType="numeric"
+                    onChangeText={(v) => setForm((f) => ({ ...f, carbs: v }))}
+                    placeholder="g" placeholderTextColor="#aaa" />
+                </View>
+                <View style={styles.nutrientField}>
+                  <Text style={styles.label}>Fat</Text>
+                  <TextInput style={styles.input} value={form.fat} keyboardType="numeric"
+                    onChangeText={(v) => setForm((f) => ({ ...f, fat: v }))}
+                    placeholder="g" placeholderTextColor="#aaa" />
+                </View>
+                <View style={styles.nutrientField}>
+                  <Text style={styles.label}>Fiber</Text>
+                  <TextInput style={styles.input} value={form.fiber} keyboardType="numeric"
+                    onChangeText={(v) => setForm((f) => ({ ...f, fiber: v }))}
+                    placeholder="g" placeholderTextColor="#aaa" />
+                </View>
+                <View style={styles.nutrientField}>
+                  <Text style={styles.label}>Sodium</Text>
+                  <TextInput style={styles.input} value={form.sodium} keyboardType="numeric"
+                    onChangeText={(v) => setForm((f) => ({ ...f, sodium: v }))}
+                    placeholder="mg" placeholderTextColor="#aaa" />
+                </View>
+              </View>
+
               <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]}
                 onPress={handleSave} disabled={saving}>
                 {saving ? <ActivityIndicator color="#fff" /> :
@@ -574,4 +655,7 @@ const styles = StyleSheet.create({
   imagePickRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   galleryBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#3498DB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
   galleryBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
+  nutrientGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 },
+  nutrientField: { width: "30%", minWidth: 90 },
+  sectionTitle: { fontSize: 14, fontWeight: "700", color: "#2E1A06", marginTop: 16, marginBottom: 4 },
 });

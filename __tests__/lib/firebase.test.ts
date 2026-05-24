@@ -229,7 +229,7 @@ describe("addRecipe", () => {
     mockCreateDocument.mockResolvedValueOnce("rid");
     await addRecipe({ title: "Test" });
     expect(AsyncStorage.removeItem).toHaveBeenCalledWith(
-      "@lasangpinoy_recipes_cache",
+      "@foodfix_recipes_cache",
     );
   });
 });

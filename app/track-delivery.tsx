@@ -366,8 +366,8 @@ export default function TrackDeliveryScreen() {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 html,body,#map{margin:0;padding:0;height:100%;width:100%}
-.legend{position:fixed;bottom:10px;left:10px;z-index:999;background:#fff;padding:8px 12px;
-  border-radius:12px;font-family:sans-serif;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.legend{position:fixed;bottom:6px;left:6px;z-index:999;background:#fff;padding:4px 8px;
+  border-radius:8px;font-family:sans-serif;font-size:10px;box-shadow:0 1px 4px rgba(0,0,0,.12)}
 </style></head><body>
 <div id="map"></div>
 <div class="legend" id="legend">Loading map...</div>
@@ -376,9 +376,9 @@ var map = L.map('map').setView([${centerLat},${centerLng}], 14);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'&copy; OSM contributors', maxZoom:19}).addTo(map);
 
-var storeIcon = L.divIcon({html:'<div style="background:#F25C05;color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">S</div>',className:'',iconSize:[26,26],iconAnchor:[13,13]});
-var custIcon  = L.divIcon({html:'<div style="background:#E74C3C;color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">C</div>',className:'',iconSize:[26,26],iconAnchor:[13,26]});
-var driverIcon= L.divIcon({html:'<div style="background:#3498DB;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">D</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
+var storeIcon = L.divIcon({html:'<div style="background:#F25C05;color:#fff;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)">S</div>',className:'',iconSize:[18,18],iconAnchor:[9,9]});
+var custIcon  = L.divIcon({html:'<div style="background:#E74C3C;color:#fff;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)">C</div>',className:'',iconSize:[18,18],iconAnchor:[9,18]});
+var driverIcon= L.divIcon({html:'<div style="background:#3498DB;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)">D</div>',className:'',iconSize:[22,22],iconAnchor:[11,11]});
 
 L.marker([${STORE_LAT},${STORE_LNG}],{icon:storeIcon}).addTo(map).bindPopup('FOODFIX Store');
 var custMarker = L.marker([${customerLat},${customerLng}],{icon:custIcon}).addTo(map).bindPopup('Delivery Location');
@@ -664,27 +664,27 @@ function handleMsg(raw){
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#E8D8A0" },
-  headerTitle: { fontSize: 17, fontWeight: "bold", color: "#2E1A06" },
-  orderBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FFF5EE" },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#E8D8A0" },
+  headerTitle: { fontSize: 16, fontWeight: "bold", color: "#2E1A06" },
+  orderBar: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#FFF5EE" },
   orderBarText: { fontSize: 13, fontWeight: "600", color: "#2E1A06", flex: 1 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusLabel: { fontSize: 12, color: "#666" },
   mapContainer: { flex: 1 },
   permissionBanner: {
-    flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#fff",
-    paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: 1, borderTopColor: "#E8D8A0",
+    flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fff",
+    paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#E8D8A0",
   },
-  permissionText: { flex: 1, fontSize: 13, color: "#555" },
-  allowBtn: { backgroundColor: "#F25C05", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  allowBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
-  etaBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#E8F8F0", paddingHorizontal: 16, paddingVertical: 12 },
-  etaText: { fontSize: 14, fontWeight: "600", color: "#2E1A06" },
-  waitingBar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFF9E6", paddingHorizontal: 16, paddingVertical: 12 },
-  waitingText: { fontSize: 13, color: "#B07820" },
-  riderInfoBar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#EBF5FB", paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#D6EAF8" },
-  riderInfoText: { flex: 1, fontSize: 14, fontWeight: "600", color: "#2E1A06" },
-  staffControls: { backgroundColor: "#fff", padding: 16, borderTopWidth: 1, borderTopColor: "#E8D8A0" },
+  permissionText: { flex: 1, fontSize: 12, color: "#555" },
+  allowBtn: { backgroundColor: "#F25C05", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
+  allowBtnText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
+  etaBar: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#E8F8F0", paddingHorizontal: 12, paddingVertical: 8 },
+  etaText: { fontSize: 13, fontWeight: "600", color: "#2E1A06" },
+  waitingBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFF9E6", paddingHorizontal: 12, paddingVertical: 8 },
+  waitingText: { fontSize: 12, color: "#B07820" },
+  riderInfoBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#EBF5FB", paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: "#D6EAF8" },
+  riderInfoText: { flex: 1, fontSize: 13, fontWeight: "600", color: "#2E1A06" },
+  staffControls: { backgroundColor: "#fff", padding: 12, borderTopWidth: 1, borderTopColor: "#E8D8A0" },
   custInfo: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
   custInfoText: { flex: 1, fontSize: 14, fontWeight: "600", color: "#2E1A06" },
   custAddress: { fontSize: 12, color: "#888", marginBottom: 12 },
@@ -697,10 +697,10 @@ const styles = StyleSheet.create({
   aiChatBtn: { backgroundColor: "#F25C0520", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   aiChatBtnText: { fontSize: 12, fontWeight: "700", color: "#F25C05" },
   aiFloatingBtn: {
-    position: "absolute", bottom: 80, right: 16, width: 48, height: 48,
-    borderRadius: 24, backgroundColor: "#fff", elevation: 4,
+    position: "absolute", bottom: 60, right: 12, width: 40, height: 40,
+    borderRadius: 20, backgroundColor: "#fff", elevation: 3,
     justifyContent: "center", alignItems: "center", shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 3,
   },
   chatModal: {
     backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24,
