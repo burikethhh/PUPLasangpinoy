@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -26,6 +27,7 @@ export default function ProfileScreen() {
   const [editFields, setEditFields] = useState({ username: "", phone: "", address: "" });
   const [scanModal, setScanModal] = useState(false);
   const [scanImage, setScanImage] = useState<string | null>(null);
+  const [scanBase64, setScanBase64] = useState<string>("");
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
 
@@ -240,6 +242,7 @@ export default function ProfileScreen() {
     const uri = result.assets[0].uri;
     const base64 = result.assets[0].base64 || "";
     setScanImage(uri);
+    setScanBase64(base64);
     setScanResult(null);
     setScanModal(true);
     setScanning(true);
@@ -372,7 +375,7 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.exploreRow} onPress={() => router.push("/(tabs)/submit-dish")}>
+          <TouchableOpacity style={styles.exploreRow} onPress={() => router.push("/(tabs)/submit-dish" as any)}>
             <View style={[styles.exploreIcon, { backgroundColor: "#F25C0522" }]}>
               <Ionicons name="restaurant" size={20} color="#F25C05" />
             </View>
@@ -478,6 +481,22 @@ export default function ProfileScreen() {
                   <ScrollView style={styles.scanResultScroll} showsVerticalScrollIndicator>
                     <Text style={styles.scanResultText}>{scanResult}</Text>
                   </ScrollView>
+                  {scanImage && (
+                    <TouchableOpacity style={styles.submitSuggestionBtn} onPress={async () => {
+                      await AsyncStorage.setItem("@foodfix_scan_result", JSON.stringify({
+                        imageUri: scanImage,
+                        base64: scanBase64,
+                      }));
+                      setScanModal(false);
+                      setScanImage(null);
+                      setScanBase64("");
+                      setScanResult(null);
+                      router.push("/(tabs)/submit-dish" as any);
+                    }}>
+                      <Ionicons name="restaurant" size={16} color="#fff" />
+                      <Text style={styles.submitSuggestionBtnText}>Submit as Dish Suggestion</Text>
+                    </TouchableOpacity>
+                  )}
                 </>
               ) : null}
             </View>
@@ -488,7 +507,6 @@ export default function ProfileScreen() {
         <Modal visible={aiVisible} animationType="slide" transparent onRequestClose={handleCloseAi}>
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
             <View style={styles.aiModal}>
-              {/* Header */}
               <View style={styles.aiHeader}>
                 <View style={styles.aiHeaderLeft}>
                   <Ionicons name="chatbubble-ellipses" size={22} color="#F25C05" />
@@ -502,7 +520,6 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Quick question chips */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.aiChipsScroll} contentContainerStyle={styles.aiChipsRow}>
                 {["Where is my driver?", "How long until delivery?", "Is my order close?", "Order status update"].map((q) => (
                   <TouchableOpacity key={q} style={styles.aiChip} onPress={() => handleAiQuery(q)}>
@@ -511,7 +528,6 @@ export default function ProfileScreen() {
                 ))}
               </ScrollView>
 
-              {/* Messages */}
               <ScrollView ref={aiScrollRef} style={styles.aiMessages} contentContainerStyle={{ padding: 12, gap: 10 }} showsVerticalScrollIndicator={false}>
                 {aiMessages.length === 0 && (
                   <View style={styles.aiEmpty}>
@@ -531,7 +547,6 @@ export default function ProfileScreen() {
                 )}
               </ScrollView>
 
-              {/* Input */}
               <View style={styles.aiInputRow}>
                 <TextInput
                   style={styles.aiInput}
@@ -612,6 +627,11 @@ const styles = StyleSheet.create({
   scanImg: { width: "100%", height: 200, borderRadius: 12, marginBottom: 12 },
   scanResultScroll: { maxHeight: 280 },
   scanResultText: { fontSize: 14, color: "#333", lineHeight: 20 },
+  submitSuggestionBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#F25C05", borderRadius: 12, padding: 12, marginTop: 12,
+  },
+  submitSuggestionBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
   aiDisclaimer: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#FFF8E1", borderRadius: 8, padding: 8, marginBottom: 10 },
   aiDisclaimerText: { flex: 1, fontSize: 11, color: "#B07820", lineHeight: 15 },
   // AI Chat styles

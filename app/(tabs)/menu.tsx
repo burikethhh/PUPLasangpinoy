@@ -71,6 +71,7 @@ export default function MenuScreen() {
           category: activeCategory || undefined,
           search: search || undefined,
           availableOnly: false,
+          autoExpireDaily: true,
         }),
         getCategories(),
       ]);
@@ -199,10 +200,6 @@ export default function MenuScreen() {
         </View>
 
         {/* MENU GRID */}
-        <Text style={styles.sectionTitle}>
-          {activeCategory || "All Menu Items"} ({items.length})
-        </Text>
-
         {loading ? (
           <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
         ) : items.length === 0 ? (
@@ -211,71 +208,156 @@ export default function MenuScreen() {
             <Text style={styles.noResults}>No food items found.</Text>
           </View>
         ) : (
-          <View style={styles.grid}>
-            {items.map((item) => {
-              const color = MENU_CATEGORY_COLORS[item.category] || "#F25C05";
-              const unavailable = !item.available || item.stock_quantity <= 0;
-              return (
-                <View key={item.id} style={styles.menuCard}>
-                  {item.image_url ? (
-                    <Image
-                      source={{ uri: item.image_url }}
-                      style={styles.menuImage}
-                      contentFit="cover"
-                      transition={300}
-                      cachePolicy="none"
-                      recyclingKey={item.id}
-                    />
-                  ) : (
-                    <View style={[styles.imagePlaceholder, { backgroundColor: color + "22" }]}>
-                      <Ionicons name="restaurant-outline" size={36} color="#ccc" />
-                    </View>
-                  )}
+          <View>
+            {/* Daily Menu */}
+            {items.filter(i => !i.is_made_to_order).length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>
+                  {activeCategory ? `Daily Menu - ${activeCategory}` : "Daily Menu"}
+                </Text>
+                <View style={styles.grid}>
+                  {items.filter(i => !i.is_made_to_order).map((item) => {
+                    const color = MENU_CATEGORY_COLORS[item.category] || "#F25C05";
+                    const unavailable = !item.available || item.stock_quantity <= 0;
+                    return (
+                      <View key={item.id} style={styles.menuCard}>
+                        {item.image_url ? (
+                          <Image
+                            source={{ uri: item.image_url }}
+                            style={styles.menuImage}
+                            contentFit="cover"
+                            transition={300}
+                            cachePolicy="none"
+                            recyclingKey={item.id}
+                          />
+                        ) : (
+                          <View style={[styles.imagePlaceholder, { backgroundColor: color + "22" }]}>
+                            <Ionicons name="restaurant-outline" size={36} color="#ccc" />
+                          </View>
+                        )}
 
-                  {/* Category tag */}
-                  <View style={[styles.catTag, { backgroundColor: color }]}>
-                    <Text style={styles.catTagText}>{item.category}</Text>
-                  </View>
+                        {/* Category tag */}
+                        <View style={[styles.catTag, { backgroundColor: color }]}>
+                          <Text style={styles.catTagText}>{item.category}</Text>
+                        </View>
 
-                  {!item.available && (
-                    <View style={styles.unavailableBadge}>
-                      <Text style={styles.unavailableBadgeText}>Unavailable</Text>
-                    </View>
-                  )}
+                        {!item.available && (
+                          <View style={styles.unavailableBadge}>
+                            <Text style={styles.unavailableBadgeText}>Unavailable</Text>
+                          </View>
+                        )}
 
-                  {/* Favorite button */}
-                  <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
-                    <Ionicons name={favIds.has(item.id) ? "heart" : "heart-outline"}
-                      size={18} color={favIds.has(item.id) ? "#E74C3C" : "#999"} />
-                  </TouchableOpacity>
+                        {/* Favorite button */}
+                        <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
+                          <Ionicons name={favIds.has(item.id) ? "heart" : "heart-outline"}
+                            size={18} color={favIds.has(item.id) ? "#E74C3C" : "#999"} />
+                        </TouchableOpacity>
 
-                  <View style={styles.cardBottom}>
-                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                    {item.description ? (
-                      <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
-                    ) : null}
-                    <View style={styles.priceRow}>
-                      <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
-                      <Text style={[styles.stock, unavailable && styles.stockUnavailable]}>
-                        {!item.available
-                          ? "Unavailable"
-                          : item.stock_quantity > 0
-                            ? `${item.stock_quantity} left`
-                            : "Sold out"}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
-                      onPress={() => handleOpenModal(item)}
-                      disabled={unavailable}
-                    >
-                      <Ionicons name="cart-outline" size={14} color="#fff" />
-                      <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
-                    </TouchableOpacity>
-                  </View>
+                        <View style={styles.cardBottom}>
+                          <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                          {item.description ? (
+                            <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
+                          ) : null}
+                          <View style={styles.priceRow}>
+                            <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
+                            <Text style={[styles.stock, unavailable && styles.stockUnavailable]}>
+                              {!item.available
+                                ? "Unavailable"
+                                : item.stock_quantity > 0
+                                  ? `${item.stock_quantity} left`
+                                  : "Sold out"}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
+                            onPress={() => handleOpenModal(item)}
+                            disabled={unavailable}
+                          >
+                            <Ionicons name="cart-outline" size={14} color="#fff" />
+                            <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
-              );
-            })}
+              </>
+            )}
+
+            {/* Made to Order */}
+            {items.filter(i => i.is_made_to_order).length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
+                  {activeCategory ? `Made to Order - ${activeCategory}` : "Made to Order"}
+                </Text>
+                <View style={styles.grid}>
+                  {items.filter(i => i.is_made_to_order).map((item) => {
+                    const color = MENU_CATEGORY_COLORS[item.category] || "#F25C05";
+                    const unavailable = !item.available || item.stock_quantity <= 0;
+                    return (
+                      <View key={item.id} style={styles.menuCard}>
+                        {item.image_url ? (
+                          <Image
+                            source={{ uri: item.image_url }}
+                            style={styles.menuImage}
+                            contentFit="cover"
+                            transition={300}
+                            cachePolicy="none"
+                            recyclingKey={item.id}
+                          />
+                        ) : (
+                          <View style={[styles.imagePlaceholder, { backgroundColor: color + "22" }]}>
+                            <Ionicons name="restaurant-outline" size={36} color="#ccc" />
+                          </View>
+                        )}
+
+                        {/* Category tag */}
+                        <View style={[styles.catTag, { backgroundColor: color }]}>
+                          <Text style={styles.catTagText}>{item.category}</Text>
+                        </View>
+
+                        {!item.available && (
+                          <View style={styles.unavailableBadge}>
+                            <Text style={styles.unavailableBadgeText}>Unavailable</Text>
+                          </View>
+                        )}
+
+                        {/* Favorite button */}
+                        <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
+                          <Ionicons name={favIds.has(item.id) ? "heart" : "heart-outline"}
+                            size={18} color={favIds.has(item.id) ? "#E74C3C" : "#999"} />
+                        </TouchableOpacity>
+
+                        <View style={styles.cardBottom}>
+                          <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                          {item.description ? (
+                            <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
+                          ) : null}
+                          <View style={styles.priceRow}>
+                            <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
+                            <Text style={[styles.stock, unavailable && styles.stockUnavailable]}>
+                              {!item.available
+                                ? "Unavailable"
+                                : item.stock_quantity > 0
+                                  ? `${item.stock_quantity} left`
+                                  : "Sold out"}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
+                            onPress={() => handleOpenModal(item)}
+                            disabled={unavailable}
+                          >
+                            <Ionicons name="cart-outline" size={14} color="#fff" />
+                            <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </View>
         )}
       </ScrollView>

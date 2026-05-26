@@ -1,7 +1,8 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator, Alert, Modal, ScrollView,
     StyleSheet, Text, TextInput, TouchableOpacity, View
@@ -24,6 +25,37 @@ export default function SubmitDishScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem("@foodfix_scan_result");
+        if (saved) {
+          await AsyncStorage.removeItem("@foodfix_scan_result");
+          const data = JSON.parse(saved);
+          if (data.base64) {
+            setScanImage(data.imageUri || "");
+            setScanning(true);
+            try {
+              const result = await analyzeImageWithQwen(data.base64, "dish");
+              if (result.type === "dish" && result.dishName) {
+                setScanResult(result);
+                setDishName(result.dishName);
+                setOriginalAiName(result.dishName);
+                setNameEdited(false);
+                setStep(2);
+              } else {
+                setScanError("Could not identify a dish in this image. Try a clearer photo.");
+              }
+            } catch (e: any) {
+              setScanError(e.message || "AI scan failed. Try again.");
+            }
+            setScanning(false);
+          }
+        }
+      } catch (e) { console.error(e); }
+    })();
+  }, []);
+
   function resetAll() {
     setStep(1);
     setScanImage(null);
@@ -34,7 +66,6 @@ export default function SubmitDishScreen() {
     setOriginalAiName("");
     setNotes("");
     setNameEdited(false);
-    setShowForm(false);
   }
 
   async function pickImage() {
@@ -102,7 +133,6 @@ export default function SubmitDishScreen() {
         created_at: serverTimestamp(),
       };
       await addDoc(collection(db, "menu_suggestions"), suggestion);
-      setShowForm(false);
       setStep(5);
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to submit suggestion.");

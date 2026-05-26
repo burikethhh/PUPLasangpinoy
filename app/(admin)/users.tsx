@@ -306,7 +306,16 @@ export default function AdminMoreScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Quick Access</Text>
+            <Text style={styles.sectionTitle}>Quick Access</Text>
+        <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => router.push("/(admin)/submissions" as any)}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F39C1222", justifyContent: "center", alignItems: "center" }}>
+              <Ionicons name="bulb-outline" size={18} color="#F39C12" />
+            </View>
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#2E1A06" }}>Manage Suggested Dishes</Text>
+            <Ionicons name="chevron-forward" size={16} color="#bbb" />
+          </View>
+        </TouchableOpacity>
 
         {/* Users Management */}
         <TouchableOpacity style={[styles.collapseHeader, { marginHorizontal: 16, marginTop: 12, marginBottom: 8 }]} onPress={() => setUsersExpanded((v) => !v)}>

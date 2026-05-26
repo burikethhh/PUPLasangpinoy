@@ -116,6 +116,7 @@ export interface Review {
   menu_item_name: string;
   rating: number;
   comment: string;
+  image_url?: string;
   created_at: Timestamp | { seconds: number };
 }
 

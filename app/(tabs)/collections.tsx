@@ -1,14 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator, Alert, RefreshControl, SectionList,
+    ActivityIndicator, Alert, RefreshControl, SectionList, Image,
     StyleSheet, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser } from "../../lib/firebase";
-import { getOrdersByUser, requestRefund, type Order } from "../../lib/firebase-store";
+import { getOrdersByUser, requestRefund, addReview, type Order } from "../../lib/firebase-store";
+import { uploadToCloudinary } from "../../lib/cloudinary";
 
 const ACTIVE_STATUSES = ["accepted", "preparing", "out_for_delivery"];
 const PENDING_STATUS = "pending";
@@ -23,6 +25,14 @@ export default function OrdersScreen() {
   const [refundOrderId, setRefundOrderId] = useState<string | null>(null);
   const [refundReason, setRefundReason] = useState("");
   const [refunding, setRefunding] = useState(false);
+
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
+  const [reviewItem, setReviewItem] = useState<{ id: string; name: string } | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewImage, setReviewImage] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useFocusEffect(useCallback(() => { fetchOrders(); }, []));
 
@@ -68,8 +78,8 @@ export default function OrdersScreen() {
 
   function sortNewest(arr: Order[]) {
     return [...arr].sort((a, b) => {
-      const ta = a.created_at?.seconds ? a.created_at.seconds * 1000 : new Date(a.created_at || 0).getTime();
-      const tb = b.created_at?.seconds ? b.created_at.seconds * 1000 : new Date(b.created_at || 0).getTime();
+      const ta = a.created_at?.seconds ? a.created_at.seconds * 1000 : 0;
+      const tb = b.created_at?.seconds ? b.created_at.seconds * 1000 : 0;
       return tb - ta;
     });
   }
@@ -147,7 +157,7 @@ export default function OrdersScreen() {
             </Text>
           </View>
         )}
-        {isFinished && item.payment_method === "gcash" && (item.status === "rejected" || item.status === "cancelled") && (!item.refund_status || item.refund_status === "none") && (
+        {isFinished && item.payment_method === "gcash" && (!item.refund_status || item.refund_status === "none") && (
           <TouchableOpacity style={styles.refundBtn} onPress={() => { setRefundOrderId(item.id); setRefundReason(""); }}>
             <Ionicons name="cash-outline" size={14} color="#fff" />
             <Text style={styles.refundBtnText}>Request Refund</Text>
@@ -188,6 +198,21 @@ export default function OrdersScreen() {
           <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(item.id)}>
             <Ionicons name="archive-outline" size={14} color="#888" />
             <Text style={styles.archiveBtnText}>Archive</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Leave Feedback button (on delivered orders only) */}
+        {item.status === "delivered" && (
+          <TouchableOpacity style={styles.feedbackBtn} onPress={() => {
+            setReviewOrder(item);
+            setReviewItem(null);
+            setReviewRating(5);
+            setReviewComment("");
+            setReviewImage("");
+            setReviewModalVisible(true);
+          }}>
+            <Ionicons name="star-outline" size={14} color="#fff" />
+            <Text style={styles.feedbackBtnText}>Leave Feedback</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -309,6 +334,102 @@ export default function OrdersScreen() {
           </View>
         </View>
       )}
+      {/* Feedback Modal */}
+      {reviewModalVisible && reviewOrder && (
+        <View style={styles.overlay}>
+          <View style={styles.feedbackModal}>
+            <Text style={styles.feedbackModalTitle}>Leave Feedback</Text>
+            <Text style={styles.feedbackModalSub}>{reviewOrder.order_number}</Text>
+
+            {/* Star rating */}
+            <View style={styles.starRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+                  <Ionicons
+                    name={star <= reviewRating ? "star" : "star-outline"}
+                    size={32} color={star <= reviewRating ? "#F39C12" : "#ccc"}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Comment */}
+            <TextInput
+              style={styles.feedbackInput}
+              placeholder="Share your experience..."
+              placeholderTextColor="#aaa"
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              multiline
+            />
+
+            {/* Image picker */}
+            <TouchableOpacity style={styles.feedbackImageBtn} onPress={async () => {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ["images"],
+                allowsEditing: true,
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets.length > 0) {
+                setReviewImage(result.assets[0].uri);
+              }
+            }}>
+              <Ionicons name={reviewImage ? "image" : "camera-outline"} size={18} color="#F25C05" />
+              <Text style={styles.feedbackImageBtnText}>{reviewImage ? "Change Photo" : "Add Photo"}</Text>
+            </TouchableOpacity>
+            {reviewImage ? (
+              <Image source={{ uri: reviewImage }} style={styles.feedbackPreviewImage} />
+            ) : null}
+
+            {/* Buttons */}
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setReviewModalVisible(false)}>
+                <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.feedbackSubmitBtn, submittingReview && { opacity: 0.6 }]}
+                disabled={submittingReview}
+                onPress={async () => {
+                  if (!reviewComment.trim()) {
+                    Alert.alert("Comment Required", "Please write a brief comment.");
+                    return;
+                  }
+                  setSubmittingReview(true);
+                  try {
+                    const user = getCurrentUser();
+                    if (!user) throw new Error("Not authenticated");
+                    let imageUrl = "";
+                    if (reviewImage) {
+                      imageUrl = await uploadToCloudinary(reviewImage, "foodfix/reviews");
+                    }
+                    // Submit a review for each item in the order
+                    for (const item of reviewOrder.items) {
+                      await addReview({
+                        user_id: user.uid,
+                        username: reviewOrder.customer_name,
+                        order_id: reviewOrder.id,
+                        menu_item_id: item.menu_item_id,
+                        menu_item_name: item.name,
+                        rating: reviewRating,
+                        comment: reviewComment.trim(),
+                        image_url: imageUrl || undefined,
+                      });
+                    }
+                    Alert.alert("Thank You!", "Your feedback has been submitted.");
+                    setReviewModalVisible(false);
+                    fetchOrders(true);
+                  } catch (e: any) {
+                    Alert.alert("Error", e.message || "Failed to submit feedback.");
+                  }
+                  setSubmittingReview(false);
+                }}
+              >
+                {submittingReview ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "bold" }}>Submit</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -394,4 +515,25 @@ const styles = StyleSheet.create({
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
   modalCancel: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#eee" },
   modalConfirmRefund: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#F25C05" },
+  feedbackBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#F39C12", borderRadius: 10, paddingVertical: 10, marginTop: 8,
+  },
+  feedbackBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
+  feedbackModal: { backgroundColor: "#fff", borderRadius: 20, padding: 20, width: "85%" },
+  feedbackModalTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06", marginBottom: 2 },
+  feedbackModalSub: { fontSize: 12, color: "#888", marginBottom: 12 },
+  starRow: { flexDirection: "row", justifyContent: "center", gap: 8, marginBottom: 16 },
+  feedbackInput: {
+    backgroundColor: "#F9F5EF", borderRadius: 12, padding: 12, fontSize: 14,
+    color: "#333", minHeight: 80, textAlignVertical: "top", marginBottom: 12,
+  },
+  feedbackImageBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#FFF5EE", borderRadius: 12, padding: 12, marginBottom: 8,
+    borderWidth: 1.5, borderColor: "#F25C05", borderStyle: "dashed",
+  },
+  feedbackImageBtnText: { color: "#F25C05", fontWeight: "600", fontSize: 13 },
+  feedbackPreviewImage: { width: "100%", height: 160, borderRadius: 12, marginBottom: 8 },
+  feedbackSubmitBtn: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#F39C12" },
 });

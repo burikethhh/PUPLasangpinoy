@@ -1,33 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useCallback, useState } from "react";
 import {
-  getRedirectResult,
-  signInWithPopup,
-  signInWithRedirect,
-} from "firebase/auth";
-import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  auth,
-  facebookProvider,
-  getProfile,
-  googleProvider,
-  resetPassword,
-  setRestTokenFromUser,
-  signIn,
+    getProfile,
+    resetPassword,
+    signIn,
 } from "../../lib/firebase";
 
 export default function LoginScreen() {
@@ -35,10 +26,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
-    {},
-  );
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   // Forgot Password Modal
   const [forgotModalVisible, setForgotModalVisible] = useState(false);
@@ -56,24 +44,6 @@ export default function LoginScreen() {
       router.replace("/(tabs)");
     }
   }, []);
-
-  const checkRedirectResult = useCallback(async () => {
-    try {
-      const result = await getRedirectResult(auth);
-      if (result?.user) {
-        // Set REST API token for OAuth sign-in
-        await setRestTokenFromUser(result.user);
-        await handleAuthSuccess(result.user.uid);
-      }
-    } catch (error: any) {
-      console.error("Redirect result error:", error);
-    }
-  }, [handleAuthSuccess]);
-
-  // Check for redirect result on mount (for OAuth)
-  useEffect(() => {
-    checkRedirectResult();
-  }, [checkRedirectResult]);
 
   function validate() {
     const newErrors: { email?: string; password?: string } = {};
@@ -113,51 +83,6 @@ export default function LoginScreen() {
       Alert.alert("Sign In Failed", message);
     }
     setLoading(false);
-  }
-
-  // Google Sign In
-  async function signInWithGoogle() {
-    setSocialLoading("google");
-    try {
-      // Use popup for web, redirect for native
-      if (Platform.OS === "web") {
-        const result = await signInWithPopup(auth, googleProvider);
-        // Set REST API token for OAuth sign-in
-        await setRestTokenFromUser(result.user);
-        await handleAuthSuccess(result.user.uid);
-      } else {
-        await signInWithRedirect(auth, googleProvider);
-      }
-    } catch (error: any) {
-      console.error("Google sign in error:", error);
-      Alert.alert(
-        "Google Sign In Failed",
-        error.message || "Failed to sign in with Google",
-      );
-    }
-    setSocialLoading(null);
-  }
-
-  // Facebook Sign In
-  async function signInWithFacebook() {
-    setSocialLoading("facebook");
-    try {
-      if (Platform.OS === "web") {
-        const result = await signInWithPopup(auth, facebookProvider);
-        // Set REST API token for OAuth sign-in
-        await setRestTokenFromUser(result.user);
-        await handleAuthSuccess(result.user.uid);
-      } else {
-        await signInWithRedirect(auth, facebookProvider);
-      }
-    } catch (error: any) {
-      console.error("Facebook sign in error:", error);
-      Alert.alert(
-        "Facebook Sign In Failed",
-        error.message || "Failed to sign in with Facebook",
-      );
-    }
-    setSocialLoading(null);
   }
 
   // Forgot Password
@@ -304,43 +229,7 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <Text style={styles.orText}>Or continue with</Text>
-
-            {/* SOCIAL LOGIN BUTTONS */}
-            <View style={styles.socialRow}>
-              <TouchableOpacity
-                style={[styles.socialBtn, styles.googleBtn]}
-                onPress={signInWithGoogle}
-                disabled={socialLoading !== null}
-              >
-                {socialLoading === "google" ? (
-                  <ActivityIndicator color="#EA4335" size="small" />
-                ) : (
-                  <>
-                    <View style={styles.googleIcon}>
-                      <Text style={{ fontSize: 16, fontWeight: "bold" }}>
-                        G
-                      </Text>
-                    </View>
-                    <Text style={styles.socialText}>Google</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.socialBtn, styles.facebookBtn]}
-                onPress={signInWithFacebook}
-                disabled={socialLoading !== null}
-              >
-                {socialLoading === "facebook" ? (
-                  <ActivityIndicator color="#1877F2" size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="logo-facebook" size={20} color="#1877F2" />
-                    <Text style={styles.socialText}>Facebook</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+            {/* SOCIAL LOGIN BUTTONS (Removed) */}
 
             <View style={styles.signUpRow}>
               <Text style={styles.signUpGray}>Don{"'"}t have an account? </Text>
@@ -532,40 +421,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   signInText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  orText: {
-    textAlign: "center",
-    color: "#C07A20",
-    fontSize: 13,
-    marginBottom: 14,
-  },
-  socialRow: { flexDirection: "row", gap: 12, marginBottom: 24 },
-  socialBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: "#E8D8A0",
-    borderRadius: 30,
-    height: 46,
-    backgroundColor: "#fff",
-  },
-  googleBtn: {
-    borderColor: "#EA433533",
-  },
-  facebookBtn: {
-    borderColor: "#1877F233",
-  },
-  googleIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  socialText: { fontSize: 14, color: "#333", fontWeight: "500" },
   signUpRow: {
     flexDirection: "row",
     justifyContent: "center",
