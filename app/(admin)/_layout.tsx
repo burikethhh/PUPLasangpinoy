@@ -60,6 +60,7 @@ export default function AdminLayout() {
       <Tabs.Screen name="submissions" options={{ href: null }} />
       <Tabs.Screen name="regions" options={{ href: null }} />
       <Tabs.Screen name="nutrition" options={{ href: null }} />
+      <Tabs.Screen name="reviews" options={{ href: null }} />
     </Tabs>
   );
 }

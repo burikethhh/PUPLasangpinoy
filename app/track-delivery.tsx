@@ -20,8 +20,8 @@ import {
 import { startDeliveryTracking, stopDeliveryTracking } from "../lib/location-task";
 import { notifyBothOptedIn } from "../lib/notifications";
 
-const STORE_LAT = 14.0789;
-const STORE_LNG = 121.1444;
+const STORE_LAT = 14.031902;
+const STORE_LNG = 121.206633;
 
 export default function TrackDeliveryScreen() {
   const { orderId, role } = useLocalSearchParams<{ orderId: string; role: "customer" | "staff" }>();

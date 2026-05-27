@@ -124,7 +124,8 @@ export default function AdminMenuScreen() {
     const payload: Record<string, any> = {
       name: form.name.trim(), description: form.description.trim(),
       price: parseFloat(form.price) || 0, category: form.category,
-      image_url: form.image_url.trim(), stock_quantity: parseInt(form.stock_quantity) || 0,
+      image_url: form.image_url.trim(), 
+      stock_quantity: (form.is_made_to_order || form.batch_date) ? 999 : (parseInt(form.stock_quantity) || 0),
       available: form.available,
       is_made_to_order: form.is_made_to_order,
       batch_date: form.batch_date.trim() || null,
@@ -419,10 +420,20 @@ export default function AdminMenuScreen() {
                   onChangeText={(v) => setForm((f) => ({ ...f, image_url: v }))}
                   placeholder="or paste URL" placeholderTextColor="#aaa" autoCapitalize="none" />
               </View>
-              <Text style={styles.label}>Stock Quantity</Text>
-              <TextInput style={styles.input} value={form.stock_quantity} keyboardType="numeric"
-                onChangeText={(v) => setForm((f) => ({ ...f, stock_quantity: v }))}
-                placeholder="0" placeholderTextColor="#aaa" />
+              {/* Stock Quantity - only show for regular items, not for Made to Order or Daily Batch */}
+              {!form.is_made_to_order && !form.batch_date && (
+                <>
+                  <Text style={styles.label}>Stock Quantity</Text>
+                  <TextInput style={styles.input} value={form.stock_quantity} keyboardType="numeric"
+                    onChangeText={(v) => setForm((f) => ({ ...f, stock_quantity: v }))}
+                    placeholder="0" placeholderTextColor="#aaa" />
+                </>
+              )}
+              {(form.is_made_to_order || form.batch_date) && (
+                <Text style={[styles.label, { color: "#888", fontStyle: "italic" }]}>
+                  {form.is_made_to_order ? "Stock: Unlimited (Made to Order)" : "Stock: Unlimited (Daily Batch)"}
+                </Text>
+              )}
               <TouchableOpacity style={styles.toggleRow}
                 onPress={() => setForm((f) => ({ ...f, available: !f.available }))}>
                 <Ionicons name={form.available ? "checkbox" : "square-outline"} size={22} color="#F25C05" />

@@ -158,12 +158,18 @@ export default function AdminDashboard() {
                   </View>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
-                onPress={() => router.push("/(admin)/banners" as any)}>
-                <Ionicons name="images" size={18} color="#9B59B6" />
-                <Text style={styles.quickText}>Manage Banners</Text>
-                <Ionicons name="chevron-forward" size={16} color="#bbb" />
-              </TouchableOpacity>
+               <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
+                 onPress={() => router.push("/(admin)/banners" as any)}>
+                 <Ionicons name="images" size={18} color="#9B59B6" />
+                 <Text style={styles.quickText}>Manage Banners</Text>
+                 <Ionicons name="chevron-forward" size={16} color="#bbb" />
+               </TouchableOpacity>
+               <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
+                 onPress={() => router.push("/(admin)/reviews" as any)}>
+                 <Ionicons name="star" size={18} color="#FFD700" />
+                 <Text style={styles.quickText}>Customer Reviews</Text>
+                 <Ionicons name="chevron-forward" size={16} color="#bbb" />
+               </TouchableOpacity>
             </View>
             {/* Orders by Status */}
             <TouchableOpacity onPress={() => router.push("/(admin)/recipes" as any)} activeOpacity={0.7}>
