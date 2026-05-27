@@ -265,26 +265,24 @@ export default function MenuScreen() {
                            {item.description ? (
                              <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
                            ) : null}
-                           <View style={styles.priceRow}>
-                             <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
-                             <Text style={[styles.stock, unavailable && styles.stockUnavailable]}>
-                               {!item.available
-                                 ? "Unavailable"
-                                 : isUnlimitedStock
-                                   ? "In Stock"
-                                   : item.stock_quantity > 0
-                                   ? `${item.stock_quantity} left`
-                                   : "Sold out"}
-                             </Text>
-                           </View>
-                           <TouchableOpacity
-                             style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
-                             onPress={() => handleOpenModal(item)}
-                             disabled={unavailable}
-                           >
-                             <Ionicons name="cart-outline" size={14} color="#fff" />
-                             <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
-                           </TouchableOpacity>
+                            <View style={styles.priceRow}>
+                              <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
+                              {!item.available ? (
+                                <Text style={[styles.stock, styles.stockUnavailable]}>Unavailable</Text>
+                              ) : isUnlimitedStock ? null : (
+                                <Text style={styles.stock}>
+                                  {item.stock_quantity > 0 ? `${item.stock_quantity} left` : "Sold out"}
+                                </Text>
+                              )}
+                            </View>
+                            <TouchableOpacity
+                              style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
+                              onPress={() => handleOpenModal(item)}
+                              disabled={unavailable}
+                            >
+                              <Ionicons name="cart-outline" size={14} color="#fff" />
+                              <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
+                            </TouchableOpacity>
                          </View>
                        </View>
                      );
@@ -342,14 +340,12 @@ export default function MenuScreen() {
                           {item.description ? (
                             <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
                           ) : null}
-                           <View style={styles.priceRow}>
-                             <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
-                             <Text style={[styles.stock, unavailable && styles.stockUnavailable]}>
-                               {!item.available
-                                 ? "Unavailable"
-                                 : "In Stock"}
-                             </Text>
-                           </View>
+                            <View style={styles.priceRow}>
+                              <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
+                              {!item.available && (
+                                <Text style={[styles.stock, styles.stockUnavailable]}>Unavailable</Text>
+                              )}
+                            </View>
                            <TouchableOpacity
                              style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
                              onPress={() => handleOpenModal(item)}

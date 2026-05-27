@@ -203,18 +203,18 @@ export default function FavoritesScreen() {
       )}
 
       {/* New Folder Modal */}
-      <Modal visible={newFolderModal} transparent animationType="fade">
+      <Modal visible={newFolderModal} transparent animationType="fade" onRequestClose={() => setNewFolderModal(false)}>
         <View style={styles.overlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>New Folder</Text>
             <TextInput style={styles.modalInput} placeholder="Folder name"
               placeholderTextColor="#aaa" value={newFolderName} onChangeText={setNewFolderName} />
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setNewFolderModal(false)}>
-                <Text style={{ color: "#888" }}>Cancel</Text>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setNewFolderModal(false)}>
+                <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirm} onPress={handleCreateFolder}>
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>Create</Text>
+              <TouchableOpacity style={styles.modalCreateBtn} onPress={handleCreateFolder}>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Create</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -222,7 +222,7 @@ export default function FavoritesScreen() {
       </Modal>
 
       {/* Move to Folder Modal */}
-      <Modal visible={!!moveItemId} transparent animationType="fade">
+      <Modal visible={!!moveItemId} transparent animationType="fade" onRequestClose={() => setMoveItemId(null)}>
         <View style={styles.overlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Move to Folder</Text>
@@ -238,8 +238,8 @@ export default function FavoritesScreen() {
                 <Text style={styles.folderOptionText}>{col.name}</Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.modalCancel} onPress={() => setMoveItemId(null)}>
-              <Text style={{ color: "#888", textAlign: "center" }}>Cancel</Text>
+            <TouchableOpacity style={styles.moveCancelBtn} onPress={() => setMoveItemId(null)}>
+              <Text style={{ color: "#666", fontWeight: "600" }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -281,8 +281,9 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06", marginBottom: 12 },
   modalInput: { backgroundColor: "#F9F5EF", borderRadius: 10, padding: 12, fontSize: 14, color: "#333" },
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
-  modalCancel: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#eee", marginTop: 8 },
-  modalConfirm: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#F25C05" },
+  modalCancelBtn: { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: "center", backgroundColor: "#eee" },
+  modalCreateBtn: { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: "center", backgroundColor: "#F25C05" },
+  moveCancelBtn: { borderRadius: 10, paddingVertical: 10, alignItems: "center", backgroundColor: "#F5F0E8", marginTop: 12 },
   folderOption: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f5f0e5" },
   folderOptionText: { fontSize: 15, color: "#2E1A06" },
 });

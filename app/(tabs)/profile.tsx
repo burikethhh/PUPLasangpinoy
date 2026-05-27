@@ -229,18 +229,26 @@ export default function ProfileScreen() {
     return () => clearTimeout(t);
   }, [aiMessages, aiThinking, aiVisible]);
 
-  async function handleScanFood() {
-    // Request camera permission explicitly
+  async function scanWithCamera() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Camera Permission", "Camera access is required to use the AI Food Scanner. Please enable it in your device settings.");
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], allowsEditing: true, quality: 0.7, base64: true });
     if (result.canceled) return;
-    const uri = result.assets[0].uri;
-    const base64 = result.assets[0].base64 || "";
+    processScanResult(result.assets[0]);
+  }
+
+  async function scanWithGallery() {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, quality: 0.7, base64: true });
+    if (result.canceled) return;
+    processScanResult(result.assets[0]);
+  }
+
+  async function processScanResult(asset: ImagePicker.ImagePickerAsset) {
+    const uri = asset.uri;
+    const base64 = asset.base64 || "";
     setScanImage(uri);
     setScanBase64(base64);
     setScanResult(null);
@@ -248,13 +256,10 @@ export default function ProfileScreen() {
     setScanning(true);
 
     try {
-      // Call AI API to analyze the image
       const analysis = await analyzeImageWithQwen(base64, "dish");
-
-      // Format the result for display
       let resultText = "";
       if (analysis.type === "dish") {
-        resultText = `**${analysis.dishName}**\n\n`;
+        resultText = `${analysis.dishName}\n\n`;
         if (analysis.isFilipino) {
           resultText += `Filipino Dish\n`;
         } else {
@@ -262,33 +267,33 @@ export default function ProfileScreen() {
         }
         resultText += `\n${analysis.description}\n\n`;
         if (analysis.ingredients && analysis.ingredients.length > 0) {
-          resultText += `**Ingredients:** ${analysis.ingredients.join(", ")}\n\n`;
+          resultText += `Ingredients: ${analysis.ingredients.join(", ")}\n\n`;
         }
         if (analysis.funFact) {
-          resultText += `**Fun Fact:** ${analysis.funFact}\n\n`;
+          resultText += `Fun Fact: ${analysis.funFact}\n\n`;
         }
         if (analysis.nutrition) {
-          resultText += `**Nutrition (per serving):**\n`;
-          resultText += `• Calories: ${analysis.nutrition.calories}\n`;
-          resultText += `• Protein: ${analysis.nutrition.protein}\n`;
-          resultText += `• Carbs: ${analysis.nutrition.carbs}\n`;
-          resultText += `• Fat: ${analysis.nutrition.fat}\n`;
-          resultText += `• Fiber: ${analysis.nutrition.fiber}\n`;
-          resultText += `• Sodium: ${analysis.nutrition.sodium}\n\n`;
+          resultText += `Nutrition (per serving):\n`;
+          resultText += `Calories: ${analysis.nutrition.calories}\n`;
+          resultText += `Protein: ${analysis.nutrition.protein}\n`;
+          resultText += `Carbs: ${analysis.nutrition.carbs}\n`;
+          resultText += `Fat: ${analysis.nutrition.fat}\n`;
+          resultText += `Fiber: ${analysis.nutrition.fiber}\n`;
+          resultText += `Sodium: ${analysis.nutrition.sodium}\n\n`;
         }
         if (analysis.servingSize) {
-          resultText += `**Serving Size:** ${analysis.servingSize}\n\n`;
+          resultText += `Serving Size: ${analysis.servingSize}\n\n`;
         }
         if (analysis.cookingTips) {
-          resultText += `**Tip:** ${analysis.cookingTips}\n\n`;
+          resultText += `Tip: ${analysis.cookingTips}\n\n`;
         }
         resultText += `Browse our menu to find similar dishes!`;
       } else if (analysis.type === "ingredients") {
-        resultText = `🥗 **Ingredients Detected:** ${analysis.ingredients?.join(", ") || "None"}\n\n`;
+        resultText = `Ingredients Detected: ${analysis.ingredients?.join(", ") || "None"}\n\n`;
         if (analysis.suggestedRecipes && analysis.suggestedRecipes.length > 0) {
-          resultText += `**Suggested Filipino Recipes:**\n\n`;
+          resultText += `Suggested Filipino Recipes:\n\n`;
           analysis.suggestedRecipes.forEach((recipe: any, idx: number) => {
-            resultText += `${idx + 1}. **${recipe.name}**\n`;
+            resultText += `${idx + 1}. ${recipe.name}\n`;
             resultText += `   ${recipe.description}\n`;
             if (recipe.mainIngredients) {
               resultText += `   Key: ${recipe.mainIngredients.join(", ")}\n`;
@@ -299,7 +304,6 @@ export default function ProfileScreen() {
       } else {
         resultText = "Unable to identify the food. Please try again with a clearer image.";
       }
-
       setScanResult(resultText);
     } catch (error: any) {
       console.error("AI Scan error:", error);
@@ -365,7 +369,7 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.exploreRow} onPress={handleScanFood}>
+          <TouchableOpacity style={styles.exploreRow} onPress={scanWithCamera}>
             <View style={[styles.exploreIcon, { backgroundColor: "#E91E8C22" }]}>
               <Ionicons name="scan" size={20} color="#E91E8C" />
             </View>
@@ -423,65 +427,103 @@ export default function ProfileScreen() {
         <Text style={styles.version}>Version 3.0.0</Text>
 
         {/* Edit Modal */}
-        <Modal visible={editVisible} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Profile</Text>
-                <TouchableOpacity onPress={() => setEditVisible(false)}>
-                  <Ionicons name="close" size={24} color="#888" />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.inputLabel}>Display Name</Text>
-              <TextInput style={styles.input} value={editFields.username}
-                onChangeText={(v) => setEditFields((f) => ({ ...f, username: v }))}
-                placeholder="Your name" placeholderTextColor="#aaa" />
-              <Text style={styles.inputLabel}>Phone</Text>
-              <TextInput style={styles.input} value={editFields.phone}
-                onChangeText={(v) => setEditFields((f) => ({ ...f, phone: v }))}
-                placeholder="09XX XXX XXXX" keyboardType="phone-pad" placeholderTextColor="#aaa" />
-              <Text style={styles.inputLabel}>Delivery Address</Text>
-              <TextInput style={[styles.input, { minHeight: 60 }]} value={editFields.address}
-                onChangeText={(v) => setEditFields((f) => ({ ...f, address: v }))}
-                placeholder="Full address" multiline placeholderTextColor="#aaa" />
-              <View style={styles.modalBtns}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
-                  <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
-                  <Text style={{ color: "#fff", fontWeight: "bold" }}>Save</Text>
-                </TouchableOpacity>
+        <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalCard}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Edit Profile</Text>
+                  <TouchableOpacity onPress={() => setEditVisible(false)}>
+                    <Ionicons name="close" size={24} color="#888" />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ maxHeight: "70%" }}>
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    <Text style={styles.inputLabel}>Display Name</Text>
+                    <TextInput style={styles.input} value={editFields.username}
+                      onChangeText={(v) => setEditFields((f) => ({ ...f, username: v }))}
+                      placeholder="Your name" placeholderTextColor="#aaa" />
+                    <Text style={styles.inputLabel}>Phone</Text>
+                    <TextInput style={styles.input} value={editFields.phone}
+                      onChangeText={(v) => setEditFields((f) => ({ ...f, phone: v }))}
+                      placeholder="09XX XXX XXXX" keyboardType="phone-pad" placeholderTextColor="#aaa"
+                      maxLength={11} />
+                    <Text style={styles.inputLabel}>Delivery Address</Text>
+                    <TextInput style={[styles.input, { minHeight: 60 }]} value={editFields.address}
+                      onChangeText={(v) => setEditFields((f) => ({ ...f, address: v }))}
+                      placeholder="Full address" multiline placeholderTextColor="#aaa" />
+                    <View style={styles.modalBtns}>
+                      <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
+                        <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
+                        <Text style={{ color: "#fff", fontWeight: "bold" }}>Save</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
+                </View>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
-        {/* AI Scan Modal */}
-        <Modal visible={scanModal} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>AI Food Scan</Text>
-                <TouchableOpacity onPress={() => { setScanModal(false); setScanImage(null); setScanResult(null); }}>
-                  <Ionicons name="close" size={24} color="#888" />
+        {/* AI Scan Modal - Redesigned */}
+        <Modal visible={scanModal} animationType="slide" transparent onRequestClose={() => { setScanModal(false); setScanImage(null); setScanResult(null); }}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
+            <View style={styles.scanModalOuter}>
+              <View style={styles.scanHandle} />
+              <View style={styles.scanModalHeader}>
+                <View>
+                  <Text style={styles.scanModalTitle}>AI Food Scanner</Text>
+                  <Text style={styles.scanModalSub}>Identify any dish instantly</Text>
+                </View>
+                <TouchableOpacity style={styles.scanCloseBtn} onPress={() => { setScanModal(false); setScanImage(null); setScanResult(null); }}>
+                  <Ionicons name="close" size={20} color="#666" />
                 </TouchableOpacity>
               </View>
-              {scanImage && <Image source={{ uri: scanImage }} style={styles.scanImg} contentFit="cover" />}
-              <View style={styles.aiDisclaimer}>
-                <Ionicons name="warning-outline" size={13} color="#B07820" />
-                <Text style={styles.aiDisclaimerText}>AI results are estimates and may not be 100% accurate. Nutritional values are approximate.</Text>
-              </View>
-              {scanning ? (
-                <View style={{ alignItems: "center", padding: 20 }}>
+
+              {!scanImage ? (
+                <View style={styles.scanEmpty}>
+                  <Ionicons name="camera-outline" size={48} color="#ddd" />
+                  <Text style={styles.scanEmptyTitle}>Take a photo or upload</Text>
+                  <Text style={styles.scanEmptySub}>Snap a picture of your food to analyze it</Text>
+                  <View style={styles.scanEmptyRow}>
+                    <TouchableOpacity style={styles.scanCameraBtn} onPress={scanWithCamera}>
+                      <Ionicons name="camera" size={20} color="#fff" />
+                      <Text style={styles.scanBtnLabel}>Camera</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.scanGalleryBtn} onPress={scanWithGallery}>
+                      <Ionicons name="images" size={20} color="#fff" />
+                      <Text style={styles.scanBtnLabel}>Gallery</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : scanning ? (
+                <View style={styles.scanLoading}>
                   <ActivityIndicator size="large" color="#F25C05" />
-                  <Text style={{ color: "#888", marginTop: 10 }}>Analyzing image...</Text>
+                  <Text style={styles.scanLoadingText}>Analyzing your food...</Text>
+                  <Text style={styles.scanLoadingSub}>This takes a few seconds</Text>
                 </View>
               ) : scanResult ? (
-                <>
-                  <ScrollView style={styles.scanResultScroll} showsVerticalScrollIndicator>
-                    <Text style={styles.scanResultText}>{scanResult}</Text>
-                  </ScrollView>
-                  {scanImage && (
+                <View style={styles.scanResultContainer}>
+                  <View style={styles.scanImageWrapper}>
+                    <Image source={{ uri: scanImage }} style={styles.scanResultImg} contentFit="cover" />
+                    <View style={styles.scanImageBadge}>
+                      <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                      <Text style={styles.scanImageBadgeText}>Scanned</Text>
+                    </View>
+                  </View>
+                  <View style={styles.scanResultContent}>
+                    <Text style={styles.scanResultTitle}>Analysis Result</Text>
+                    <ScrollView style={styles.scanResultScroll} showsVerticalScrollIndicator>
+                      <Text style={styles.scanResultText}>{scanResult}</Text>
+                    </ScrollView>
+                  </View>
+                  <View style={styles.scanResultActions}>
+                    <TouchableOpacity style={styles.scanRetakeBtn} onPress={() => { setScanImage(null); setScanResult(null); }}>
+                      <Ionicons name="camera-outline" size={16} color="#666" />
+                      <Text style={styles.scanRetakeText}>Retake</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={styles.submitSuggestionBtn} onPress={async () => {
                       await AsyncStorage.setItem("@foodfix_scan_result", JSON.stringify({
                         imageUri: scanImage,
@@ -494,13 +536,17 @@ export default function ProfileScreen() {
                       router.push("/(tabs)/submit-dish" as any);
                     }}>
                       <Ionicons name="restaurant" size={16} color="#fff" />
-                      <Text style={styles.submitSuggestionBtnText}>Submit as Dish Suggestion</Text>
+                      <Text style={styles.submitSuggestionBtnText}>Suggest Dish</Text>
                     </TouchableOpacity>
-                  )}
-                </>
+                  </View>
+                  <View style={styles.scanDisclaimer}>
+                    <Ionicons name="information-circle" size={13} color="#B07820" />
+                    <Text style={styles.scanDisclaimerText}>AI results are estimates. Nutritional values are approximate.</Text>
+                  </View>
+                </View>
               ) : null}
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* AI Delivery Chat Modal */}
@@ -624,16 +670,85 @@ const styles = StyleSheet.create({
   exploreIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: "center", alignItems: "center" },
   exploreName: { fontSize: 13, fontWeight: "bold", color: "#2E1A06" },
   exploreSub: { fontSize: 11, color: "#888", marginTop: 2 },
-  scanImg: { width: "100%", height: 200, borderRadius: 12, marginBottom: 12 },
-  scanResultScroll: { maxHeight: 280 },
-  scanResultText: { fontSize: 14, color: "#333", lineHeight: 20 },
+  // AI Scan styles
+  scanModalOuter: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: "92%",
+    paddingBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  scanHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#ddd",
+    alignSelf: "center",
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  scanModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0e8d8",
+  },
+  scanModalTitle: { fontSize: 18, fontWeight: "800", color: "#2E1A06" },
+  scanModalSub: { fontSize: 12, color: "#999", marginTop: 2 },
+  scanCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#F5F0E8", justifyContent: "center", alignItems: "center" },
+  scanEmpty: { alignItems: "center", padding: 40, paddingBottom: 32 },
+  scanEmptyTitle: { fontSize: 17, fontWeight: "700", color: "#2E1A06", marginTop: 16, marginBottom: 6 },
+  scanEmptySub: { fontSize: 13, color: "#999", marginBottom: 24, textAlign: "center" },
+  scanEmptyRow: { flexDirection: "row", gap: 12 },
+  scanCameraBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "#F25C05", borderRadius: 12, paddingHorizontal: 24, paddingVertical: 14,
+  },
+  scanGalleryBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "#3498DB", borderRadius: 12, paddingHorizontal: 24, paddingVertical: 14,
+  },
+  scanBtnLabel: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  scanLoading: { alignItems: "center", padding: 48 },
+  scanLoadingText: { fontSize: 16, fontWeight: "600", color: "#2E1A06", marginTop: 16 },
+  scanLoadingSub: { fontSize: 12, color: "#999", marginTop: 4 },
+  scanResultContainer: { paddingHorizontal: 16 },
+  scanImageWrapper: { position: "relative", marginBottom: 12 },
+  scanResultImg: { width: "100%", height: 180, borderRadius: 14 },
+  scanImageBadge: {
+    position: "absolute", top: 10, right: 10,
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "rgba(52, 179, 106, 0.9)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  scanImageBadgeText: { color: "#fff", fontSize: 11, fontWeight: "600" },
+  scanResultContent: { marginBottom: 12 },
+  scanResultTitle: { fontSize: 14, fontWeight: "700", color: "#2E1A06", marginBottom: 8 },
+  scanResultScroll: { maxHeight: 200 },
+  scanResultText: { fontSize: 13, color: "#444", lineHeight: 20 },
+  scanResultActions: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  scanRetakeBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    flex: 1, backgroundColor: "#F5F0E8", borderRadius: 12, padding: 12,
+  },
+  scanRetakeText: { color: "#666", fontWeight: "600", fontSize: 13 },
   submitSuggestionBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: "#F25C05", borderRadius: 12, padding: 12, marginTop: 12,
+    flex: 2, backgroundColor: "#F25C05", borderRadius: 12, padding: 12,
   },
-  submitSuggestionBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
-  aiDisclaimer: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#FFF8E1", borderRadius: 8, padding: 8, marginBottom: 10 },
-  aiDisclaimerText: { flex: 1, fontSize: 11, color: "#B07820", lineHeight: 15 },
+  submitSuggestionBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  scanDisclaimer: {
+    flexDirection: "row", alignItems: "flex-start", gap: 6,
+    backgroundColor: "#FFF8E1", borderRadius: 10, padding: 10, marginBottom: 8,
+  },
+  scanDisclaimerText: { flex: 1, fontSize: 11, color: "#B07820", lineHeight: 15 },
   // AI Chat styles
   aiModal: {
     backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24,

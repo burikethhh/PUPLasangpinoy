@@ -23,6 +23,7 @@ import {
     updateMenuItem,
     type MenuItem,
 } from "../../lib/firebase-store";
+import { uploadToCloudinary } from "../../lib/cloudinary";
 
 const EMPTY_FORM = {
   name: "", description: "", price: "", category: MENU_CATEGORIES[0] as string,
@@ -132,6 +133,11 @@ export default function AdminMenuScreen() {
     };
     if (Object.keys(nutrients).length > 0) payload.nutrients = nutrients;
     try {
+      // Upload local image to Cloudinary so it's visible on all devices
+      if (payload.image_url && payload.image_url.startsWith("file://")) {
+        const cloudUrl = await uploadToCloudinary(payload.image_url, "foodfix/menu");
+        payload.image_url = cloudUrl;
+      }
       if (editing) await updateMenuItem(editing.id, payload);
       else await addMenuItem(payload);
       setModalVisible(false);

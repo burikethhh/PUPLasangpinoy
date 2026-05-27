@@ -18,7 +18,7 @@ export default function Homepage() {
     useCallback(() => {
       const user = getCurrentUser();
       const firstName = user?.displayName?.split(" ")[0] || "there";
-      setGreeting(`Hello, ${firstName}! 👋`);
+      setGreeting(`Hello, ${firstName}! Welcome to FoodFix`);
       
       const fetchBanners = async () => {
         try {
@@ -50,7 +50,7 @@ export default function Homepage() {
         <View style={styles.headerGradient}>
           <View style={styles.headerContent}>
             <Text style={styles.greeting}>{greeting}</Text>
-            <Text style={styles.subGreeting}>🍜 Lasang Pinoy • Fresh Daily</Text>
+            <Text style={styles.subGreeting}>🍜 Fresh Daily Filipino Favorites</Text>
           </View>
           <View style={styles.headerCurve} />
         </View>

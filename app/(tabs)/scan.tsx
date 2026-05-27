@@ -595,7 +595,7 @@ export default function CartScreen() {
               onChangeText={(v) => { setPhone(v); setPhoneError(""); }}
               keyboardType="phone-pad"
               placeholderTextColor="#aaa"
-              maxLength={13}
+              maxLength={11}
             />
             {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
 

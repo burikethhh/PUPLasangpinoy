@@ -244,8 +244,11 @@ export default function TrackDeliveryScreen() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // Use customer's live location for ETA if available, else fall back to saved order coords, then store
+  // Use saved order delivery address for destination (staff sees this), customer sees their live location
   function getDestCoords() {
+    // Staff should always navigate to the delivery address on file
+    if (!isCustomer && order?.customer_lat && order?.customer_lng) return { lat: order.customer_lat, lng: order.customer_lng };
+    // Customer can see their own live location if sharing
     if (customerLoc) return { lat: customerLoc.lat, lng: customerLoc.lng };
     if (order?.customer_lat && order?.customer_lng) return { lat: order.customer_lat, lng: order.customer_lng };
     return { lat: STORE_LAT, lng: STORE_LNG };
@@ -353,7 +356,7 @@ export default function TrackDeliveryScreen() {
     }, 700);
   }
 
-  function getMapHtml(customerLat = customerLoc?.lat ?? order?.customer_lat ?? STORE_LAT, customerLng = customerLoc?.lng ?? order?.customer_lng ?? STORE_LNG) {
+  function getMapHtml(customerLat = (isCustomer ? (customerLoc?.lat ?? order?.customer_lat ?? STORE_LAT) : (order?.customer_lat ?? STORE_LAT)), customerLng = (isCustomer ? (customerLoc?.lng ?? order?.customer_lng ?? STORE_LNG) : (order?.customer_lng ?? STORE_LNG))) {
     const dLat = driverLoc?.lat ?? STORE_LAT;
     const dLng = driverLoc?.lng ?? STORE_LNG;
     const centerLat = isCustomer ? (customerLat + dLat) / 2 : dLat;

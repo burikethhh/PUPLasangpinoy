@@ -422,8 +422,11 @@ export async function getConversations(): Promise<{ customer_id: string; custome
     },
   );
 
+  // Filter out archived messages (delete/archive hides them, new messages un-archive)
+  const activeMessages = allMessages.filter((m: any) => !m.archived);
+
   const convMap = new Map<string, { customer_id: string; customer_name: string; last_message: string; unread: number }>();
-  for (const msg of allMessages) {
+  for (const msg of activeMessages) {
     const cid = msg.conversation_id;
     if (!convMap.has(cid)) {
       convMap.set(cid, {
