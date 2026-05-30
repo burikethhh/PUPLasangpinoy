@@ -1194,10 +1194,34 @@ export async function processRefund(
     refund_status: status,
     updated_at: new Date(),
   };
-  return firestoreOp(
+  await firestoreOp(
     async () => { await updateDoc(doc(db, "orders", orderId), updates); },
     async () => { await RestApi.updateDocument("orders", orderId, updates); },
   );
+
+  // Notify the customer about the refund decision
+  let customer_id: string | undefined;
+  try {
+    const orderDoc = await firestoreOp(
+      async () => { const snap = await getDoc(doc(db, "orders", orderId)); return snap.exists() ? snap.data() : null; },
+      async () => { return await RestApi.getDocument("orders", orderId); },
+    );
+    customer_id = (orderDoc as any)?.customer_id;
+  } catch {}
+
+  if (customer_id) {
+    const notifPayload = {
+      type: "refund_update",
+      order_id: orderId,
+      customer_id,
+      refund_status: status,
+      created_at: new Date(),
+    };
+    await firestoreOp(
+      async () => { await addDoc(collection(db, "notifications"), notifPayload); },
+      async () => { await RestApi.createDocument("notifications", notifPayload); },
+    );
+  }
 }
 
 // ==================== EMAIL VERIFICATION CODE ====================

@@ -16,6 +16,7 @@ import {
     getMenuItems,
     getOrders,
     markGcashPaid,
+    processRefund,
     type Order,
 } from "../../lib/firebase-store";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -30,6 +31,7 @@ export default function AdminDashboard() {
   const [finishedOrders, setFinishedOrders] = useState<Order[]>([]);
   const [ordersByStatus, setOrdersByStatus] = useState<Record<string, number>>({});
   const [gcashPayments, setGcashPayments] = useState<any[]>([]);
+  const [refundRequests, setRefundRequests] = useState<Order[]>([]);
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
 
@@ -91,6 +93,7 @@ export default function AdminDashboard() {
         unreadMessages: unread,
       });
       setOrdersByStatus(statusCounts);
+      setRefundRequests(orders.filter((o) => o.refund_status === "pending"));
       const ACTIVE = ["pending", "accepted", "preparing", "out_for_delivery"];
       setActiveOrders(orders.filter((o) => ACTIVE.includes(o.status)).slice(0, 8));
       setFinishedOrders(orders.filter((o) => !["pending", "accepted", "preparing", "out_for_delivery"].includes(o.status)).slice(0, 5));
@@ -190,6 +193,46 @@ export default function AdminDashboard() {
                   <Ionicons name="chevron-forward" size={16} color="#bbb" />
                 </TouchableOpacity>
               </View>
+              {refundRequests.length > 0 && (
+                <View style={[styles.quickCard, { flexDirection: "column", alignItems: "stretch", borderColor: "#E74C3C", borderWidth: 1, marginTop: 10 }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name="refresh-circle" size={18} color="#E74C3C" />
+                    <Text style={[styles.quickText, { flex: 1, fontWeight: "bold", color: "#E74C3C" }]}>Refund: {refundRequests.length} pending</Text>
+                  </View>
+                  {refundRequests.slice(0, 3).map((o) => (
+                    <View key={o.id} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#f0e8d0" }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11, color: "#555" }} numberOfLines={1}>
+                          {o.order_number} — {o.customer_name} — P{o.total?.toFixed(0)}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: "#888", fontStyle: "italic" }} numberOfLines={1}>
+                          {o.refund_reason}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={{ backgroundColor: "#27AE60", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}
+                        onPress={async () => {
+                          Alert.alert("Approve Refund", `Approve refund for order ${o.order_number}?`, [
+                            { text: "Cancel", style: "cancel" },
+                            { text: "Approve", onPress: async () => { await processRefund(o.id, "approved"); fetchData(true); } },
+                          ]);
+                        }}>
+                        <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>Approve</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ backgroundColor: "#E74C3C", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}
+                        onPress={async () => {
+                          Alert.alert("Reject Refund", `Reject refund for order ${o.order_number}?`, [
+                            { text: "Cancel", style: "cancel" },
+                            { text: "Reject", onPress: async () => { await processRefund(o.id, "rejected"); fetchData(true); } },
+                          ]);
+                        }}>
+                        <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
             {/* Orders by Status */}
             <TouchableOpacity onPress={() => router.push("/(admin)/recipes" as any)} activeOpacity={0.7}>
