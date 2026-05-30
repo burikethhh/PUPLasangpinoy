@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Recipe images
+    // Anyone can read (images are public)
+    // Authenticated users can upload (admin check is done in app logic)
+    // Limit: 5MB max, must be an image
+    match /recipe-images/{imageId} {
+      allow read: if true;
+      allow write: if isSignedIn() && 
+                      request.resource.size < 5 * 1024 * 1024 &&
+                      request.resource.contentType.matches('image/.*');
+      allow delete: if isSignedIn();
+    }
+    
+    // User profile images (future feature)
+    // Anyone can read
+    // Only the user themselves can upload their own image
+    match /profile-images/{userId}/{imageId} {
+      allow read: if true;
+      allow write: if isSignedIn() && 
+                      request.auth.uid == userId &&
+                      request.resource.size < 2 * 1024 * 1024 &&
+                      request.resource.contentType.matches('image/.*');
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+  }
+}
