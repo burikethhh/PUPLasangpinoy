@@ -1,0 +1,166 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '11px', 'fontFamily': 'Consolas, monospace', 'lineColor': '#2c3e50'}, 'flowchart': {'curve': 'linear'}}}%%
+flowchart LR
+    classDef table fill:#fff8e7,stroke:#d4a373,stroke-width:2px,font-family:Consolas
+
+    BANNERS["<b>BANNERS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | name
+string | image_url
+boolean | active
+timestamp | created_at"]
+
+    APP_SETTINGS["<b>APP_SETTINGS</b>
+━━━━━━━━━━━━━━━━━━━━
+number | delivery_fee
+number | delivery_radius_km
+boolean | gcash_enabled
+string | gcash_number
+string | store_name
+string | store_address
+string | store_phone"]
+
+    PROFILES["<b>PROFILES</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | email
+string | username
+boolean | is_admin
+string | role
+string | phone
+string | address
+timestamp | created_at"]
+
+    MENU_ITEMS["<b>MENU_ITEMS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | name
+string | description
+number | price
+string | category
+string | image_url
+number | stock_quantity
+boolean | available
+timestamp | created_at"]
+
+    ORDERS["<b>ORDERS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | order_number
+string | customer_id | FK
+string | customer_name
+string | customer_phone
+string | customer_address
+number | customer_lat
+number | customer_lng
+array | items
+number | subtotal
+number | delivery_fee
+number | total
+string | status
+string | order_type
+string | payment_method
+string | scheduled_date
+string | scheduled_time
+string | reject_reason
+string | prepared_by
+string | driver_name
+string | driver_phone
+string | driver_id
+boolean | location_sharing_enabled
+boolean | customer_location_opt_in
+boolean | staff_location_opt_in
+timestamp | created_at
+timestamp | updated_at"]
+
+    MESSAGES["<b>MESSAGES</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | conversation_id
+string | sender_id | FK
+string | sender_name
+string | sender_role
+string | content
+boolean | read
+boolean | archived
+string | archived_at
+timestamp | created_at"]
+
+    MENU_SUGGESTIONS["<b>MENU_SUGGESTIONS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | name
+string | description
+string | category
+string | user_id | FK
+string | user_email
+string | user_name
+string | status
+string | reject_reason
+timestamp | created_at"]
+
+    FAVORITE_COLLECTIONS["<b>FAVORITE_COLLECTIONS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | user_id | FK
+string | name
+timestamp | created_at"]
+
+    ORDER_ITEMS["<b>ORDER_ITEMS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | menu_item_id | FK
+string | name
+number | price
+number | quantity
+string | image_url"]
+
+    REVIEWS["<b>REVIEWS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | user_id | FK
+string | username
+string | order_id | FK
+string | menu_item_id | FK
+string | menu_item_name
+number | rating
+string | comment
+timestamp | created_at"]
+
+    FAVORITES["<b>FAVORITES</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | user_id | FK
+string | menu_item_id | FK
+string | collection_id | FK
+timestamp | created_at"]
+
+    LIVE_LOCATIONS["<b>LIVE_LOCATIONS</b>
+━━━━━━━━━━━━━━━━━━━━
+string | id | PK
+string | order_id | FK
+string | user_id
+string | role
+number | lat
+number | lng
+number | heading
+number | speed
+number | accuracy
+timestamp | updated_at"]
+
+    PROFILES --> ORDERS
+    PROFILES --> MESSAGES
+    PROFILES --> REVIEWS
+    PROFILES --> FAVORITES
+    PROFILES --> FAVORITE_COLLECTIONS
+    PROFILES --> MENU_SUGGESTIONS
+    PROFILES --> LIVE_LOCATIONS
+    ORDERS --> ORDER_ITEMS
+    ORDERS --> REVIEWS
+    ORDERS --> LIVE_LOCATIONS
+    MENU_ITEMS --> ORDER_ITEMS
+    MENU_ITEMS --> REVIEWS
+    MENU_ITEMS --> FAVORITES
+    FAVORITE_COLLECTIONS --> FAVORITES
+
+    class BANNERS,APP_SETTINGS,PROFILES,MENU_ITEMS,ORDERS,MESSAGES,MENU_SUGGESTIONS,FAVORITE_COLLECTIONS,ORDER_ITEMS,REVIEWS,FAVORITES,LIVE_LOCATIONS table
+    linkStyle default stroke:#2c3e50,stroke-width:2px
