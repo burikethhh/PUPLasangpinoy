@@ -1,15 +1,9 @@
 // Order-related constants for FoodFix Food Ordering System
 
 export const ORDER_STATUSES = [
-  "pending",
-  "accepted",
-  "preparing",
-  "out_for_delivery",
-  "delivered",
-  "rejected",
-  "cancelled",
+  "pending", "accepted", "preparing", "out_for_delivery",
+  "delivered", "unable_to_fulfill", "cancelled", "issue_encountered",
 ] as const;
-
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -18,8 +12,9 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   preparing: "Preparing",
   out_for_delivery: "Out for Delivery",
   delivered: "Delivered",
-  rejected: "Rejected",
+  unable_to_fulfill: "Unable to Fulfill",
   cancelled: "Cancelled",
+  issue_encountered: "Issue Encountered",
 };
 
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
@@ -28,8 +23,9 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   preparing: "#9B59B6",
   out_for_delivery: "#E67E22",
   delivered: "#27AE60",
-  rejected: "#E74C3C",
+  unable_to_fulfill: "#E74C3C",
   cancelled: "#95A5A6",
+  issue_encountered: "#E67E22",
 };
 
 export const ORDER_TYPES = [

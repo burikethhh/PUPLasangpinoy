@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
@@ -359,7 +360,7 @@ export default function ProfileScreen() {
         {/* Explore / Engagement */}
         <View style={styles.card} >
           <Text style={styles.sectionTitle}>Explore</Text>
-          <TouchableOpacity style={styles.exploreRow} onPress={() => router.push("/(tabs)/submit")}>
+          <TouchableOpacity style={styles.exploreRow} onPress={() => router.push("/(tabs)/menu" as any)}>
             <View style={[styles.exploreIcon, { backgroundColor: "#FF408122" }]}>
               <Ionicons name="heart" size={20} color="#FF4081" />
             </View>
@@ -424,7 +425,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 3.0.0</Text>
+        <Text style={styles.version}>Version {Constants.expoConfig?.version || "3.2.0"}</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>

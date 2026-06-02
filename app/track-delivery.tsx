@@ -13,15 +13,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { getCurrentUser } from "../lib/firebase";
 import {
-  onLocationUpdate, onOrderUpdate,
+  getSettings, onLocationUpdate, onOrderUpdate,
   setLocationOptIn, updateOrderStatus, upsertLocation,
-  type LiveLocation, type Order
+  type AppSettings, type LiveLocation, type Order
 } from "../lib/firebase-store";
 import { startDeliveryTracking, stopDeliveryTracking } from "../lib/location-task";
 import { notifyBothOptedIn } from "../lib/notifications";
-
-const STORE_LAT = 14.031902;
-const STORE_LNG = 121.206633;
 
 export default function TrackDeliveryScreen() {
   const { orderId, role } = useLocalSearchParams<{ orderId: string; role: "customer" | "staff" }>();
@@ -31,6 +28,9 @@ export default function TrackDeliveryScreen() {
   const [otherOptIn, setOtherOptIn] = useState(false);
   const [tracking, setTracking] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const storeLatRef = useRef(14.031902);
+  const storeLngRef = useRef(121.206633);
   const [chatVisible, setChatVisible] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -67,6 +67,15 @@ export default function TrackDeliveryScreen() {
     orderUnsubRef.current = unsub;
     return () => unsub?.();
   }, [orderId, user, isCustomer]);
+
+  // Load settings for store coordinates
+  useEffect(() => {
+    getSettings().then((s) => {
+      setSettings(s);
+      storeLatRef.current = s.store_lat;
+      storeLngRef.current = s.store_lng;
+    }).catch(() => {});
+  }, []);
 
   // Subscribe to driver location (customer watches staff) - NO opt-in gate, always subscribe
   useEffect(() => {
@@ -249,7 +258,7 @@ export default function TrackDeliveryScreen() {
     // Customer can see their own live location if sharing
     if (customerLoc) return { lat: customerLoc.lat, lng: customerLoc.lng };
     if (order?.customer_lat && order?.customer_lng) return { lat: order.customer_lat, lng: order.customer_lng };
-    return { lat: STORE_LAT, lng: STORE_LNG };
+    return { lat: storeLatRef.current, lng: storeLngRef.current };
   }
 
   function getETA(): string {
@@ -272,7 +281,7 @@ export default function TrackDeliveryScreen() {
       // Calculate distance from driver (staff) to customer
       const dist = driverLoc 
         ? calcDistance(driverLoc.lat, driverLoc.lng, customerLoc.lat, customerLoc.lng)
-        : calcDistance(STORE_LAT, STORE_LNG, customerLoc.lat, customerLoc.lng);
+        : calcDistance(storeLatRef.current, storeLngRef.current, customerLoc.lat, customerLoc.lng);
       const speedKmh = driverLoc?.speed && driverLoc.speed > 2 ? driverLoc.speed : 25;
       const mins = Math.round((dist / speedKmh) * 60);
       const distStr = dist < 1 ? `${(dist * 1000).toFixed(0)} meters` : `${dist.toFixed(1)} km`;
@@ -354,9 +363,9 @@ export default function TrackDeliveryScreen() {
     }, 700);
   }
 
-  function getMapHtml(customerLat = (isCustomer ? (customerLoc?.lat ?? order?.customer_lat ?? STORE_LAT) : (order?.customer_lat ?? STORE_LAT)), customerLng = (isCustomer ? (customerLoc?.lng ?? order?.customer_lng ?? STORE_LNG) : (order?.customer_lng ?? STORE_LNG))) {
-    const dLat = driverLoc?.lat ?? STORE_LAT;
-    const dLng = driverLoc?.lng ?? STORE_LNG;
+  function getMapHtml(customerLat = (isCustomer ? (customerLoc?.lat ?? order?.customer_lat ?? storeLatRef.current) : (order?.customer_lat ?? storeLatRef.current)), customerLng = (isCustomer ? (customerLoc?.lng ?? order?.customer_lng ?? storeLngRef.current) : (order?.customer_lng ?? storeLngRef.current))) {
+    const dLat = driverLoc?.lat ?? storeLatRef.current;
+    const dLng = driverLoc?.lng ?? storeLngRef.current;
     const centerLat = isCustomer ? (customerLat + dLat) / 2 : dLat;
     const centerLng = isCustomer ? (customerLng + dLng) / 2 : dLng;
 
@@ -381,7 +390,7 @@ var storeIcon = L.divIcon({html:'<div style="background:#F25C05;color:#fff;width
 var custIcon  = L.divIcon({html:'<div style="background:#E74C3C;color:#fff;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)">C</div>',className:'',iconSize:[18,18],iconAnchor:[9,18]});
 var driverIcon= L.divIcon({html:'<div style="background:#3498DB;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)">D</div>',className:'',iconSize:[22,22],iconAnchor:[11,11]});
 
-L.marker([${STORE_LAT},${STORE_LNG}],{icon:storeIcon}).addTo(map).bindPopup('FOODFIX Store');
+L.marker([${storeLatRef.current},${storeLngRef.current}],{icon:storeIcon}).addTo(map).bindPopup('FOODFIX Store');
 var custMarker = L.marker([${customerLat},${customerLng}],{icon:custIcon}).addTo(map).bindPopup('Delivery Location');
 
 // Start with null markers - will be created dynamically on first update

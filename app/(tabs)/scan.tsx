@@ -111,7 +111,7 @@ export default function CartScreen() {
     if (user) {
       const p = await getProfile(user.uid);
       if (p) {
-        if (p.username) setCustomerName(p.username);
+        setCustomerName(p.username || user.email?.split('@')[0] || user.displayName || "Customer");
         if (p.address) setAddress(p.address);
         if (p.phone) setPhone(p.phone);
       }
@@ -298,8 +298,8 @@ export default function CartScreen() {
   const deliveryFee = (orderType === "delivery_now" || orderType === "delivery_later") ? (settings?.delivery_fee || 50) : 0;
   const total = subtotal + deliveryFee;
 
-  const STORE_LAT = 13.7565;
-  const STORE_LNG = 121.0583;
+  const STORE_LAT = settings?.store_lat || 14.031902;
+  const STORE_LNG = settings?.store_lng || 121.206633;
 
   function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
@@ -343,7 +343,7 @@ export default function CartScreen() {
       })));
       if (!stockCheck.valid) {
         setPlacing(false);
-        return Alert.alert("Stock Issue", stockCheck.issues.join("\n\nPlease adjust your cart and try again."));
+        return Alert.alert("Stock Issue", stockCheck.issues.join("\n") + "\n\nPlease adjust your cart and try again.");
       }
     } catch (e) {
       // If stock validation fails, continue with order (graceful degradation)
@@ -685,7 +685,7 @@ export default function CartScreen() {
               onPress={async () => {
                 setNotifyingGcash(true);
                 try {
-                  await notifyGcashPayment(gcashOrder.orderId, customerName, gcashOrder.amount);
+                  await notifyGcashPayment(gcashOrder.orderId, customerName, phone, gcashOrder.amount);
                   Alert.alert("Notification Sent", "The store has been notified of your payment. Track your order in the Orders tab.");
                   setGcashOrder(null);
                 } catch (e: any) {

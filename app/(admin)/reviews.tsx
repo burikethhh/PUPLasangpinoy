@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect } from "expo-router";
-import { deleteDoc, doc } from "firebase/firestore";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text,

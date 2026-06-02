@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator, Alert, FlatList, Modal, RefreshControl,
+    ActivityIndicator, Alert, FlatList, Image, Modal, RefreshControl,
     StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,7 +13,8 @@ import { notifyDeliveryStarted } from "../../lib/notifications";
 
 const FILTER_OPTIONS: (OrderStatus | "all" | "archived")[] = ["all", ...ORDER_STATUSES, "archived"];
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
-  pending: "accepted", accepted: "preparing", preparing: "out_for_delivery", out_for_delivery: "delivered",
+  pending: "accepted", accepted: "preparing", preparing: "out_for_delivery",
+  issue_encountered: "out_for_delivery", out_for_delivery: "delivered",
 };
 
 export default function AdminOrders() {
@@ -74,7 +75,7 @@ export default function AdminOrders() {
 
   async function confirmReject() {
     if (!rejectId) return;
-    await updateOrderStatus(rejectId, "rejected", { reject_reason: rejectReason || "Rejected by admin" });
+    await updateOrderStatus(rejectId, "unable_to_fulfill", { reject_reason: rejectReason || "Unable to fulfill order" });
     setRejectId(null);
     fetchOrders(true);
   }
@@ -100,7 +101,7 @@ export default function AdminOrders() {
     ]);
   }
 
-  const FINISHED = ["delivered", "rejected", "cancelled"];
+  const FINISHED = ["delivered", "unable_to_fulfill", "cancelled"];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -222,6 +223,9 @@ export default function AdminOrders() {
                 {item.refund_reason && (
                   <Text style={styles.refundReasonText}>Refund reason: {item.refund_reason}</Text>
                 )}
+                {item.refund_image_url && (
+                  <Image source={{ uri: item.refund_image_url }} style={styles.refundImage} />
+                )}
                 {item.refund_status === "pending" && (
                   <View style={styles.refundActions}>
                     <TouchableOpacity style={[styles.refundActionBtn, { backgroundColor: "#27AE60" }]}
@@ -272,7 +276,7 @@ export default function AdminOrders() {
                   </View>
                 )}
                 {item.reject_reason && (
-                  <Text style={styles.rejectText}>Rejected: {item.reject_reason}</Text>
+                  <Text style={styles.rejectText}>Unable to Fulfill: {item.reject_reason}</Text>
                 )}
                 {/* Progress tracker */}
                 {!isFinished && (
@@ -293,7 +297,57 @@ export default function AdminOrders() {
                   </View>
                 )}
                 {/* Action Buttons */}
-                {next && (
+                {item.status === "preparing" ? (
+                  <View style={styles.actions}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: ORDER_STATUS_COLORS.out_for_delivery }]}
+                      onPress={() => advanceStatus(item)}>
+                      <Ionicons name="arrow-forward" size={16} color="#fff" />
+                      <Text style={styles.actionText}>Out for Delivery</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: "#E67E22" }]}
+                      onPress={async () => {
+                        Alert.alert("Issue Encountered", "Report an issue with this order? The customer will be notified.", [
+                          { text: "Cancel", style: "cancel" },
+                          { text: "Report Issue", style: "destructive", onPress: async () => {
+                            await updateOrderStatus(item.id, "issue_encountered");
+                            fetchOrders(true);
+                          }},
+                        ]);
+                      }}>
+                      <Ionicons name="warning" size={16} color="#fff" />
+                      <Text style={styles.actionText}>Issue Encountered</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : item.status === "issue_encountered" ? (
+                  <View style={styles.actions}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: "#27AE60" }]}
+                      onPress={async () => {
+                        Alert.alert("Re-prepare", "Mark this order as being re-prepared?", [
+                          { text: "Cancel", style: "cancel" },
+                          { text: "Re-prepare", onPress: async () => {
+                            await updateOrderStatus(item.id, "preparing");
+                            fetchOrders(true);
+                          }},
+                        ]);
+                      }}>
+                      <Ionicons name="refresh" size={16} color="#fff" />
+                      <Text style={styles.actionText}>Re-prepare</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: "#E74C3C" }]}
+                      onPress={async () => {
+                        Alert.alert("Cancel Order", "Cancel this order due to the issue?", [
+                          { text: "Go Back", style: "cancel" },
+                          { text: "Cancel Order", style: "destructive", onPress: async () => {
+                            await updateOrderStatus(item.id, "cancelled");
+                            fetchOrders(true);
+                          }},
+                        ]);
+                      }}>
+                      <Ionicons name="close" size={16} color="#fff" />
+                      <Text style={styles.actionText}>Cancel Order</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : next && (
                   <View style={styles.actions}>
                     <TouchableOpacity style={[styles.actionBtn, { backgroundColor: ORDER_STATUS_COLORS[next] }]}
                       onPress={() => advanceStatus(item)}>
@@ -304,7 +358,7 @@ export default function AdminOrders() {
                       <TouchableOpacity style={[styles.actionBtn, { backgroundColor: "#E74C3C" }]}
                         onPress={() => promptReject(item.id)}>
                         <Ionicons name="close" size={16} color="#fff" />
-                        <Text style={styles.actionText}>Reject</Text>
+                        <Text style={styles.actionText}>Unable to Fulfill</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -333,19 +387,20 @@ export default function AdminOrders() {
         />
       )}
 
-      {/* Reject Reason Modal */}
+      {/* Unable to Fulfill Modal */}
       {rejectId && (
         <View style={styles.overlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Reject Order</Text>
-            <TextInput style={styles.modalInput} placeholder="Reason (optional)"
+            <Text style={styles.modalTitle}>Unable to Fulfill Order</Text>
+            <TextInput style={styles.modalInput} placeholder="Reason (required)"
               placeholderTextColor="#aaa" value={rejectReason} onChangeText={setRejectReason} />
             <View style={styles.modalBtns}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setRejectId(null)}>
                 <Text style={{ color: "#888" }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirm} onPress={confirmReject}>
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>Reject</Text>
+              <TouchableOpacity style={[styles.modalConfirm, (!rejectReason.trim()) && { opacity: 0.5 }]}
+                onPress={confirmReject} disabled={!rejectReason.trim()}>
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>Confirm</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -433,6 +488,7 @@ const styles = StyleSheet.create({
   },
   refundBadgeText: { fontSize: 11, fontWeight: "bold" },
   refundReasonText: { fontSize: 11, color: "#888", marginTop: 2, fontStyle: "italic" },
+  refundImage: { width: "100%", height: 160, borderRadius: 10, marginTop: 6 },
   refundActions: { flexDirection: "row", gap: 6, marginTop: 8 },
   refundActionBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",

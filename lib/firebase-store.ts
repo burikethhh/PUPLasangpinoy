@@ -81,6 +81,7 @@ export interface Order {
   refund_status?: "none" | "pending" | "approved" | "completed" | "rejected";
   refund_amount?: number;
   refund_reason?: string;
+  refund_image_url?: string;
   created_at: Timestamp | { seconds: number };
   updated_at?: Timestamp | { seconds: number };
 }
@@ -137,6 +138,8 @@ export interface AppSettings {
   store_name: string;
   store_address: string;
   store_phone: string;
+  store_lat: number;
+  store_lng: number;
 }
 
 // ==================== HELPERS ====================
@@ -822,6 +825,8 @@ export async function getSettings(): Promise<AppSettings> {
     store_name: "FoodFix",
     store_address: "P. Herrera St, Batangas City, 4200 Batangas",
     store_phone: "",
+    store_lat: 14.031902,
+    store_lng: 121.206633,
   };
 
   try {
@@ -1005,21 +1010,6 @@ export async function setLocationOptIn(
   );
 }
 
-export async function archiveOrder(orderId: string): Promise<void> {
-  const archivedAt = new Date().toISOString();
-  return firestoreOp(
-    async () => { await updateDoc(doc(db, "orders", orderId), { archived: true, archived_at: archivedAt }); },
-    async () => { await RestApi.updateDocument("orders", orderId, { archived: true, archived_at: archivedAt }); },
-  );
-}
-
-export async function unarchiveOrder(orderId: string): Promise<void> {
-  return firestoreOp(
-    async () => { await updateDoc(doc(db, "orders", orderId), { archived: false, archived_at: null }); },
-    async () => { await RestApi.updateDocument("orders", orderId, { archived: false, archived_at: null }); },
-  );
-}
-
 export async function cleanupArchivedOrders(): Promise<void> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -1139,12 +1129,14 @@ export async function getBanners(): Promise<Banner[]> {
 export async function notifyGcashPayment(
   orderId: string,
   customerName: string,
+  customerPhone: string,
   amount: number,
 ): Promise<void> {
   const payload = {
     type: "gcash_payment",
     order_id: orderId,
     customer_name: customerName,
+    customer_phone: customerPhone,
     amount,
     paid: false,
     created_at: new Date(),
@@ -1164,10 +1156,11 @@ export async function markGcashPaid(notificationId: string): Promise<void> {
 
 // ==================== REFUND SYSTEM ====================
 
-export async function requestRefund(orderId: string, reason: string): Promise<void> {
+export async function requestRefund(orderId: string, reason: string, imageUrl?: string): Promise<void> {
   const updates: any = {
     refund_status: "pending",
     refund_reason: reason,
+    refund_image_url: imageUrl || null,
     updated_at: new Date(),
   };
   await firestoreOp(
@@ -1251,7 +1244,7 @@ export async function generateEmailCode(email: string): Promise<string> {
   );
 }
 
-export async function verifyEmailCode(email: string, code: string): Promise<boolean> {
+export async function verifyEmailCode(email: string, code: string, userId?: string): Promise<boolean> {
   return firestoreOp(
     async () => {
       const q = query(
@@ -1268,6 +1261,9 @@ export async function verifyEmailCode(email: string, code: string): Promise<bool
         }
         await deleteDoc(doc(db, "email_verifications", d.id));
       }
+      if (userId) {
+        await updateDoc(doc(db, "profiles", userId), { email_verified: true });
+      }
       return true;
     },
     async () => {
@@ -1279,7 +1275,70 @@ export async function verifyEmailCode(email: string, code: string): Promise<bool
         return false;
       }
       await RestApi.deleteDocument("email_verifications", match.id);
+      if (userId) {
+        await RestApi.updateDocument("profiles", userId, { email_verified: true });
+      }
       return true;
+    },
+  );
+}
+
+// ==================== INVENTORY ADJUSTMENTS ====================
+
+export interface InventoryAdjustment {
+  id: string;
+  item_id: string;
+  item_name: string;
+  previous_qty: number;
+  adjustment: number;
+  reason: "spoilage" | "expired" | "damaged" | "lost" | "returned";
+  notes?: string;
+  admin_id: string;
+  created_at: Timestamp | { seconds: number };
+}
+
+export async function addInventoryAdjustment(
+  data: Omit<InventoryAdjustment, "id" | "created_at">,
+): Promise<{ id: string }> {
+  const payload = { ...data, created_at: new Date() };
+  return firestoreOp(
+    async () => {
+      const ref = await addDoc(collection(db, "inventory_adjustments"), payload);
+      await updateDoc(doc(db, "menu_items", data.item_id), {
+        stock_quantity: Math.max(0, data.previous_qty + data.adjustment),
+      });
+      return { id: ref.id };
+    },
+    async () => {
+      const id = await RestApi.createDocument("inventory_adjustments", payload);
+      await RestApi.updateDocument("menu_items", data.item_id, {
+        stock_quantity: Math.max(0, data.previous_qty + data.adjustment),
+      });
+      return { id };
+    },
+  );
+}
+
+export async function getInventoryAdjustments(
+  itemId?: string,
+): Promise<InventoryAdjustment[]> {
+  return firestoreOp(
+    async () => {
+      let q = query(collection(db, "inventory_adjustments"), orderBy("created_at", "desc"));
+      if (itemId) q = query(q, where("item_id", "==", itemId));
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryAdjustment));
+    },
+    async () => {
+      let data = await RestApi.queryCollection("inventory_adjustments", "item_id", "!=", "__nonexistent__");
+      data = (data as any[]).filter((d: any) => d.item_id !== undefined);
+      let result = (data as any[]).map((d: any) => ({ ...d })) as InventoryAdjustment[];
+      if (itemId) result = result.filter((r) => r.item_id === itemId);
+      return result.sort((a, b) => {
+        const ta = (a.created_at as any)?.seconds || 0;
+        const tb = (b.created_at as any)?.seconds || 0;
+        return tb - ta;
+      });
     },
   );
 }

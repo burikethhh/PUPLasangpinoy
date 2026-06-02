@@ -110,13 +110,13 @@ export default function Homepage() {
             <TouchableOpacity 
               style={styles.actionBtn}
               activeOpacity={0.8}
-              onPress={() => router.push("/(tabs)/profile" as any)}
+              onPress={() => router.push("/(tabs)/scan" as any)}
             >
               <View style={[styles.actionIcon, { backgroundColor: "#E8F8F5" }]}>
-                <Ionicons name="camera" size={32} color="#34B36A" />
+                <Ionicons name="cart" size={32} color="#34B36A" />
               </View>
-              <Text style={styles.actionLabel}>Scan Food</Text>
-              <Text style={styles.actionSub}>AI Assistant</Text>
+              <Text style={styles.actionLabel}>Cart</Text>
+              <Text style={styles.actionSub}>View order</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   headerCurve: {
     position: "absolute",
-    bottom: -2,
+    bottom: -1,
     left: 0,
     right: 0,
     height: 40,

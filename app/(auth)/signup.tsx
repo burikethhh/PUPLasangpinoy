@@ -10,7 +10,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { signUp, verifyEmail } from '../../lib/firebase';
+import { signUp } from '../../lib/firebase';
 
 export default function SignUpScreen() {
   const [displayName, setDisplayName] = useState('');
@@ -52,7 +52,6 @@ export default function SignUpScreen() {
     
     try {
       await signUp(email, password, displayName.trim(), 'customer', phone.trim(), address.trim());
-      verifyEmail().catch(e => console.log('[Auth] Verification email skipped:', e.message));
       router.replace('/(auth)/verify-email');
     } catch (error: any) {
       let message = error.message;
@@ -114,7 +113,7 @@ export default function SignUpScreen() {
               <Ionicons name="call-outline" size={18} color="#aaa" style={styles.inputIcon} />
               <TextInput style={styles.input} placeholder="09XX XXX XXXX" placeholderTextColor="#aaa"
                 value={phone} onChangeText={(v) => { setPhone(v); clearError('phone'); }}
-                keyboardType="phone-pad" maxLength={13} />
+                keyboardType="phone-pad" maxLength={11} />
             </View>
             {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
 

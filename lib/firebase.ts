@@ -54,6 +54,7 @@ export interface Profile {
   role: 'admin' | 'staff' | 'customer';
   phone?: string;
   address?: string;
+  email_verified?: boolean;
   created_at: Timestamp | { seconds: number };
 }
 

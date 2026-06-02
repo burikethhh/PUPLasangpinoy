@@ -5,7 +5,7 @@ import {
     ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getCurrentUser, signOut } from "../../lib/firebase";
+import { getCurrentUser, logOut } from "../../lib/firebase";
 import { generateEmailCode, verifyEmailCode } from "../../lib/firebase-store";
 
 export default function VerifyEmailScreen() {
@@ -26,6 +26,8 @@ export default function VerifyEmailScreen() {
     if (user.emailVerified) {
       setVerified(true);
     }
+    // Auto-send verification code on mount
+    sendCode();
   }, []);
 
   useEffect(() => {
@@ -38,10 +40,9 @@ export default function VerifyEmailScreen() {
     if (!user?.email) return;
     setSending(true);
     try {
-      const c = await generateEmailCode(user.email);
+      await generateEmailCode(user.email);
       setCodeSent(true);
       setCountdown(60);
-      Alert.alert("Code Sent", `A 6-digit verification code has been sent to ${user.email}.\n\nFor testing, your code is: ${c}`);
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to send verification code.");
     }
@@ -57,11 +58,11 @@ export default function VerifyEmailScreen() {
     if (!user?.email) return;
     setLoading(true);
     try {
-      const result = await verifyEmailCode(user.email, fullCode);
+      const result = await verifyEmailCode(user.email, fullCode, user.uid);
       if (result) {
         setVerified(true);
       } else {
-        Alert.alert("Incorrect Code", "The code you entered is incorrect. Please try again.");
+        Alert.alert("Incorrect Code", "The code you entered is incorrect or expired. Please try again.");
       }
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to verify code.");
@@ -77,6 +78,12 @@ export default function VerifyEmailScreen() {
     if (text && index < 5) {
       inputs.current[index + 1]?.focus();
     }
+    if (text && index === 5) {
+      const fullCode = newCode.join("");
+      if (fullCode.length === 6) {
+        verifyCode();
+      }
+    }
   }
 
   function handleKeyPress(e: any, index: number) {
@@ -86,7 +93,7 @@ export default function VerifyEmailScreen() {
   }
 
   async function handleLogout() {
-    await signOut();
+    await logOut();
     router.replace("/(auth)/welcome");
   }
 

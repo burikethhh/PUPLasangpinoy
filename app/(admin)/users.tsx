@@ -35,6 +35,8 @@ export default function AdminMoreScreen() {
   const [gcashNumber, setGcashNumber] = useState("");
   const [gcashEnabled, setGcashEnabled] = useState(false);
   const [gcashQrImage, setGcashQrImage] = useState("");
+  const [storeLat, setStoreLat] = useState("");
+  const [storeLng, setStoreLng] = useState("");
   const [uploadingQr, setUploadingQr] = useState(false);
   const [staffModal, setStaffModal] = useState(false);
   const [staffForm, setStaffForm] = useState({ name: "", email: "", password: "", phone: "" });
@@ -64,6 +66,8 @@ export default function AdminMoreScreen() {
       setGcashEnabled(s.gcash_enabled);
       setGcashNumber(s.gcash_number || "");
       setGcashQrImage(s.gcash_qr_image || "");
+      setStoreLat((s.store_lat || 14.031902).toString());
+      setStoreLng((s.store_lng || 121.206633).toString());
       const staffUsers = u.filter((x) => x.role === "staff");
       setStaff(staffUsers);
       setUsers(u);
@@ -100,6 +104,8 @@ export default function AdminMoreScreen() {
         gcash_enabled: gcashEnabled,
         gcash_number: gcashNumber.trim(),
         gcash_qr_image: gcashQrImage,
+        store_lat: parseFloat(storeLat) || 14.031902,
+        store_lng: parseFloat(storeLng) || 121.206633,
       });
       Alert.alert("Saved", "Settings updated!");
     } catch (e: any) { Alert.alert("Error", e.message); }
@@ -363,6 +369,12 @@ export default function AdminMoreScreen() {
           <Text style={{ fontSize: 11, color: "#888", marginTop: 2, marginLeft: 2 }}>
             Orders outside this radius will be automatically rejected.
           </Text>
+          <Text style={styles.label}>Store Latitude</Text>
+          <TextInput style={styles.input} value={storeLat} keyboardType="numbers-and-punctuation"
+            onChangeText={setStoreLat} placeholder="14.031902" placeholderTextColor="#aaa" />
+          <Text style={styles.label}>Store Longitude</Text>
+          <TextInput style={styles.input} value={storeLng} keyboardType="numbers-and-punctuation"
+            onChangeText={setStoreLng} placeholder="121.206633" placeholderTextColor="#aaa" />
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>GCash Payment</Text>
             <Switch value={gcashEnabled} onValueChange={setGcashEnabled}

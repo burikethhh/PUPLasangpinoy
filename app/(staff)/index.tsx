@@ -99,7 +99,7 @@ export default function StaffOrdersScreen() {
     ]);
   }
 
-  const FINISHED = ["delivered", "rejected", "cancelled"];
+  const FINISHED = ["delivered", "unable_to_fulfill", "cancelled"];
   const filters: (OrderStatus | "all" | "archived")[] = ["all", "accepted", "preparing", "out_for_delivery", "delivered", "archived"];
   const filterLabel = (f: OrderStatus | "all" | "archived") => {
     if (f === "all") return "All";
@@ -136,7 +136,7 @@ export default function StaffOrdersScreen() {
         <View style={styles.itemsList}>
           {(item.items || []).map((i, idx) => (
             <Text key={idx} style={styles.itemText}>
-              {i.quantity}x {i.name} - P{i.price * i.quantity}
+              {i.quantity}x {i.name} - P{(i.price * i.quantity).toFixed(2)}
             </Text>
           ))}
         </View>
@@ -148,8 +148,8 @@ export default function StaffOrdersScreen() {
             <View style={styles.tracker}>
               {trackSteps.map((s, idx) => (
                 <View key={s} style={styles.trackStep}>
-                  <View style={[styles.trackDot, idx <= currentIdx && { backgroundColor: "#3498DB" }]} />
-                  {idx < 4 && <View style={[styles.trackLine, idx < currentIdx && { backgroundColor: "#3498DB" }]} />}
+                  <View style={[styles.trackDot, idx <= currentIdx && { backgroundColor: "#F25C05" }]} />
+                  {idx < 4 && <View style={[styles.trackLine, idx < currentIdx && { backgroundColor: "#F25C05" }]} />}
                 </View>
               ))}
             </View>
@@ -186,8 +186,8 @@ export default function StaffOrdersScreen() {
         )}
         {filter === "archived" && (
           <TouchableOpacity style={[styles.archiveBtn, { marginTop: 10 }]} onPress={() => handleUnarchive(item.id)}>
-            <Ionicons name="arrow-undo-outline" size={14} color="#3498DB" />
-            <Text style={[styles.archiveBtnText, { color: "#3498DB" }]}>Unarchive</Text>
+            <Ionicons name="arrow-undo-outline" size={14} color="#F25C05" />
+            <Text style={[styles.archiveBtnText, { color: "#F25C05" }]}>Unarchive</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -200,7 +200,7 @@ export default function StaffOrdersScreen() {
 
       {/* Filter Dropdown */}
       <TouchableOpacity style={styles.filterDropdownBtn} onPress={() => setFilterDropdown(true)}>
-        <Ionicons name="filter" size={16} color="#3498DB" />
+        <Ionicons name="filter" size={16} color="#F25C05" />
         <Text style={styles.filterDropdownText}>{filterLabel(filter)}</Text>
         <Ionicons name="chevron-down" size={16} color="#888" />
       </TouchableOpacity>
@@ -211,7 +211,7 @@ export default function StaffOrdersScreen() {
             <Text style={styles.dropdownTitle}>Filter Orders</Text>
             {filters.map((f) => {
               const active = filter === f;
-              const color = f === "all" ? "#3498DB" : f === "archived" ? "#888" : ORDER_STATUS_COLORS[f] || "#888";
+              const color = f === "all" ? "#F25C05" : f === "archived" ? "#888" : ORDER_STATUS_COLORS[f] || "#888";
               return (
                 <TouchableOpacity key={f}
                   style={[styles.dropdownItem, active && { backgroundColor: color + "15" }]}
@@ -229,7 +229,7 @@ export default function StaffOrdersScreen() {
       </Modal>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#3498DB" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={filtered}
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   preparedBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
   archiveBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 8, padding: 4 },
   archiveBtnText: { fontSize: 11, color: "#888" },
-  startDeliveryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#3498DB", borderRadius: 12, padding: 12, marginTop: 8 },
+  startDeliveryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#F25C05", borderRadius: 12, padding: 12, marginTop: 8 },
   startDeliveryBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
   trackerWrap: { marginTop: 8, paddingTop: 6 },
   tracker: { flexDirection: "row", alignItems: "center" },

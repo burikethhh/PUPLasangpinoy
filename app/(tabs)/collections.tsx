@@ -9,12 +9,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser } from "../../lib/firebase";
-import { getOrdersByUser, requestRefund, addReview, type Order } from "../../lib/firebase-store";
+import { getOrdersByUser, requestRefund, addReview, updateOrderStatus, type Order } from "../../lib/firebase-store";
 import { uploadToCloudinary } from "../../lib/cloudinary";
 
 const ACTIVE_STATUSES = ["accepted", "preparing", "out_for_delivery"];
 const PENDING_STATUS = "pending";
-const DONE_STATUSES = ["delivered", "rejected", "cancelled"];
+const DONE_STATUSES = ["delivered", "unable_to_fulfill", "cancelled"];
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -25,6 +25,7 @@ export default function OrdersScreen() {
   const [refundOrderId, setRefundOrderId] = useState<string | null>(null);
   const [refundReason, setRefundReason] = useState("");
   const [refunding, setRefunding] = useState(false);
+  const [refundImage, setRefundImage] = useState("");
 
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
@@ -138,7 +139,7 @@ export default function OrdersScreen() {
         {item.reject_reason && (
           <View style={styles.rejectBox}>
             <Ionicons name="alert-circle" size={12} color="#E74C3C" />
-            <Text style={styles.rejectText}>{item.reject_reason}</Text>
+            <Text style={styles.rejectText}>Unable to Fulfill: {item.reject_reason}</Text>
           </View>
         )}
 
@@ -162,6 +163,38 @@ export default function OrdersScreen() {
             <Ionicons name="cash-outline" size={14} color="#fff" />
             <Text style={styles.refundBtnText}>Request Refund</Text>
           </TouchableOpacity>
+        )}
+
+        {/* Cancel Order button — only when pending or issue_encountered */}
+        {(item.status === "pending" || item.status === "issue_encountered") && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => {
+            Alert.alert(
+              "Cancel Order",
+              "Are you sure you want to cancel this order? This cannot be undone.",
+              [
+                { text: "Keep Order", style: "cancel" },
+                { text: "Cancel Order", style: "destructive", onPress: async () => {
+                  try {
+                    await updateOrderStatus(item.id, "cancelled");
+                    fetchOrders(true);
+                  } catch (e: any) {
+                    Alert.alert("Error", e.message || "Failed to cancel order.");
+                  }
+                }},
+              ],
+            );
+          }}>
+            <Ionicons name="close-circle-outline" size={14} color="#E74C3C" />
+            <Text style={styles.cancelBtnText}>Cancel Order</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Issue Encountered banner */}
+        {item.status === "issue_encountered" && (
+          <View style={styles.issueBanner}>
+            <Ionicons name="warning" size={14} color="#E67E22" />
+            <Text style={styles.issueBannerText}>There's an issue with your order. You may cancel or wait for the store to resolve it.</Text>
+          </View>
         )}
 
         {/* Live tracking button */}
@@ -271,7 +304,7 @@ export default function OrdersScreen() {
                       <Text style={styles.orderNum} numberOfLines={1}>{item.order_number}</Text>
                     </View>
                     <Text style={styles.typeChip} numberOfLines={1}>{ORDER_TYPE_LABELS[item.order_type]}</Text>
-                    <View style={[styles.badge, { backgroundColor: "#88822" }]}>
+                    <View style={[styles.badge, { backgroundColor: "#888" }]}>
                       <Text style={[styles.badgeText, { color: "#888" }]}>{ORDER_STATUS_LABELS[item.status]}</Text>
                     </View>
                     <Text style={styles.totalInline}>P{item.total?.toFixed(0)}</Text>
@@ -297,7 +330,7 @@ export default function OrdersScreen() {
         <View style={styles.overlay}>
           <View style={styles.refundModal}>
             <Text style={styles.refundModalTitle}>Request Refund</Text>
-            <Text style={styles.refundModalSub}>Please provide a reason for your refund request.</Text>
+            <Text style={styles.refundModalSub}>Please provide a reason and photo evidence for your refund request.</Text>
             <TextInput
               style={styles.refundModalInput}
               placeholder="Reason for refund..."
@@ -306,8 +339,26 @@ export default function OrdersScreen() {
               onChangeText={setRefundReason}
               multiline
             />
+            {refundImage ? (
+              <View>
+                <Image source={{ uri: refundImage }} style={styles.refundPreviewImage} />
+                <TouchableOpacity style={styles.removeImageBtn} onPress={() => setRefundImage("")}>
+                  <Ionicons name="close-circle" size={22} color="#E74C3C" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.refundImageBtn} onPress={async () => {
+                const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+                if (!result.canceled && result.assets[0]) {
+                  setRefundImage(result.assets[0].uri);
+                }
+              }}>
+                <Ionicons name="camera-outline" size={18} color="#F25C05" />
+                <Text style={styles.refundImageBtnText}>Add Photo Evidence</Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setRefundOrderId(null)}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => { setRefundOrderId(null); setRefundImage(""); }}>
                 <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -316,10 +367,15 @@ export default function OrdersScreen() {
                   if (!refundReason.trim()) return;
                   setRefunding(true);
                   try {
-                    await requestRefund(refundOrderId, refundReason.trim());
+                    let imageUrl = "";
+                    if (refundImage) {
+                      imageUrl = await uploadToCloudinary(refundImage, "foodfix/refunds");
+                    }
+                    await requestRefund(refundOrderId, refundReason.trim(), imageUrl);
                     Alert.alert("Refund Requested", "Your refund request has been submitted. The store will review it shortly.");
                     setRefundOrderId(null);
                     setRefundReason("");
+                    setRefundImage("");
                     fetchOrders(true);
                   } catch (e: any) {
                     Alert.alert("Error", e.message || "Failed to submit refund request.");
@@ -402,19 +458,16 @@ export default function OrdersScreen() {
                     if (reviewImage) {
                       imageUrl = await uploadToCloudinary(reviewImage, "foodfix/reviews");
                     }
-                    // Submit a review for each item in the order
-                    for (const item of reviewOrder.items) {
-                      await addReview({
-                        user_id: user.uid,
-                        username: reviewOrder.customer_name,
-                        order_id: reviewOrder.id,
-                        menu_item_id: item.menu_item_id,
-                        menu_item_name: item.name,
-                        rating: reviewRating,
-                        comment: reviewComment.trim(),
-                        image_url: imageUrl || undefined,
-                      });
-                    }
+                    await addReview({
+                      user_id: user.uid,
+                      username: reviewOrder.customer_name,
+                      order_id: reviewOrder.id,
+                      menu_item_id: reviewOrder.items[0]?.menu_item_id || "order",
+                      menu_item_name: reviewOrder.items.map((i) => i.name).join(", "),
+                      rating: reviewRating,
+                      comment: reviewComment.trim(),
+                      image_url: imageUrl || undefined,
+                    });
                     Alert.alert("Thank You!", "Your feedback has been submitted.");
                     setReviewModalVisible(false);
                     fetchOrders(true);
@@ -500,6 +553,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#F25C05", borderRadius: 10, paddingVertical: 10, marginTop: 8,
   },
   refundBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
+  cancelBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    borderRadius: 10, paddingVertical: 10, marginTop: 8,
+    backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E74C3C",
+  },
+  cancelBtnText: { color: "#E74C3C", fontWeight: "bold", fontSize: 13 },
+  issueBanner: {
+    flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 8,
+    padding: 10, backgroundColor: "#FFF8E1", borderRadius: 8, borderWidth: 1, borderColor: "#F0D060",
+  },
+  issueBannerText: { flex: 1, fontSize: 11, color: "#2E1A06", lineHeight: 16 },
   overlay: {
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center",
@@ -515,6 +579,14 @@ const styles = StyleSheet.create({
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
   modalCancel: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#eee" },
   modalConfirmRefund: { flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#F25C05" },
+  refundImageBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#FFF5EE", borderRadius: 12, padding: 12, marginTop: 10,
+    borderWidth: 1.5, borderColor: "#F25C05", borderStyle: "dashed",
+  },
+  refundImageBtnText: { color: "#F25C05", fontWeight: "600", fontSize: 13 },
+  refundPreviewImage: { width: "100%", height: 140, borderRadius: 12, marginTop: 10 },
+  removeImageBtn: { position: "absolute", top: 14, right: 4 },
   feedbackBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     backgroundColor: "#F39C12", borderRadius: 10, paddingVertical: 10, marginTop: 8,
