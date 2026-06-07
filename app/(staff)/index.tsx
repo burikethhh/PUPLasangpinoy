@@ -162,13 +162,41 @@ export default function StaffOrdersScreen() {
         )}
 
         {canMarkPrepared && (
-          <TouchableOpacity
-            style={styles.preparedBtn}
-            onPress={() => handleMarkPrepared(item)}
-          >
-            <Ionicons name="checkmark-circle" size={18} color="#fff" />
-            <Text style={styles.preparedBtnText}>Mark as Prepared</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              style={[styles.preparedBtn, { flex: 1 }]}
+              onPress={() => handleMarkPrepared(item)}
+            >
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={styles.preparedBtnText}>Mark as Prepared</Text>
+            </TouchableOpacity>
+            {item.status === "preparing" && (
+              <TouchableOpacity
+                style={[styles.preparedBtn, { flex: 1, backgroundColor: "#E74C3C" }]}
+                onPress={() => {
+                  Alert.alert("Issue Encountered", `Report an issue with order ${item.order_number}?`, [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Report Issue",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          await updateOrderStatus(item.id, "issue_encountered");
+                          Alert.alert("Done", "Issue reported. Admin will review.");
+                          fetchOrders(true);
+                        } catch (e: any) {
+                          Alert.alert("Error", e.message);
+                        }
+                      },
+                    },
+                  ]);
+                }}
+              >
+                <Ionicons name="warning" size={18} color="#fff" />
+                <Text style={styles.preparedBtnText}>Issue</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
         {item.status === "out_for_delivery" && (
           <TouchableOpacity

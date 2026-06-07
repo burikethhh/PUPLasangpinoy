@@ -40,6 +40,8 @@ export default function WelcomeScreen() {
       router.replace("/(admin)");
     } else if (profile?.role === "staff") {
       router.replace("/(staff)" as any);
+    } else if (profile && !profile.email_verified) {
+      router.replace("/(auth)/verify-email");
     } else {
       router.replace("/(tabs)");
     }

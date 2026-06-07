@@ -239,7 +239,7 @@ export default function AdminDashboard() {
               <Text style={styles.sectionTitle}>Orders by Status <Ionicons name="chevron-forward" size={13} color="#888" /></Text>
             </TouchableOpacity>
             <View style={styles.card}>
-              {(["pending", "accepted", "preparing", "out_for_delivery", "delivered", "rejected", "cancelled"] as OrderStatus[]).map((s) => {
+              {(["pending", "accepted", "preparing", "out_for_delivery", "delivered", "unable_to_fulfill", "cancelled"] as OrderStatus[]).map((s) => {
                 const count = ordersByStatus[s] || 0;
                 if (count === 0) return null;
                 const color = ORDER_STATUS_COLORS[s];
