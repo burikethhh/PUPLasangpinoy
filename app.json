@@ -2,7 +2,7 @@
   "expo": {
     "name": "FOODFIX",
     "slug": "foodfix",
-    "version": "3.3.2",
+    "version": "3.3.3",
     "orientation": "portrait",
     "icon": "./logo.jpg",
     "scheme": "foodfix",
@@ -11,11 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.foodfix.mobile",
-      "buildNumber": "34"
+      "buildNumber": "35"
     },
     "android": {
       "package": "com.foodfix.mobile",
-      "versionCode": 34,
+      "versionCode": 35,
       "adaptiveIcon": {
         "foregroundImage": "./logo.jpg",
         "backgroundColor": "#F5EDD9"
@@ -28,6 +28,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withReleaseSigning",
       "expo-router",
       [
         "expo-splash-screen",
