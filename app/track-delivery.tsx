@@ -273,41 +273,40 @@ export default function TrackDeliveryScreen() {
   function generateAiResponse(question: string): string {
     const q = question.toLowerCase();
     
-    // Staff context - asking about customer
+    // Staff context - asking about customer delivery location
     if (!isCustomer) {
-      if (!customerLoc) {
-        return "I'm waiting for the customer to share their location. Once they opt in, I can give you their live position and distance.";
-      }
-      // Calculate distance from driver (staff) to customer
+      const destLat = order?.customer_lat ?? storeLatRef.current;
+      const destLng = order?.customer_lng ?? storeLngRef.current;
+      // Calculate distance from driver (staff) to order delivery address
       const dist = driverLoc 
-        ? calcDistance(driverLoc.lat, driverLoc.lng, customerLoc.lat, customerLoc.lng)
-        : calcDistance(storeLatRef.current, storeLngRef.current, customerLoc.lat, customerLoc.lng);
+        ? calcDistance(driverLoc.lat, driverLoc.lng, destLat, destLng)
+        : calcDistance(storeLatRef.current, storeLngRef.current, destLat, destLng);
       const speedKmh = driverLoc?.speed && driverLoc.speed > 2 ? driverLoc.speed : 25;
       const mins = Math.round((dist / speedKmh) * 60);
       const distStr = dist < 1 ? `${(dist * 1000).toFixed(0)} meters` : `${dist.toFixed(1)} km`;
       
-      if (q.includes("where") || q.includes("location") || q.includes("customer")) {
-        if (dist < 0.3) return `Your customer is very close — less than 300 meters away! Almost there.`;
-        if (dist < 1) return `Your customer is ${distStr} away. Just a short drive remaining!`;
-        return `Your customer is currently ${distStr} away from your position.`;
+      if (q.includes("where") || q.includes("location") || q.includes("customer") || q.includes("address")) {
+        if (dist < 0.3) return `You are almost at the delivery address (${order?.customer_address || "Customer location"}) — less than 300 meters away!`;
+        if (dist < 1) return `The delivery destination is ${distStr} away at ${order?.customer_address || "pinned address"}.`;
+        return `The customer's delivery destination (${order?.customer_address || "address"}) is ${distStr} away from your position.`;
       }
       if (q.includes("how long") || q.includes("when") || q.includes("eta") || q.includes("arrive") || q.includes("time") || q.includes("delivery")) {
-        if (mins <= 1) return `You'll reach your customer any moment now!`;
-        if (mins <= 5) return `About ${mins} minutes until you reach your customer.`;
-        return `Estimated arrival at customer location in ~${mins} minutes (${distStr} remaining).`;
+        if (mins <= 1) return `You'll reach the delivery location any moment now!`;
+        if (mins <= 5) return `About ${mins} minutes until you reach the delivery address.`;
+        return `Estimated arrival at delivery address in ~${mins} minutes (${distStr} remaining).`;
       }
       if (q.includes("route") || q.includes("way") || q.includes("direction") || q.includes("go")) {
-        return `Head toward your customer's location. They are ${distStr} away. The map shows their live position with the red (C) marker.`;
+        return `Head toward the delivery address: ${order?.customer_address || "pinned location"}. Destination is ${distStr} away. The map shows the destination with the red (C) marker.`;
       }
       if (q.includes("near") || q.includes("close") || q.includes("far")) {
-        if (dist < 0.5) return `Very close! Only ${distStr} to go.`;
-        if (dist < 2) return `Getting closer — ${distStr} remaining.`;
-        return `Still ${distStr} to your customer's location.`;
+        if (dist < 0.5) return `Very close! Only ${distStr} to the delivery address.`;
+        if (dist < 2) return `Getting closer — ${distStr} remaining to delivery address.`;
+        return `Still ${distStr} to the delivery location.`;
       }
       if (q.includes("hello") || q.includes("hi") || q.includes("hey")) {
-        return `Hello! Your customer is ${distStr} away. Estimated arrival in ~${mins} minutes. Ask me about their location or best route!`;
+        return `Hello! The delivery address is ${distStr} away. Estimated arrival in ~${mins} minutes. Ask me about the destination or route!`;
       }
-      return `Your customer is ${distStr} away — about ${mins} minutes at current speed. Live tracking is ${sharingActive ? "active" : "waiting for customer"}. Ask me: "Where is my customer?" or "How long to delivery?"`;
+      return `Delivery destination (${order?.customer_address || "address"}) is ${distStr} away — about ${mins} minutes at current speed. Ask me: "Where is the delivery address?" or "How long to delivery?"`;
     }
     
     // Customer context - asking about driver

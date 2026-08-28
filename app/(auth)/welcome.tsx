@@ -41,7 +41,7 @@ export default function WelcomeScreen() {
     } else if (profile?.role === "staff") {
       router.replace("/(staff)" as any);
     } else if (profile && !profile.email_verified) {
-      router.replace("/(auth)/verify-email");
+      router.replace("/(auth)/verify-email" as any);
     } else {
       router.replace("/(tabs)");
     }

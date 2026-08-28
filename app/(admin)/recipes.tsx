@@ -8,8 +8,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { OrderStatus } from "../../constants/order";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUSES } from "../../constants/order";
-import { getOrders, processRefund, updateOrderStatus, type Order } from "../../lib/firebase-store";
+import { getOrders, onAllOrdersUpdate, processRefund, updateOrderStatus, type Order } from "../../lib/firebase-store";
 import { notifyDeliveryStarted } from "../../lib/notifications";
+import { createLogger } from "../../lib/logger";
+
+const log = createLogger("AdminOrders");
 
 const FILTER_OPTIONS: (OrderStatus | "all" | "archived")[] = ["all", ...ORDER_STATUSES, "archived"];
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
@@ -24,6 +27,10 @@ export default function AdminOrders() {
   const [refreshing, setRefreshing] = useState(false);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [issueId, setIssueId] = useState<string | null>(null);
+  const [issueReason, setIssueReason] = useState("");
+  const [rejectRefundData, setRejectRefundData] = useState<{ id: string; customerName: string; customerPhone: string } | null>(null);
+  const [rejectRefundReason, setRejectRefundReason] = useState("");
   const [archived, setArchived] = useState<Set<string>>(new Set());
   const [filterDropdown, setFilterDropdown] = useState(false);
   const [pendingRefundCount, setPendingRefundCount] = useState(0);
@@ -33,19 +40,23 @@ export default function AdminOrders() {
     try {
       const data = await getOrders(filter === "all" || filter === "archived" ? undefined : { status: filter });
       setOrders(data);
-      setPendingRefundCount(data.filter((o: any) => o.refund_status === "pending").length);
-    } catch (e) { console.error(e); }
+      const pendingCount = data.filter((o: any) => o.refund_status === "pending").length;
+      setPendingRefundCount(pendingCount);
+      log.info("Orders fetched", { count: data.length, pendingRefundCount: pendingCount });
+    } catch (e) { log.error("Failed to fetch orders", e); }
     if (!silent) setLoading(false);
   }, [filter]);
 
-  useFocusEffect(useCallback(() => { fetchOrders(); }, [fetchOrders]));
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchOrders(true);
-    }, 8000);
-    return () => clearInterval(intervalId);
-  }, [fetchOrders]);
+  useFocusEffect(useCallback(() => {
+    fetchOrders();
+    const unsub = onAllOrdersUpdate((allData) => {
+      const filtered = filter === "all" || filter === "archived" ? allData : allData.filter(o => o.status === filter);
+      setOrders(filtered);
+      setPendingRefundCount(allData.filter((o: any) => o.refund_status === "pending").length);
+      setLoading(false);
+    });
+    return () => unsub?.();
+  }, [fetchOrders, filter]));
 
   async function onRefresh() {
     setRefreshing(true);
@@ -56,6 +67,7 @@ export default function AdminOrders() {
   async function advanceStatus(order: Order) {
     const next = NEXT_STATUS[order.status];
     if (!next) return;
+    log.info("Advancing order status", { orderId: order.id, orderNumber: order.order_number, fromStatus: order.status, toStatus: next });
     Alert.alert("Update Status", `Move order ${order.order_number} to "${ORDER_STATUS_LABELS[next]}"?`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -75,8 +87,30 @@ export default function AdminOrders() {
 
   async function confirmReject() {
     if (!rejectId) return;
+    log.info("Rejecting order", { orderId: rejectId, reason: rejectReason || "Unable to fulfill order" });
     await updateOrderStatus(rejectId, "unable_to_fulfill", { reject_reason: rejectReason || "Unable to fulfill order" });
     setRejectId(null);
+    fetchOrders(true);
+  }
+
+  function promptIssue(orderId: string) {
+    setIssueId(orderId);
+    setIssueReason("");
+  }
+
+  async function confirmReportIssue() {
+    if (!issueId) return;
+    log.info("Reporting issue for order", { orderId: issueId, reason: issueReason || "No reason provided" });
+    await updateOrderStatus(issueId, "issue_encountered", { issue_reason: issueReason || "No reason provided" });
+    setIssueId(null);
+    fetchOrders(true);
+  }
+
+  async function confirmRejectRefund() {
+    if (!rejectRefundData) return;
+    log.info("Rejecting refund", { orderId: rejectRefundData.id, customer: rejectRefundData.customerName, reason: rejectRefundReason || "Refund rejected" });
+    await processRefund(rejectRefundData.id, "rejected", { refund_rejection_reason: rejectRefundReason || "Refund rejected" });
+    setRejectRefundData(null);
     fetchOrders(true);
   }
 
@@ -202,6 +236,12 @@ export default function AdminOrders() {
                 {item.payment_method && (
                   <Text style={styles.paymentText}>Payment: {item.payment_method.toUpperCase()}</Text>
                 )}
+                {item.issue_reason && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                    <Ionicons name="warning" size={12} color="#E67E22" />
+                    <Text style={{ fontSize: 11, color: "#E67E22", fontStyle: "italic" }}>Issue: {item.issue_reason}</Text>
+                  </View>
+                )}
                 {item.refund_status && item.refund_status !== "none" && (
                   <View style={[styles.refundBadge,
                     item.refund_status === "approved" || item.refund_status === "completed" ? { backgroundColor: "#27AE6018" } :
@@ -221,7 +261,10 @@ export default function AdminOrders() {
                   </View>
                 )}
                 {item.refund_reason && (
-                  <Text style={styles.refundReasonText}>Refund reason: {item.refund_reason}</Text>
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={styles.refundRequester}>Requested by: {item.customer_name} — {item.customer_phone}</Text>
+                    <Text style={styles.refundReasonText}>Reason: {item.refund_reason}</Text>
+                  </View>
                 )}
                 {item.refund_image_url && (
                   <Image source={{ uri: item.refund_image_url }} style={styles.refundImage} />
@@ -230,7 +273,7 @@ export default function AdminOrders() {
                   <View style={styles.refundActions}>
                     <TouchableOpacity style={[styles.refundActionBtn, { backgroundColor: "#27AE60" }]}
                       onPress={async () => {
-                        Alert.alert("Approve Refund", `Approve refund for order ${item.order_number}?`, [
+                        Alert.alert("Approve Refund", `Approve refund from ${item.customer_name} (${item.customer_phone}) for order ${item.order_number}? Customer will be asked to fill in their refund details.`, [
                           { text: "Cancel", style: "cancel" },
                           {
                             text: "Approve", onPress: async () => {
@@ -244,23 +287,25 @@ export default function AdminOrders() {
                       <Text style={styles.refundActionText}>Approve</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.refundActionBtn, { backgroundColor: "#E74C3C" }]}
-                      onPress={async () => {
-                        Alert.alert("Reject Refund", `Reject refund for order ${item.order_number}?`, [
-                          { text: "Cancel", style: "cancel" },
-                          {
-                            text: "Reject", style: "destructive", onPress: async () => {
-                              await processRefund(item.id, "rejected");
-                              fetchOrders(true);
-                            },
-                          },
-                        ]);
-                      }}>
+                      onPress={() => { setRejectRefundData({ id: item.id, customerName: item.customer_name, customerPhone: item.customer_phone }); setRejectRefundReason(""); }}>
                       <Ionicons name="close" size={14} color="#fff" />
                       <Text style={styles.refundActionText}>Reject</Text>
                     </TouchableOpacity>
+                  </View>
+                )}
+                {item.refund_status === "approved" && item.refund_account_name && (
+                  <View style={styles.refundActions}>
+                    {item.refund_account_name && (
+                      <View style={{ flex: 1, backgroundColor: "#F0F9F4", borderRadius: 8, padding: 8, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 11, color: "#27AE60", fontWeight: "600" }}>Refund Details:</Text>
+                        <Text style={{ fontSize: 11, color: "#555" }}>Name: {item.refund_account_name}</Text>
+                        <Text style={{ fontSize: 11, color: "#555" }}>Account: {item.refund_account_number}</Text>
+                        <Text style={{ fontSize: 11, color: "#555" }}>Method: {(item.refund_method || "gcash").toUpperCase()}</Text>
+                      </View>
+                    )}
                     <TouchableOpacity style={[styles.refundActionBtn, { backgroundColor: "#3498DB" }]}
-                      onPress={async () => {
-                        Alert.alert("Complete Refund", `Mark refund as completed for order ${item.order_number}?`, [
+                      onPress={() => {
+                        Alert.alert("Complete Refund", `Mark refund as completed for order ${item.order_number}? The refund will be sent to the customer's provided account.`, [
                           { text: "Cancel", style: "cancel" },
                           {
                             text: "Complete", onPress: async () => {
@@ -273,6 +318,12 @@ export default function AdminOrders() {
                       <Ionicons name="checkmark-done" size={14} color="#fff" />
                       <Text style={styles.refundActionText}>Complete</Text>
                     </TouchableOpacity>
+                  </View>
+                )}
+                {item.refund_status === "approved" && !item.refund_account_name && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                    <Ionicons name="hourglass-outline" size={12} color="#F39C12" />
+                    <Text style={{ fontSize: 11, color: "#F39C12", fontStyle: "italic" }}>Waiting for customer to submit refund details...</Text>
                   </View>
                 )}
                 {item.reject_reason && (
@@ -305,15 +356,7 @@ export default function AdminOrders() {
                       <Text style={styles.actionText}>Out for Delivery</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.actionBtn, { backgroundColor: "#E67E22" }]}
-                      onPress={async () => {
-                        Alert.alert("Issue Encountered", "Report an issue with this order? The customer will be notified.", [
-                          { text: "Cancel", style: "cancel" },
-                          { text: "Report Issue", style: "destructive", onPress: async () => {
-                            await updateOrderStatus(item.id, "issue_encountered");
-                            fetchOrders(true);
-                          }},
-                        ]);
-                      }}>
+                      onPress={() => promptIssue(item.id)}>
                       <Ionicons name="warning" size={16} color="#fff" />
                       <Text style={styles.actionText}>Issue Encountered</Text>
                     </TouchableOpacity>
@@ -406,6 +449,49 @@ export default function AdminOrders() {
           </View>
         </View>
       )}
+
+      {/* Issue Reason Modal */}
+      {issueId && (
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Report Issue Encountered</Text>
+            <Text style={{ fontSize: 13, color: "#888", marginBottom: 8 }}>Describe the issue with this order:</Text>
+            <TextInput style={styles.modalInput} placeholder="Reason (required)"
+              placeholderTextColor="#aaa" value={issueReason} onChangeText={setIssueReason} multiline />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setIssueId(null)}>
+                <Text style={{ color: "#888" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalConfirm, { backgroundColor: "#E67E22" }, (!issueReason.trim()) && { opacity: 0.5 }]}
+                onPress={confirmReportIssue} disabled={!issueReason.trim()}>
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>Report Issue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Reject Refund Modal */}
+      {rejectRefundData && (
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Reject Refund</Text>
+            <Text style={{ fontSize: 12, color: "#333", marginBottom: 8 }}>Customer: {rejectRefundData.customerName} — {rejectRefundData.customerPhone}</Text>
+            <Text style={{ fontSize: 13, color: "#888", marginBottom: 8 }}>Provide a reason for rejecting this refund:</Text>
+            <TextInput style={styles.modalInput} placeholder="Reason (required)"
+              placeholderTextColor="#aaa" value={rejectRefundReason} onChangeText={setRejectRefundReason} multiline />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setRejectRefundData(null)}>
+                <Text style={{ color: "#888" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalConfirm, (!rejectRefundReason.trim()) && { opacity: 0.5 }]}
+                onPress={confirmRejectRefund} disabled={!rejectRefundReason.trim()}>
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>Reject Refund</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -487,6 +573,7 @@ const styles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 4,
   },
   refundBadgeText: { fontSize: 11, fontWeight: "bold" },
+  refundRequester: { fontSize: 11, color: "#E74C3C", fontWeight: "600", marginTop: 2 },
   refundReasonText: { fontSize: 11, color: "#888", marginTop: 2, fontStyle: "italic" },
   refundImage: { width: "100%", height: 160, borderRadius: 10, marginTop: 6 },
   refundActions: { flexDirection: "row", gap: 6, marginTop: 8 },

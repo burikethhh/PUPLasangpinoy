@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentUser, getProfile } from '../../lib/firebase';
-import { deleteConversation, deleteMessage, getMessages, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
+import { deleteConversation, deleteMessage, getMessages, onMessagesUpdate, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -17,8 +17,6 @@ export default function ChatScreen() {
   const [userName, setUserName] = useState('Customer');
   const flatListRef = useRef<FlatList>(null);
 
-  useFocusEffect(useCallback(() => { loadMessages(); }, []));
-
   useEffect(() => {
     const user = getCurrentUser();
     if (user) {
@@ -26,18 +24,23 @@ export default function ChatScreen() {
     }
   }, []);
 
-  // Poll for new messages every 10s
-  useEffect(() => {
-    const interval = setInterval(loadMessages, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  useFocusEffect(useCallback(() => {
+    loadMessages();
+    const user = getCurrentUser();
+    if (!user) return;
+    const unsub = onMessagesUpdate(user.uid, (msgs) => {
+      setMessages(msgs);
+      setLoading(false);
+    });
+    return () => unsub?.();
+  }, []));
 
   async function loadMessages() {
     const user = getCurrentUser();
     if (!user) { setLoading(false); return; }
     try {
       const msgs = await getMessages(user.uid);
-      setMessages(msgs.reverse()); // oldest first
+      setMessages(msgs.reverse());
     } catch (e) { console.error(e); }
     setLoading(false);
   }
@@ -120,21 +123,21 @@ export default function ChatScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.headerAvatar}>
-            <Ionicons name="storefront" size={22} color="#F25C05" />
+            <Ionicons name="storefront" size={20} color="#F25C05" />
           </View>
           <View>
-              <Text style={styles.headerTitle}>FOODFIX</Text>
-            <Text style={styles.headerSub}>Message the store</Text>
+            <Text style={styles.headerTitle}>FOODFIX Store</Text>
+            <Text style={styles.headerSub}>Online • Typical reply within minutes</Text>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {messages.length > 0 && (
-            <TouchableOpacity onPress={handleClearChat} style={{ padding: 8 }}>
-              <Ionicons name="trash-outline" size={20} color="#E74C3C" />
+            <TouchableOpacity onPress={handleClearChat} style={styles.headerBtn}>
+              <Ionicons name="trash-outline" size={18} color="#E74C3C" />
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={loadMessages} style={{ padding: 8 }}>
-            <Ionicons name="refresh" size={20} color="#888" />
+          <TouchableOpacity onPress={loadMessages} style={styles.headerBtn}>
+            <Ionicons name="refresh" size={18} color="#666" />
           </TouchableOpacity>
         </View>
       </View>
@@ -153,23 +156,36 @@ export default function ChatScreen() {
             onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
             ListEmptyComponent={
               <View style={styles.empty}>
-                <Ionicons name="chatbubbles-outline" size={48} color="#ddd" />
+                <View style={styles.emptyIconCircle}>
+                  <Ionicons name="chatbubbles-outline" size={42} color="#bbb" />
+                </View>
                 <Text style={styles.emptyText}>No messages yet</Text>
-                <Text style={styles.emptySubtext}>Send a message to the store!</Text>
+                <Text style={styles.emptySubtext}>Have questions about your order or our menu? Send us a message!</Text>
               </View>
             }
           />
         )}
 
         <View style={styles.inputRow}>
-          <TextInput style={styles.input} placeholder="Type a message..."
-            placeholderTextColor="#aaa" value={inputText} onChangeText={setInputText}
-            multiline maxLength={500} returnKeyType="send" onSubmitEditing={handleSend} />
+          <TextInput 
+            style={styles.input} 
+            placeholder="Type a message..."
+            placeholderTextColor="#aaa" 
+            value={inputText} 
+            onChangeText={setInputText}
+            multiline 
+            maxLength={500} 
+            returnKeyType="send" 
+            onSubmitEditing={handleSend} 
+          />
           <TouchableOpacity
             style={[styles.sendBtn, (!inputText.trim() || sending) && { backgroundColor: '#E0D8C8' }]}
-            onPress={handleSend} disabled={!inputText.trim() || sending}>
+            onPress={handleSend} 
+            disabled={!inputText.trim() || sending}
+            activeOpacity={0.8}
+          >
             {sending ? <ActivityIndicator size="small" color="#fff" /> :
-              <Ionicons name="send" size={18} color={inputText.trim() ? '#fff' : '#ccc'} />}
+              <Ionicons name="send" size={18} color={inputText.trim() ? '#fff' : '#aaa'} />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -180,44 +196,102 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9F0DC' },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 12, paddingHorizontal: 16, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#E8D8A0',
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingHorizontal: 16, 
+    paddingVertical: 12, 
+    backgroundColor: '#fff',
+    borderBottomWidth: 1, 
+    borderBottomColor: '#F0E4CE',
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF5EE',
-    justifyContent: 'center', alignItems: 'center',
+    width: 40, 
+    height: 40, 
+    borderRadius: 12, // Squircle
+    backgroundColor: '#FFF0E6',
+    justifyContent: 'center', 
+    alignItems: 'center',
   },
-  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#2E1A06' },
-  headerSub: { fontSize: 11, color: '#888' },
-  list: { padding: 16, paddingBottom: 8 },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: '#2E1A06' },
+  headerSub: { fontSize: 11, color: '#27AE60', fontWeight: '500' },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F7F2E7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  list: { padding: 16, paddingBottom: 16 },
   bubble: { flexDirection: 'row', marginBottom: 10, maxWidth: '85%' },
   myBubble: { alignSelf: 'flex-end' },
   theirBubble: { alignSelf: 'flex-start' },
   avatarBox: {
-    width: 30, height: 30, borderRadius: 15, backgroundColor: '#FFF5EE',
-    justifyContent: 'center', alignItems: 'center', marginRight: 8,
+    width: 32, 
+    height: 32, 
+    borderRadius: 10, 
+    backgroundColor: '#FFF0E6',
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginRight: 8,
   },
-  msgContent: { padding: 12, borderRadius: 16, maxWidth: '100%' },
+  msgContent: { 
+    padding: 12, 
+    paddingHorizontal: 14, 
+    borderRadius: 16, 
+    maxWidth: '100%',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
   myContent: { backgroundColor: '#F25C05', borderBottomRightRadius: 4 },
-  theirContent: { backgroundColor: '#fff', borderBottomLeftRadius: 4, elevation: 1 },
+  theirContent: { backgroundColor: '#fff', borderBottomLeftRadius: 4 },
   senderName: { fontSize: 11, fontWeight: 'bold', color: '#F25C05', marginBottom: 2 },
   msgText: { fontSize: 14, lineHeight: 20, color: '#2E1A06' },
   timeText: { fontSize: 10, color: '#aaa', marginTop: 4, alignSelf: 'flex-end' },
-  empty: { alignItems: 'center', marginTop: 80 },
-  emptyText: { fontSize: 16, fontWeight: 'bold', color: '#aaa', marginTop: 12 },
-  emptySubtext: { fontSize: 13, color: '#bbb', marginTop: 4 },
+  empty: { alignItems: 'center', marginTop: 70, paddingHorizontal: 30 },
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#EFE6D2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  emptyText: { fontSize: 16, fontWeight: 'bold', color: '#666' },
+  emptySubtext: { fontSize: 13, color: '#999', textAlign: 'center', marginTop: 4 },
   inputRow: {
-    flexDirection: 'row', alignItems: 'flex-end', padding: 12, paddingHorizontal: 16,
-    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#E8D8A0', gap: 10,
+    flexDirection: 'row', 
+    alignItems: 'flex-end', 
+    padding: 12, 
+    paddingHorizontal: 16,
+    backgroundColor: '#fff', 
+    borderTopWidth: 1, 
+    borderTopColor: '#F0E4CE', 
+    gap: 10,
   },
   input: {
-    flex: 1, minHeight: 44, maxHeight: 100, backgroundColor: '#F9F5EF',
-    borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#2E1A06',
+    flex: 1, 
+    minHeight: 44, 
+    maxHeight: 100, 
+    backgroundColor: '#F9F5EF',
+    borderRadius: 20, 
+    paddingHorizontal: 16, 
+    paddingVertical: 10, 
+    fontSize: 14, 
+    color: '#2E1A06',
   },
   sendBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#F25C05',
-    justifyContent: 'center', alignItems: 'center',
+    width: 44, 
+    height: 44, 
+    borderRadius: 14, 
+    backgroundColor: '#F25C05',
+    justifyContent: 'center', 
+    alignItems: 'center',
   },
 });

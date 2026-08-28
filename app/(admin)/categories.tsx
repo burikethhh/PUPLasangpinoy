@@ -27,6 +27,9 @@ import {
     type MenuItem,
 } from "../../lib/firebase-store";
 import { uploadToCloudinary } from "../../lib/cloudinary";
+import { createLogger } from "../../lib/logger";
+
+const log = createLogger("AdminMenu");
 
 const EMPTY_FORM = {
   name: "", description: "", price: "", category: MENU_CATEGORIES[0] as string,
@@ -61,6 +64,7 @@ export default function AdminMenuScreen() {
   const [adjusting, setAdjusting] = useState(false);
   const [showAdjustHistory, setShowAdjustHistory] = useState(false);
   const [adjustHistory, setAdjustHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
@@ -80,8 +84,9 @@ export default function AdminMenuScreen() {
       ]);
       setItems(menuItems);
       setCategories(categoryDocs);
+      log.info("Menu loaded", { itemCount: menuItems.length, categoryCount: categoryDocs.length });
     } catch (e) {
-      console.error(e);
+      log.error("Failed to load menu", e);
     }
     if (!silent) setLoading(false);
   }
@@ -144,22 +149,31 @@ export default function AdminMenuScreen() {
     if (Object.keys(nutrients).length > 0) payload.nutrients = nutrients;
     try {
       // Upload local image to Cloudinary so it's visible on all devices
-      if (payload.image_url && payload.image_url.startsWith("file://")) {
-        const cloudUrl = await uploadToCloudinary(payload.image_url, "foodfix/menu");
-        payload.image_url = cloudUrl;
+      if (payload.image_url && !payload.image_url.startsWith("http://") && !payload.image_url.startsWith("https://")) {
+        try {
+          const cloudUrl = await uploadToCloudinary(payload.image_url, "foodfix/menu");
+          payload.image_url = cloudUrl;
+        } catch (imgErr: any) {
+          log.warn("Cloudinary upload failed, keeping URI", imgErr);
+        }
       }
-      if (editing) await updateMenuItem(editing.id, payload);
-      else await addMenuItem(payload);
+      if (editing) {
+        await updateMenuItem(editing.id, payload);
+        log.info("Menu item updated", { id: editing.id, name: form.name });
+      } else {
+        await addMenuItem(payload);
+        log.info("Menu item created", { name: form.name });
+      }
       setModalVisible(false);
       load();
-    } catch (e: any) { Alert.alert("Error", e.message); }
+    } catch (e: any) { log.error("Failed to save menu item", e); Alert.alert("Error", e.message); }
     setSaving(false);
   }
 
   function handleDelete(item: MenuItem) {
     Alert.alert("Delete", `Remove "${item.name}" from the menu?`, [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { await deleteMenuItem(item.id); load(); } },
+      { text: "Delete", style: "destructive", onPress: async () => { log.info("Menu item deleted", { id: item.id, name: item.name }); await deleteMenuItem(item.id); load(); } },
     ]);
   }
 
@@ -198,11 +212,13 @@ export default function AdminMenuScreen() {
           name: newCategoryName,
           color: categoryForm.color.trim() || "#F25C05",
         });
+        log.info("Category updated", { id: editingCategory.id, name: newCategoryName });
       } else {
         await addCategoryDoc(
           newCategoryName,
           categoryForm.color.trim() || "#F25C05",
         );
+        log.info("Category created", { name: newCategoryName });
       }
       setEditingCategory(null);
       setCategoryForm({ name: "", color: "#F25C05" });
@@ -226,6 +242,7 @@ export default function AdminMenuScreen() {
         );
       }
     } catch (e: any) {
+      log.error("Failed to save category", e);
       Alert.alert("Error", e.message || "Failed to save category.");
     }
     setSavingCategory(false);
@@ -242,9 +259,11 @@ export default function AdminMenuScreen() {
           style: "destructive",
           onPress: async () => {
             try {
+              log.info("Category deleted", { id: category.id, name: category.name });
               await deleteCategoryDoc(category.id);
               await load();
             } catch (e: any) {
+              log.error("Failed to delete category", e);
               Alert.alert("Error", e.message || "Failed to delete category.");
             }
           },
@@ -352,11 +371,25 @@ export default function AdminMenuScreen() {
                     Stock: {item.stock_quantity}
                   </Text>
                   <View style={styles.cardActions}>
-                    <TouchableOpacity onPress={() => { setAdjustItem(item); setAdjustQty(""); setAdjustNotes(""); setAdjustReason("spoilage"); }} style={styles.iconBtn}>
-                      <Ionicons name="git-commit-outline" size={16} color="#E67E22" />
+                    <TouchableOpacity onPress={() => { setAdjustItem(item); setAdjustQty(""); setAdjustNotes(""); setAdjustReason("spoilage"); }} style={[styles.iconBtn, { backgroundColor: "#E67E2218" }]}>
+                      <Ionicons name="create-outline" size={16} color="#E67E22" />
+                      <Text style={{ fontSize: 10, color: "#E67E22", fontWeight: "600", marginLeft: 2 }}>Adjust</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={async () => { try { const h = await getInventoryAdjustments(item.id); setAdjustHistory(h); setShowAdjustHistory(true); } catch (e) { Alert.alert("Error", "Failed to load history."); } }} style={styles.iconBtn}>
-                      <Ionicons name="time-outline" size={16} color="#888" />
+                    <TouchableOpacity onPress={async () => {
+                      setLoadingHistory(true);
+                      try {
+                        const h = await getInventoryAdjustments(item.id);
+                        setAdjustHistory(h);
+                        log.info("Adjustment history loaded", { itemId: item.id, count: h.length });
+                        setShowAdjustHistory(true);
+                      } catch (e: any) {
+                        log.error("Failed to load adjustment history", e);
+                        Alert.alert("Error", e?.message || "Failed to load history. Make sure the inventory_adjustments collection exists in Firestore.");
+                      }
+                      setLoadingHistory(false);
+                    }} style={[styles.iconBtn, { backgroundColor: "#3498DB18" }]} disabled={loadingHistory}>
+                      {loadingHistory ? <ActivityIndicator size="small" color="#3498DB" /> : <Ionicons name="time-outline" size={16} color="#3498DB" />}
+                      <Text style={{ fontSize: 10, color: "#3498DB", fontWeight: "600", marginLeft: 2 }}>{loadingHistory ? "Loading..." : "History"}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => openEdit(item)} style={styles.iconBtn}>
                       <Ionicons name="pencil" size={16} color="#3498DB" />
@@ -634,73 +667,78 @@ export default function AdminMenuScreen() {
       </Modal>
 
       {/* Inventory Adjustment Modal */}
-      {adjustItem && (
-        <View style={styles.overlay}>
-          <View style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Adjust Stock: {adjustItem.name}</Text>
-              <TouchableOpacity onPress={() => setAdjustItem(null)}>
-                <Ionicons name="close" size={24} color="#888" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.label}>Current Stock: <Text style={{ fontWeight: "bold" }}>{adjustItem.stock_quantity}</Text></Text>
-            <Text style={styles.label}>Adjustment Amount (negative to reduce)</Text>
-            <TextInput style={styles.input} value={adjustQty} keyboardType="numeric"
-              onChangeText={setAdjustQty} placeholder="e.g. -5" placeholderTextColor="#aaa" />
-            <Text style={styles.label}>Reason</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 8 }}>
-              {(["spoilage", "expired", "damaged", "lost", "returned"] as const).map((r) => (
-                <TouchableOpacity key={r}
-                  style={[styles.chip, adjustReason === r && styles.chipActive]}
-                  onPress={() => setAdjustReason(r)}>
-                  <Text style={[styles.chipText, adjustReason === r && styles.chipTextActive]}>{r.charAt(0).toUpperCase() + r.slice(1)}</Text>
+      <Modal visible={!!adjustItem} transparent animationType="slide" onRequestClose={() => setAdjustItem(null)}>
+        {adjustItem && (
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Adjust Stock: {adjustItem.name}</Text>
+                <TouchableOpacity onPress={() => setAdjustItem(null)}>
+                  <Ionicons name="close" size={24} color="#888" />
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <Text style={styles.label}>Notes (optional)</Text>
-            <TextInput style={styles.input} value={adjustNotes}
-              onChangeText={setAdjustNotes} placeholder="e.g. Left in the sun too long" placeholderTextColor="#aaa" />
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-              <TouchableOpacity style={{ flex: 1, borderRadius: 12, padding: 14, alignItems: "center", backgroundColor: "#eee" }}
-                onPress={() => setAdjustItem(null)}>
-                <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[{
-                flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
-                backgroundColor: "#E67E22",
-              }, (!adjustQty.trim() || adjusting) && { opacity: 0.6 }]}
-                onPress={async () => {
-                  const qty = parseInt(adjustQty);
-                  if (isNaN(qty) || qty >= 0) {
-                    Alert.alert("Invalid", "Enter a negative number to reduce stock.");
-                    return;
-                  }
-                  setAdjusting(true);
-                  try {
-                    const user = getCurrentUser();
-                    await addInventoryAdjustment({
-                      item_id: adjustItem.id,
-                      item_name: adjustItem.name,
-                      previous_qty: adjustItem.stock_quantity,
-                      adjustment: qty,
-                      reason: adjustReason,
-                      notes: adjustNotes.trim() || undefined,
-                      admin_id: user?.uid || "unknown",
-                    });
-                    Alert.alert("Adjusted", `Stock updated: ${adjustItem.stock_quantity} → ${Math.max(0, adjustItem.stock_quantity + qty)}`);
-                    setAdjustItem(null);
-                    load(true);
-                  } catch (e: any) {
-                    Alert.alert("Error", e.message);
-                  }
-                  setAdjusting(false);
-                }} disabled={!adjustQty.trim() || adjusting}>
-                {adjusting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "bold" }}>Apply Adjustment</Text>}
-              </TouchableOpacity>
+              </View>
+              <Text style={styles.label}>Current Stock: <Text style={{ fontWeight: "bold" }}>{adjustItem.stock_quantity}</Text></Text>
+              <Text style={styles.label}>Adjustment Amount (negative to reduce)</Text>
+              <TextInput style={styles.input} value={adjustQty} keyboardType="numeric"
+                onChangeText={setAdjustQty} placeholder="e.g. -5" placeholderTextColor="#aaa" />
+              <Text style={styles.label}>Reason</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 8 }}>
+                {(["spoilage", "expired", "damaged", "lost", "returned"] as const).map((r) => (
+                  <TouchableOpacity key={r}
+                    style={[styles.chip, adjustReason === r && styles.chipActive]}
+                    onPress={() => setAdjustReason(r)}>
+                    <Text style={[styles.chipText, adjustReason === r && styles.chipTextActive]}>{r.charAt(0).toUpperCase() + r.slice(1)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={styles.label}>Notes (optional)</Text>
+              <TextInput style={styles.input} value={adjustNotes}
+                onChangeText={setAdjustNotes} placeholder="e.g. Left in the sun too long" placeholderTextColor="#aaa" />
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                <TouchableOpacity style={{ flex: 1, borderRadius: 12, padding: 14, alignItems: "center", backgroundColor: "#eee" }}
+                  onPress={() => setAdjustItem(null)}>
+                  <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[{
+                  flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+                  backgroundColor: "#E67E22",
+                }, (!adjustQty.trim() || adjusting) && { opacity: 0.6 }]}
+                    onPress={async () => {
+                      const qty = parseInt(adjustQty);
+                      if (isNaN(qty) || qty >= 0) {
+                        Alert.alert("Invalid", "Enter a negative number to reduce stock.");
+                        return;
+                      }
+                      setAdjusting(true);
+                      try {
+                        const user = getCurrentUser();
+                        log.info("Applying inventory adjustment", { itemId: adjustItem.id, itemName: adjustItem.name, adjustment: qty, reason: adjustReason });
+                        await addInventoryAdjustment({
+                          item_id: adjustItem.id,
+                          item_name: adjustItem.name,
+                          previous_qty: adjustItem.stock_quantity,
+                          adjustment: qty,
+                          reason: adjustReason,
+                          notes: adjustNotes.trim() || undefined,
+                          admin_id: user?.uid || "unknown",
+                        });
+                        log.info("Inventory adjustment applied", { itemId: adjustItem.id });
+                        Alert.alert("Adjusted", `Stock updated: ${adjustItem.stock_quantity} → ${Math.max(0, adjustItem.stock_quantity + qty)}`);
+                        setAdjustItem(null);
+                        load(true);
+                      } catch (e: any) {
+                        log.error("Inventory adjustment failed", e);
+                        Alert.alert("Error", e.message);
+                      }
+                      setAdjusting(false);
+                    }} disabled={!adjustQty.trim() || adjusting}>
+                    {adjusting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "bold" }}>Apply Adjustment</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
-      )}
+        )}
+      </Modal>
 
       {/* View Adjustment History */}
       <Modal visible={showAdjustHistory} animationType="slide" transparent>
@@ -716,15 +754,22 @@ export default function AdminMenuScreen() {
               <Text style={styles.emptyText}>No adjustments recorded.</Text>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: 2, borderBottomColor: "#E8D8A0", backgroundColor: "#FEF9F0", paddingHorizontal: 4, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#8B4513", width: 70 }}>Date</Text>
+                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#8B4513", flex: 1 }}>Item</Text>
+                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#8B4513", width: 45, textAlign: "center" }}>Prev</Text>
+                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#8B4513", width: 45, textAlign: "center" }}>Adj</Text>
+                  <Text style={{ fontSize: 11, fontWeight: "bold", color: "#8B4513", width: 70, textAlign: "right" }}>Reason</Text>
+                </View>
                 {adjustHistory.map((h: any) => (
-                  <View key={h.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f0e8d0" }}>
-                    <Text style={{ fontSize: 11, color: "#888", width: 60 }}>
-                      {h.created_at?.seconds ? new Date(h.created_at.seconds * 1000).toLocaleDateString() : ""}
+                  <View key={h.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: "#f0e8d0" }}>
+                    <Text style={{ fontSize: 11, color: "#888", width: 70 }}>
+                      {h.created_at?.seconds ? new Date(h.created_at.seconds * 1000).toLocaleDateString() : (h.created_at ? new Date(h.created_at).toLocaleDateString() : "")}
                     </Text>
-                    <Text style={{ fontSize: 12, color: "#333", flex: 1 }}>{h.item_name}</Text>
-                    <Text style={{ fontSize: 12, color: "#888" }}>{h.previous_qty}</Text>
-                    <Text style={{ fontSize: 12, fontWeight: "bold", color: h.adjustment < 0 ? "#E74C3C" : "#27AE60" }}>{h.adjustment}</Text>
-                    <Text style={{ fontSize: 11, color: "#888", width: 60 }}>{h.reason}</Text>
+                    <Text style={{ fontSize: 12, color: "#333", flex: 1 }} numberOfLines={1}>{h.item_name}</Text>
+                    <Text style={{ fontSize: 12, color: "#888", width: 45, textAlign: "center" }}>{h.previous_qty}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "bold", width: 45, textAlign: "center", color: h.adjustment < 0 ? "#E74C3C" : "#27AE60" }}>{h.adjustment > 0 ? `+${h.adjustment}` : h.adjustment}</Text>
+                    <Text style={{ fontSize: 11, color: "#E67E22", fontWeight: "600", width: 70, textAlign: "right", textTransform: "capitalize" }}>{h.reason}</Text>
                   </View>
                 ))}
               </ScrollView>

@@ -11,6 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signUp } from '../../lib/firebase';
+import { createLogger } from '../../lib/logger';
+
+const log = createLogger('Signup');
 
 export default function SignUpScreen() {
   const [displayName, setDisplayName] = useState('');
@@ -48,12 +51,15 @@ export default function SignUpScreen() {
 
   async function handleSignUp() {
     if (!validate()) return;
+    log.info('Sign up attempt', { email });
     setLoading(true);
     
     try {
       await signUp(email, password, displayName.trim(), 'customer', phone.trim(), address.trim());
-      router.replace('/(auth)/verify-email');
+      log.info('Sign up successful', { email });
+      router.replace('/(auth)/verify-email' as any);
     } catch (error: any) {
+      log.error('Sign up failed', error);
       let message = error.message;
       if (error.code === 'auth/email-already-in-use') message = 'This email is already registered.';
       else if (error.code === 'auth/invalid-email') message = 'Invalid email address.';

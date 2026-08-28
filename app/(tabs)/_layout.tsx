@@ -28,10 +28,24 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: "#F25C05",
-        tabBarInactiveTintColor: "#999",
+        tabBarInactiveTintColor: "#888",
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+          marginBottom: 4,
+        },
         tabBarStyle: {
           backgroundColor: "#fff",
-          borderTopColor: "#f0e8d0",
+          borderTopColor: "#F0E4CE",
+          borderTopWidth: 1,
+          height: 60,
+          paddingTop: 6,
+          paddingBottom: 6,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 4,
         },
       }}
     >
@@ -39,8 +53,14 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="home" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{
+              width: 36, height: 32, borderRadius: 10,
+              backgroundColor: focused ? "#FFF0E6" : "transparent",
+              justifyContent: "center", alignItems: "center"
+            }}>
+              <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
+            </View>
           ),
         }}
       />
@@ -48,8 +68,14 @@ export default function TabLayout() {
         name="menu"
         options={{
           title: "Menu",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="fast-food" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{
+              width: 36, height: 32, borderRadius: 10,
+              backgroundColor: focused ? "#FFF0E6" : "transparent",
+              justifyContent: "center", alignItems: "center"
+            }}>
+              <Ionicons name={focused ? "restaurant" : "restaurant-outline"} size={22} color={color} />
+            </View>
           ),
         }}
       />
@@ -57,17 +83,21 @@ export default function TabLayout() {
         name="scan"
         options={{
           title: "Cart",
-          tabBarIcon: ({ color }) => (
-            <View>
-              <Ionicons name="cart" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{
+              width: 36, height: 32, borderRadius: 10,
+              backgroundColor: focused ? "#FFF0E6" : "transparent",
+              justifyContent: "center", alignItems: "center"
+            }}>
+              <Ionicons name={focused ? "cart" : "cart-outline"} size={22} color={color} />
               {cartCount > 0 && (
                 <View style={{
-                  position: "absolute", top: -4, right: -10,
-                  backgroundColor: "#F25C05", borderRadius: 9,
-                  minWidth: 18, height: 18, justifyContent: "center", alignItems: "center",
-                  paddingHorizontal: 4,
+                  position: "absolute", top: -2, right: -4,
+                  backgroundColor: "#F25C05", borderRadius: 8,
+                  minWidth: 16, height: 16, justifyContent: "center", alignItems: "center",
+                  paddingHorizontal: 3,
                 }}>
-                  <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>{cartCount}</Text>
+                  <Text style={{ color: "#fff", fontSize: 9, fontWeight: "bold" }}>{cartCount}</Text>
                 </View>
               )}
             </View>
@@ -78,8 +108,14 @@ export default function TabLayout() {
         name="collections"
         options={{
           title: "Orders",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="receipt" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{
+              width: 36, height: 32, borderRadius: 10,
+              backgroundColor: focused ? "#FFF0E6" : "transparent",
+              justifyContent: "center", alignItems: "center"
+            }}>
+              <Ionicons name={focused ? "receipt" : "receipt-outline"} size={22} color={color} />
+            </View>
           ),
         }}
       />
@@ -87,8 +123,14 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: "Chat",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="chatbubble" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{
+              width: 36, height: 32, borderRadius: 10,
+              backgroundColor: focused ? "#FFF0E6" : "transparent",
+              justifyContent: "center", alignItems: "center"
+            }}>
+              <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} size={22} color={color} />
+            </View>
           ),
         }}
       />
@@ -97,8 +139,8 @@ export default function TabLayout() {
         options={{
           title: "Favorites",
           href: null,
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="heart" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "heart" : "heart-outline"} size={22} color={color} />
           ),
         }}
       />
@@ -113,8 +155,14 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="person" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{
+              width: 36, height: 32, borderRadius: 10,
+              backgroundColor: focused ? "#FFF0E6" : "transparent",
+              justifyContent: "center", alignItems: "center"
+            }}>
+              <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />
+            </View>
           ),
         }}
       />

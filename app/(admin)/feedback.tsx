@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform,
     StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -8,8 +8,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
 import {
-    archiveConversation, deleteMessage, deleteConversation, getArchivedConversations,
-    getConversations, getMessages, markMessagesRead, sendMessage as sendMsg, type Message,
+    archiveConversation, deleteConversation, deleteMessage, getArchivedConversations,
+    getConversations, getMessages, markMessagesRead, onMessagesUpdate, sendMessage as sendMsg, unarchiveConversation, type Message,
 } from "../../lib/firebase-store";
 
 interface Convo { customer_id: string; customer_name: string; last_message: string; unread: number; }
@@ -27,6 +27,17 @@ export default function AdminMessages() {
   const listRef = useRef<FlatList>(null);
 
   useFocusEffect(useCallback(() => { loadConvos(); loadArchivedConvos(); loadAdminName(); }, []));
+
+  useEffect(() => {
+    if (!selected) return;
+    const unsub = onMessagesUpdate(selected.customer_id, (msgs) => {
+      setMessages(msgs);
+      setLoadingChat(false);
+      markMessagesRead(selected.customer_id, "admin").catch(() => {});
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+    return () => unsub?.();
+  }, [selected]);
 
   async function loadAdminName() {
     const u = getCurrentUser();
@@ -89,7 +100,7 @@ export default function AdminMessages() {
       { text: "Cancel", style: "cancel" },
       { text: "Unarchive", onPress: async () => {
         try {
-          await deleteConversation(convo.customer_id);
+          await unarchiveConversation(convo.customer_id);
           await loadConvos();
           await loadArchivedConvos();
         } catch (e) { console.error(e); }
@@ -116,7 +127,7 @@ export default function AdminMessages() {
       { text: "Cancel", style: "cancel" },
       { text: "Archive", onPress: async () => {
         try {
-          await deleteConversation(selected.customer_id);
+          await archiveConversation(selected.customer_id);
           setMessages([]);
           setSelected(null);
           await loadConvos();
@@ -151,50 +162,90 @@ export default function AdminMessages() {
   // Conversation List View
   if (!selected) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.title}>Messages</Text>
-        {/* Toggle: Active / Archived */}
-        <View style={styles.tabRow}>
-          <TouchableOpacity
-            style={[styles.tabBtn, !showArchived && styles.tabBtnActive]}
-            onPress={() => setShowArchived(false)}>
-            <Text style={[styles.tabText, !showArchived && styles.tabTextActive]}>Active ({convos.length})</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabBtn, showArchived && styles.tabBtnActive]}
-            onPress={() => { setShowArchived(true); loadArchivedConvos(); }}>
-            <Text style={[styles.tabText, showArchived && styles.tabTextActive]}>Archived ({archivedConvos.length})</Text>
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        {/* Modern Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={styles.headerIconBadge}>
+              <Ionicons name="chatbubbles" size={20} color="#F25C05" />
+            </View>
+            <View>
+              <Text style={styles.headerSub}>Owner Portal</Text>
+              <Text style={styles.headerTitle}>Customer Inquiries</Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={() => { loadConvos(); loadArchivedConvos(); }} style={styles.refreshBtn}>
+            <Ionicons name="refresh" size={20} color="#666" />
           </TouchableOpacity>
         </View>
+
+        {/* Toggle: Active / Archived */}
+        <View style={styles.tabContainer}>
+          <View style={styles.tabRow}>
+            <TouchableOpacity
+              style={[styles.tabBtn, !showArchived && styles.tabBtnActive]}
+              onPress={() => setShowArchived(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabText, !showArchived && styles.tabTextActive]}>
+                Active ({convos.length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabBtn, showArchived && styles.tabBtnActive]}
+              onPress={() => { setShowArchived(true); loadArchivedConvos(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabText, showArchived && styles.tabTextActive]}>
+                Archived ({archivedConvos.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {loading ? (
           <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
         ) : displayConvos.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#ddd" />
-            <Text style={styles.emptyText}>{showArchived ? "No archived conversations" : "No conversations yet"}</Text>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="chatbubbles-outline" size={42} color="#bbb" />
+            </View>
+            <Text style={styles.emptyText}>{showArchived ? "No archived conversations" : "No active messages"}</Text>
+            <Text style={styles.emptySubtext}>Customer messages will appear here in real-time</Text>
           </View>
         ) : (
-          <FlatList data={displayConvos} keyExtractor={(i) => i.customer_id}
-            contentContainerStyle={{ padding: 16 }}
+          <FlatList 
+            data={displayConvos} 
+            keyExtractor={(i) => i.customer_id}
+            contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.convoCard} onPress={() => openConvo(item)}
-                onLongPress={() => showArchived ? handleUnarchiveConversation(item) : handleArchiveConversation(item)}>
+              <TouchableOpacity 
+                style={styles.convoCard} 
+                onPress={() => openConvo(item)}
+                onLongPress={() => showArchived ? handleUnarchiveConversation(item) : handleArchiveConversation(item)}
+                activeOpacity={0.8}
+              >
                 <View style={styles.convoAvatar}>
                   <Text style={styles.convoAvatarText}>{item.customer_name.charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.convoInfo}>
-                  <Text style={styles.convoName}>{item.customer_name}</Text>
-                  <Text style={styles.convoLast} numberOfLines={1}>{item.last_message}</Text>
+                  <View style={styles.convoHeaderRow}>
+                    <Text style={styles.convoName}>{item.customer_name}</Text>
+                    {item.unread > 0 && (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadText}>{item.unread} new</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.convoLast} numberOfLines={1}>{item.last_message || "Started a conversation"}</Text>
                 </View>
                 {showArchived ? (
                   <TouchableOpacity onPress={() => handleUnarchiveConversation(item)} style={styles.archiveBtn}>
-                    <Ionicons name="arrow-undo" size={18} color="#3498DB" />
+                    <Ionicons name="arrow-undo" size={16} color="#3498DB" />
                   </TouchableOpacity>
-                ) : item.unread > 0 ? (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadText}>{item.unread}</Text>
-                  </View>
-                ) : null}
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color="#ccc" />
+                )}
               </TouchableOpacity>
             )}
           />
@@ -205,46 +256,70 @@ export default function AdminMessages() {
 
   // Chat View
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.chatHeader}>
         <TouchableOpacity onPress={() => setSelected(null)} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#2E1A06" />
         </TouchableOpacity>
-        <Text style={styles.chatTitle}>{selected.customer_name}</Text>
-        <TouchableOpacity onPress={handleClearChat} style={{ padding: 4, marginLeft: "auto" }}>
-          <Ionicons name="trash-outline" size={20} color="#E74C3C" />
+        <View style={styles.chatAvatar}>
+          <Text style={styles.chatAvatarText}>{selected.customer_name.charAt(0).toUpperCase()}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.chatTitle}>{selected.customer_name}</Text>
+          <Text style={styles.chatSubtitle}>Customer</Text>
+        </View>
+        <TouchableOpacity onPress={handleClearChat} style={styles.actionHeaderBtn}>
+          <Ionicons name="archive-outline" size={20} color="#E74C3C" />
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
         {loadingChat ? (
           <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
         ) : (
-          <FlatList ref={listRef} data={messages} keyExtractor={(i) => i.id}
-            contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+          <FlatList 
+            ref={listRef} 
+            data={messages} 
+            keyExtractor={(i) => i.id}
+            contentContainerStyle={styles.chatListContent}
+            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
             renderItem={({ item }) => {
               const isAdmin = item.sender_role === "admin";
               return (
                 <TouchableOpacity
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                   onLongPress={() => handleDeleteMessage(item)}
-                  style={[styles.bubble, isAdmin ? styles.bubbleAdmin : styles.bubbleCustomer]}>
-                  <Text style={[styles.bubbleText, isAdmin && { color: "#fff" }]}>{item.content}</Text>
-                  <Text style={[styles.bubbleTime, isAdmin && { color: "rgba(255,255,255,0.7)" }]}>
-                    {item.created_at?.seconds
-                      ? new Date(item.created_at.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                      : ""}
-                  </Text>
+                  style={[styles.bubbleWrapper, isAdmin ? styles.bubbleRight : styles.bubbleLeft]}
+                >
+                  <View style={[styles.bubble, isAdmin ? styles.bubbleAdmin : styles.bubbleCustomer]}>
+                    <Text style={[styles.bubbleText, isAdmin && { color: "#fff" }]}>{item.content}</Text>
+                    <Text style={[styles.bubbleTime, isAdmin ? { color: "rgba(255,255,255,0.7)" } : { color: "#999" }]}>
+                      {item.created_at?.seconds
+                        ? new Date(item.created_at.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : ""}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               );
             }}
           />
         )}
         <View style={styles.inputRow}>
-          <TextInput style={styles.inputField} placeholder="Type a message..." placeholderTextColor="#aaa"
-            value={input} onChangeText={setInput} multiline />
-          <TouchableOpacity style={styles.sendBtn} onPress={send}>
-            <Ionicons name="send" size={20} color="#fff" />
+          <TextInput 
+            style={styles.inputField} 
+            placeholder="Reply to customer..." 
+            placeholderTextColor="#aaa"
+            value={input} 
+            onChangeText={setInput} 
+            multiline 
+            maxLength={500}
+          />
+          <TouchableOpacity 
+            style={[styles.sendBtn, !input.trim() && { backgroundColor: "#E0D8C8" }]} 
+            onPress={send}
+            disabled={!input.trim()}
+          >
+            <Ionicons name="send" size={18} color={input.trim() ? "#fff" : "#aaa"} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -254,32 +329,167 @@ export default function AdminMessages() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
-  title: { fontSize: 22, fontWeight: "bold", color: "#2E1A06", padding: 16, paddingBottom: 8 },
-  tabRow: { flexDirection: "row", marginHorizontal: 16, marginBottom: 8, backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", elevation: 1 },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: "center" },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0E4CE",
+  },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFF0E6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerSub: { fontSize: 11, color: "#888", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  headerTitle: { fontSize: 18, fontWeight: "800", color: "#2E1A06" },
+  refreshBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#F7F2E7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tabContainer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
+  tabRow: {
+    flexDirection: "row",
+    backgroundColor: "#EAE0CC",
+    borderRadius: 12,
+    padding: 3,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 10,
+  },
   tabBtnActive: { backgroundColor: "#F25C05" },
-  tabText: { fontSize: 13, fontWeight: "600", color: "#888" },
+  tabText: { fontSize: 13, fontWeight: "700", color: "#666" },
   tabTextActive: { color: "#fff" },
-  empty: { alignItems: "center", marginTop: 60 },
-  emptyText: { fontSize: 15, color: "#aaa", marginTop: 10 },
-  convoCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 10, elevation: 1 },
-  convoAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#F25C05", justifyContent: "center", alignItems: "center" },
-  convoAvatarText: { color: "#fff", fontWeight: "bold", fontSize: 18 },
-  convoInfo: { flex: 1, marginLeft: 12 },
-  convoName: { fontSize: 14, fontWeight: "bold", color: "#2E1A06" },
-  convoLast: { fontSize: 12, color: "#888", marginTop: 2 },
-  unreadBadge: { backgroundColor: "#F25C05", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
-  unreadText: { color: "#fff", fontWeight: "bold", fontSize: 11 },
-  archiveBtn: { padding: 6, borderRadius: 12, backgroundColor: "#EBF5FB" },
-  chatHeader: { flexDirection: "row", alignItems: "center", padding: 16, paddingBottom: 10, gap: 12, borderBottomWidth: 1, borderBottomColor: "#f0e8d0" },
-  backBtn: { padding: 4 },
-  chatTitle: { fontSize: 18, fontWeight: "bold", color: "#2E1A06" },
-  bubble: { maxWidth: "78%", borderRadius: 16, padding: 12, marginBottom: 8 },
-  bubbleAdmin: { backgroundColor: "#F25C05", alignSelf: "flex-end", borderBottomRightRadius: 4 },
-  bubbleCustomer: { backgroundColor: "#fff", alignSelf: "flex-start", borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: 14, color: "#333" },
-  bubbleTime: { fontSize: 10, color: "#aaa", marginTop: 4, textAlign: "right" },
-  inputRow: { flexDirection: "row", alignItems: "flex-end", padding: 12, gap: 8, borderTopWidth: 1, borderTopColor: "#f0e8d0" },
-  inputField: { flex: 1, backgroundColor: "#fff", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, maxHeight: 100, color: "#333" },
-  sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#F25C05", justifyContent: "center", alignItems: "center" },
+  empty: { alignItems: "center", marginTop: 70, paddingHorizontal: 30 },
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#EFE6D2",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  emptyText: { fontSize: 16, fontWeight: "bold", color: "#666", textAlign: "center" },
+  emptySubtext: { fontSize: 13, color: "#999", textAlign: "center", marginTop: 4 },
+  listContent: { padding: 16, paddingBottom: 30 },
+  convoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+  convoAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 14, // Squircle
+    backgroundColor: "#FFF0E6",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#FAD7BE",
+  },
+  convoAvatarText: { color: "#F25C05", fontWeight: "bold", fontSize: 18 },
+  convoInfo: { flex: 1, marginLeft: 12, marginRight: 8 },
+  convoHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
+  convoName: { fontSize: 15, fontWeight: "700", color: "#2E1A06" },
+  convoLast: { fontSize: 13, color: "#777", marginTop: 2 },
+  unreadBadge: {
+    backgroundColor: "#F25C05",
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  unreadText: { color: "#fff", fontWeight: "bold", fontSize: 10 },
+  archiveBtn: { padding: 8, borderRadius: 10, backgroundColor: "#EBF5FB" },
+  chatHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0E4CE",
+  },
+  backBtn: { padding: 6, borderRadius: 10, backgroundColor: "#F7F2E7" },
+  chatAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFF0E6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  chatAvatarText: { color: "#F25C05", fontWeight: "bold", fontSize: 16 },
+  chatTitle: { fontSize: 16, fontWeight: "800", color: "#2E1A06" },
+  chatSubtitle: { fontSize: 11, color: "#888", fontWeight: "500" },
+  actionHeaderBtn: { padding: 8, borderRadius: 10, backgroundColor: "#FDF2E9" },
+  chatListContent: { padding: 16, paddingBottom: 16 },
+  bubbleWrapper: { marginBottom: 10, maxWidth: "80%" },
+  bubbleLeft: { alignSelf: "flex-start" },
+  bubbleRight: { alignSelf: "flex-end" },
+  bubble: {
+    borderRadius: 16,
+    padding: 12,
+    paddingHorizontal: 14,
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  bubbleAdmin: { backgroundColor: "#F25C05", borderBottomRightRadius: 4 },
+  bubbleCustomer: { backgroundColor: "#fff", borderBottomLeftRadius: 4 },
+  bubbleText: { fontSize: 14, lineHeight: 20, color: "#2E1A06" },
+  bubbleTime: { fontSize: 10, marginTop: 4, textAlign: "right" },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    padding: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#F0E4CE",
+    gap: 10,
+  },
+  inputField: {
+    flex: 1,
+    backgroundColor: "#F9F5EF",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
+    maxHeight: 100,
+    color: "#2E1A06",
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#F25C05",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

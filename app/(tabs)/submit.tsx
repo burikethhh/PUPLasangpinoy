@@ -46,14 +46,16 @@ export default function FavoritesScreen() {
         getFavoriteCollections(user.uid),
       ]);
       setCollections(cols);
-      const menuItems: FavItem[] = [];
-      for (const fav of favs) {
-        try {
-          const item = await getMenuItem(fav.menu_item_id);
-          if (item) menuItems.push({ ...item, collection_id: fav.collection_id });
-        } catch {}
-      }
-      setItems(menuItems);
+      const itemsList = await Promise.all(
+        favs.map(async (fav) => {
+          try {
+            const item = await getMenuItem(fav.menu_item_id);
+            if (item) return { ...item, collection_id: fav.collection_id } as FavItem;
+          } catch {}
+          return null;
+        })
+      );
+      setItems(itemsList.filter(Boolean) as FavItem[]);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
@@ -182,13 +184,18 @@ export default function FavoritesScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.addBtn} onPress={() => addToCart(item)}
-                  disabled={item.stock_quantity <= 0}>
-                  <Ionicons name="cart-outline" size={16} color="#fff" />
-                  <Text style={styles.addBtnText}>
-                    {item.stock_quantity > 0 ? "Add to Cart" : "Sold Out"}
-                  </Text>
-                </TouchableOpacity>
+                {(() => {
+                  const isSoldOut = !item.is_made_to_order && !item.batch_date && (item.stock_quantity || 0) <= 0;
+                  return (
+                    <TouchableOpacity style={[styles.addBtn, isSoldOut && { backgroundColor: "#ccc" }]} onPress={() => addToCart(item)}
+                      disabled={isSoldOut}>
+                      <Ionicons name="cart-outline" size={16} color="#fff" />
+                      <Text style={styles.addBtnText}>
+                        {!isSoldOut ? "Add to Cart" : "Sold Out"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })()}
               </View>
             );
           }}
@@ -204,28 +211,38 @@ export default function FavoritesScreen() {
 
       {/* New Folder Modal */}
       <Modal visible={newFolderModal} transparent animationType="fade" onRequestClose={() => setNewFolderModal(false)}>
-        <View style={styles.overlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>New Folder</Text>
-            <TextInput style={styles.modalInput} placeholder="Folder name"
-              placeholderTextColor="#aaa" value={newFolderName} onChangeText={setNewFolderName} />
-            <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setNewFolderModal(false)}>
-                <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalCreateBtn} onPress={handleCreateFolder}>
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Create</Text>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setNewFolderModal(false)}>
+          <TouchableOpacity style={styles.modal} activeOpacity={1}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={styles.modalTitle}>New Folder</Text>
+              <TouchableOpacity onPress={() => setNewFolderModal(false)}>
+                <Ionicons name="close" size={22} color="#888" />
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+            <TextInput style={styles.modalInput} placeholder="Folder name (e.g. Breakfast, Desserts)"
+              placeholderTextColor="#aaa" value={newFolderName} onChangeText={setNewFolderName} autoFocus />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setNewFolderModal(false)}>
+                <Text style={{ color: "#666", fontWeight: "600" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalCreateBtn, !newFolderName.trim() && { opacity: 0.6 }]} onPress={handleCreateFolder} disabled={!newFolderName.trim()}>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* Move to Folder Modal */}
       <Modal visible={!!moveItemId} transparent animationType="fade" onRequestClose={() => setMoveItemId(null)}>
-        <View style={styles.overlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Move to Folder</Text>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setMoveItemId(null)}>
+          <TouchableOpacity style={styles.modal} activeOpacity={1}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={styles.modalTitle}>Move to Folder</Text>
+              <TouchableOpacity onPress={() => setMoveItemId(null)}>
+                <Ionicons name="close" size={22} color="#888" />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity style={styles.folderOption}
               onPress={() => handleMoveToCollection("")}>
               <Ionicons name="heart" size={18} color="#E74C3C" />
@@ -241,8 +258,8 @@ export default function FavoritesScreen() {
             <TouchableOpacity style={styles.moveCancelBtn} onPress={() => setMoveItemId(null)}>
               <Text style={{ color: "#666", fontWeight: "600" }}>Cancel</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );

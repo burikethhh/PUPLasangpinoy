@@ -37,7 +37,7 @@ export default function MenuScreen() {
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORIES);
 
-  // New states for phase 2 modals
+  // Modals
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [selectedQty, setSelectedQty] = useState(1);
@@ -112,7 +112,6 @@ export default function MenuScreen() {
   }
 
   function handleOpenModal(item: MenuItem) {
-    // Allow modal to open if available, OR if it's made-to-order/daily batch (unlimited stock)
     const isUnlimitedStock = item.is_made_to_order || item.batch_date;
     if (!item.available || (!isUnlimitedStock && item.stock_quantity <= 0)) return;
     setSelectedItem(item);
@@ -127,8 +126,6 @@ export default function MenuScreen() {
       const existing = cart.find((c) => c.menu_item_id === selectedItem.id);
       
       const newQty = (existing?.quantity || 0) + selectedQty;
-      
-      // Check stock limit only for regular items (not made-to-order or daily batch)
       const isUnlimitedStock = selectedItem.is_made_to_order || selectedItem.batch_date;
       
       if (existing) {
@@ -223,84 +220,8 @@ export default function MenuScreen() {
                 <View style={styles.grid}>
                   {items.filter(i => !i.is_made_to_order).map((item) => {
                     const color = MENU_CATEGORY_COLORS[item.category] || "#F25C05";
-                    // Don't mark as unavailable based on stock if it's made-to-order or daily batch
                     const isUnlimitedStock = item.is_made_to_order || item.batch_date;
                     const unavailable = !item.available || (!isUnlimitedStock && item.stock_quantity <= 0);
-                    return (
-                      <View key={item.id} style={styles.menuCard}>
-                        {item.image_url ? (
-                          <Image
-                            source={{ uri: item.image_url }}
-                            style={styles.menuImage}
-                            contentFit="cover"
-                            transition={300}
-                            cachePolicy="none"
-                            recyclingKey={item.id}
-                          />
-                        ) : (
-                          <View style={[styles.imagePlaceholder, { backgroundColor: color + "22" }]}>
-                            <Ionicons name="restaurant-outline" size={36} color="#ccc" />
-                          </View>
-                        )}
-
-                        {/* Category tag */}
-                        <View style={[styles.catTag, { backgroundColor: color }]}>
-                          <Text style={styles.catTagText}>{item.category}</Text>
-                        </View>
-
-                        {!item.available && (
-                          <View style={styles.unavailableBadge}>
-                            <Text style={styles.unavailableBadgeText}>Unavailable</Text>
-                          </View>
-                        )}
-
-                        {/* Favorite button */}
-                        <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
-                          <Ionicons name={favIds.has(item.id) ? "heart" : "heart-outline"}
-                            size={18} color={favIds.has(item.id) ? "#E74C3C" : "#999"} />
-                        </TouchableOpacity>
-
-                        <View style={styles.cardBottom}>
-                           <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                           {item.description ? (
-                             <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
-                           ) : null}
-                            <View style={styles.priceRow}>
-                              <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
-                              {!item.available ? (
-                                <Text style={[styles.stock, styles.stockUnavailable]}>Unavailable</Text>
-                              ) : isUnlimitedStock ? null : (
-                                <Text style={styles.stock}>
-                                  {item.stock_quantity > 0 ? `${item.stock_quantity} left` : "Sold out"}
-                                </Text>
-                              )}
-                            </View>
-                            <TouchableOpacity
-                              style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
-                              onPress={() => handleOpenModal(item)}
-                              disabled={unavailable}
-                            >
-                              <Ionicons name="cart-outline" size={14} color="#fff" />
-                              <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
-                            </TouchableOpacity>
-                         </View>
-                       </View>
-                     );
-                   })}
-                 </View>
-               </>
-             )}
-
-             {/* Made to Order */}
-             {items.filter(i => i.is_made_to_order).length > 0 && (
-               <>
-                 <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
-                   {activeCategory ? `Made to Order - ${activeCategory}` : "Made to Order"}
-                 </Text>
-                 <View style={styles.grid}>
-                   {items.filter(i => i.is_made_to_order).map((item) => {
-                     const color = MENU_CATEGORY_COLORS[item.category] || "#F25C05";
-                     const unavailable = !item.available;
                     return (
                       <View key={item.id} style={styles.menuCard}>
                         {item.image_url ? (
@@ -340,17 +261,92 @@ export default function MenuScreen() {
                           {item.description ? (
                             <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
                           ) : null}
-                            <View style={styles.priceRow}>
-                              <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
-                              {!item.available && (
-                                <Text style={[styles.stock, styles.stockUnavailable]}>Unavailable</Text>
-                              )}
-                            </View>
-                           <TouchableOpacity
-                             style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
-                             onPress={() => handleOpenModal(item)}
-                             disabled={unavailable}
-                           >
+                          <View style={styles.priceRow}>
+                            <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
+                            {!item.available ? (
+                              <Text style={[styles.stock, styles.stockUnavailable]}>Unavailable</Text>
+                            ) : isUnlimitedStock ? null : (
+                              <Text style={styles.stock}>
+                                {item.stock_quantity > 0 ? `${item.stock_quantity} left` : "Sold out"}
+                              </Text>
+                            )}
+                          </View>
+                          <TouchableOpacity
+                            style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
+                            onPress={() => handleOpenModal(item)}
+                            disabled={unavailable}
+                          >
+                            <Ionicons name="cart-outline" size={14} color="#fff" />
+                            <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            {/* Made to Order */}
+            {items.filter(i => i.is_made_to_order).length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
+                  {activeCategory ? `Made to Order - ${activeCategory}` : "Made to Order"}
+                </Text>
+                <View style={styles.grid}>
+                  {items.filter(i => i.is_made_to_order).map((item) => {
+                    const color = MENU_CATEGORY_COLORS[item.category] || "#F25C05";
+                    const unavailable = !item.available;
+                    return (
+                      <View key={item.id} style={styles.menuCard}>
+                        {item.image_url ? (
+                          <Image
+                            source={{ uri: item.image_url }}
+                            style={styles.menuImage}
+                            contentFit="cover"
+                            transition={300}
+                            cachePolicy="none"
+                            recyclingKey={item.id}
+                          />
+                        ) : (
+                          <View style={[styles.imagePlaceholder, { backgroundColor: color + "22" }]}>
+                            <Ionicons name="restaurant-outline" size={36} color="#ccc" />
+                          </View>
+                        )}
+
+                        {/* Category tag */}
+                        <View style={[styles.catTag, { backgroundColor: color }]}>
+                          <Text style={styles.catTagText}>{item.category}</Text>
+                        </View>
+
+                        {!item.available && (
+                          <View style={styles.unavailableBadge}>
+                            <Text style={styles.unavailableBadgeText}>Unavailable</Text>
+                          </View>
+                        )}
+
+                        {/* Favorite button */}
+                        <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
+                          <Ionicons name={favIds.has(item.id) ? "heart" : "heart-outline"}
+                            size={18} color={favIds.has(item.id) ? "#E74C3C" : "#999"} />
+                        </TouchableOpacity>
+
+                        <View style={styles.cardBottom}>
+                          <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                          {item.description ? (
+                            <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
+                          ) : null}
+                          <View style={styles.priceRow}>
+                            <Text style={styles.price}>P{item.price?.toFixed(2)}</Text>
+                            {!item.available && (
+                              <Text style={[styles.stock, styles.stockUnavailable]}>Unavailable</Text>
+                            )}
+                          </View>
+                          <TouchableOpacity
+                            style={[styles.addBtn, unavailable && styles.addBtnDisabled]}
+                            onPress={() => handleOpenModal(item)}
+                            disabled={unavailable}
+                          >
                             <Ionicons name="cart-outline" size={14} color="#fff" />
                             <Text style={styles.addBtnText}>{unavailable ? "Unavailable" : "Add to Cart"}</Text>
                           </TouchableOpacity>
@@ -366,9 +362,9 @@ export default function MenuScreen() {
       </ScrollView>
 
       {/* Category Dropdown Modal */}
-      <Modal visible={dropdownVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.dropdownModal}>
+      <Modal visible={dropdownVisible} transparent animationType="fade" onRequestClose={() => setDropdownVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setDropdownVisible(false)}>
+          <View style={styles.dropdownModal} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>Select Category</Text>
             <ScrollView style={{ maxHeight: 300 }}>
               {categoryOptions.map((cat) => (
@@ -390,13 +386,13 @@ export default function MenuScreen() {
               <Text style={styles.modalCloseText}>Close</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Item Preview & Quantity Modal */}
-      <Modal visible={!!selectedItem} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.itemModal}>
+      <Modal visible={!!selectedItem} transparent animationType="slide" onRequestClose={() => setSelectedItem(null)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSelectedItem(null)}>
+          <View style={styles.itemModal} onStartShouldSetResponder={() => true}>
             {selectedItem?.image_url && (
               <Image source={{ uri: selectedItem.image_url }} style={styles.itemModalImg} contentFit="cover" />
             )}
@@ -454,7 +450,10 @@ export default function MenuScreen() {
                   <Text style={styles.qtyVal}>{selectedQty}</Text>
                   <TouchableOpacity 
                     style={styles.qtyBtn} 
-                    onPress={() => setSelectedQty(Math.min(selectedItem?.stock_quantity || 999, selectedQty + 1))}
+                    onPress={() => {
+                      const max = selectedItem?.is_made_to_order || selectedItem?.batch_date ? 99 : (selectedItem?.stock_quantity || 99);
+                      setSelectedQty(Math.min(max, selectedQty + 1));
+                    }}
                   >
                     <Ionicons name="add" size={20} color="#F25C05" />
                   </TouchableOpacity>
@@ -471,9 +470,8 @@ export default function MenuScreen() {
               </View>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
-
     </SafeAreaView>
   );
 }
@@ -578,4 +576,14 @@ const styles = StyleSheet.create({
   },
   nutrientVal: { fontSize: 14, fontWeight: "bold", color: "#2E1A06" },
   nutrientLabel: { fontSize: 10, color: "#888", marginTop: 1 },
+  modalXBtn: {
+    position: "absolute", top: 10, right: 10, width: 32, height: 32, borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center",
+  },
+  modalNoImgHeader: {
+    flexDirection: "row", justifyContent: "flex-end", padding: 10, paddingBottom: 0,
+  },
+  modalXBtnDark: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: "#f0f0f0", justifyContent: "center", alignItems: "center",
+  },
 });

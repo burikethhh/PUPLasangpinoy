@@ -18,8 +18,13 @@ service cloud.firestore {
     // ==================== PROFILES ====================
     match /profiles/{userId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow update: if isOwner(userId) && request.resource.data.is_admin == resource.data.is_admin || isAdmin();
+      allow create: if isSignedIn() && (
+        (request.auth.uid == userId && (!('is_admin' in request.resource.data) || request.resource.data.is_admin == false) && (!('role' in request.resource.data) || request.resource.data.role == 'customer'))
+        || isAdmin()
+      );
+      allow update: if (
+        isOwner(userId) && (!('is_admin' in request.resource.data) || request.resource.data.is_admin == resource.data.is_admin) && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role)
+      ) || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
     }
     
@@ -35,7 +40,14 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isSignedIn() && (resource.data.customer_id == request.auth.uid || isAdmin() || isStaff());
       allow create: if isSignedIn() && request.resource.data.customer_id == request.auth.uid;
-      allow update: if isAdmin() || isStaff() || (isSignedIn() && resource.data.customer_id == request.auth.uid);
+      allow update: if isAdmin() || isStaff() || (
+        isSignedIn() && resource.data.customer_id == request.auth.uid && (
+          request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'status', 'reject_reason', 'refund_reason', 'refund_image_url', 'refund_status',
+            'refund_account_name', 'refund_account_number', 'refund_method', 'customer_location_opt_in', 'updated_at'
+          ])
+        )
+      );
       allow delete: if isAdmin();
       
       // Live location subcollection
@@ -160,12 +172,17 @@ service cloud.firestore {
     
     // ==================== EMAIL VERIFICATIONS ====================
     match /email_verifications/{docId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
     
+    // ==================== INVENTORY ADJUSTMENTS ====================
+    match /inventory_adjustments/{docId} {
+      allow read: if isSignedIn() && (isAdmin() || isStaff());
+      allow create: if isSignedIn() && (isAdmin() || isStaff());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ==================== CONNECTIVITY TEST ====================
     match /_connectivity_test/{docId} {
       allow read: if true;

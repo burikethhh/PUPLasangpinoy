@@ -14,7 +14,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { OrderType, PaymentMethod } from "../../constants/order";
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
-import { createOrder, deleteSavedAddress, getSavedAddresses, getSettings, notifyGcashPayment, saveAddress, validateStock, type AppSettings, type SavedAddress } from "../../lib/firebase-store";
+import { createLogger } from "../../lib/logger";
+const log = createLogger("Cart");
+
+import { createOrder, deleteSavedAddress, getSavedAddresses, getSettings, notifyGcashPayment, rollbackStock, saveAddress, validateStock, type AppSettings, type SavedAddress } from "../../lib/firebase-store";
 
 const CART_KEY = "@foodfix_cart";
 
@@ -80,6 +83,14 @@ export default function CartScreen() {
     loadSettings();
     loadProfile();
     loadSavedAddresses();
+    // Always get GPS location for distance calculation
+    ExpoLocation.requestForegroundPermissionsAsync().then(({ status }) => {
+      if (status === "granted") {
+        ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).then((loc) => {
+          setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        }).catch(() => {});
+      }
+    }).catch(() => {});
     // Auto-fill scheduled date/time with nearest next hour
     const now = new Date();
     now.setHours(now.getHours() + 1, 0, 0, 0);
@@ -97,24 +108,33 @@ export default function CartScreen() {
     setLoading(true);
     try {
       const raw = await AsyncStorage.getItem(CART_KEY);
-      setCart(raw ? JSON.parse(raw) : []);
-    } catch (e) { console.error(e); }
+      const items = raw ? JSON.parse(raw) : [];
+      setCart(items);
+      log.info("Cart loaded", { itemCount: items.length });
+    } catch (e) { log.error("Failed to load cart", e); }
     setLoading(false);
   }
 
   async function loadSettings() {
-    try { setSettings(await getSettings()); } catch (e) { console.error(e); }
+    try {
+      const s = await getSettings();
+      setSettings(s);
+      log.info("Settings loaded", { gcash_enabled: s.gcash_enabled, delivery_fee: s.delivery_fee });
+    } catch (e) { log.error("Failed to load settings", e); }
   }
 
   async function loadProfile() {
     const user = getCurrentUser();
     if (user) {
-      const p = await getProfile(user.uid);
-      if (p) {
-        setCustomerName(p.username || user.email?.split('@')[0] || user.displayName || "Customer");
-        if (p.address) setAddress(p.address);
-        if (p.phone) setPhone(p.phone);
-      }
+      try {
+        const p = await getProfile(user.uid);
+        if (p) {
+          setCustomerName(p.username || user.email?.split('@')[0] || user.displayName || "Customer");
+          if (p.address) setAddress(p.address);
+          if (p.phone) setPhone(p.phone);
+          log.info("Profile loaded", { username: p.username });
+        }
+      } catch (e) { log.error("Failed to load profile", e); }
     }
   }
 
@@ -124,7 +144,8 @@ export default function CartScreen() {
       try {
         const addrs = await getSavedAddresses(user.uid);
         setSavedAddresses(addrs);
-      } catch (e) { console.error(e); }
+        log.info("Saved addresses loaded", { count: addrs.length });
+      } catch (e) { log.error("Failed to load saved addresses", e); }
     }
   }
 
@@ -156,14 +177,15 @@ export default function CartScreen() {
     try {
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
       if (status !== "granted") {
+        log.warn("Location permission denied");
         Alert.alert("Permission Denied", "Enable location access in device settings to use this feature.");
         return;
       }
       const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
       const { latitude, longitude } = loc.coords;
       setCoords({ lat: latitude, lng: longitude });
+      log.info("Location obtained", { lat: latitude, lng: longitude });
 
-      // Reverse geocode with Nominatim (OSM)
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
         { headers: { "User-Agent": "FOODFIX-App/2.3" } }
@@ -171,8 +193,10 @@ export default function CartScreen() {
       const data = await res.json();
       if (data.display_name) {
         setAddress(data.display_name);
+        log.info("Reverse geocode success", { address: data.display_name });
       }
     } catch (e: any) {
+      log.error("Location error", e);
       Alert.alert("Location Error", e.message || "Could not get location.");
     } finally {
       setLocating(false);
@@ -208,7 +232,7 @@ export default function CartScreen() {
     setAddress(text);
     setShowSuggestions(false);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => fetchAddressSuggestions(text), 300);
+    searchTimeoutRef.current = setTimeout(() => fetchAddressSuggestions(text), 500);
   }
 
   function handleSelectSuggestion(suggestion: NominatimSuggestion) {
@@ -216,6 +240,7 @@ export default function CartScreen() {
     setCoords({ lat: parseFloat(suggestion.lat), lng: parseFloat(suggestion.lon) });
     setShowSuggestions(false);
     setAddressSuggestions([]);
+    log.debug("Address suggestion selected", { address: suggestion.display_name });
   }
 
   async function handleSaveAddress() {
@@ -234,10 +259,12 @@ export default function CartScreen() {
         lat: coords?.lat,
         lng: coords?.lng,
       });
+      log.info("Address saved", { label: saveLabel.trim() });
       setSaveAddressModal(false);
       setSaveLabel("");
       await loadSavedAddresses();
     } catch (e: any) {
+      log.error("Failed to save address", e);
       Alert.alert("Error", e.message || "Failed to save address.");
     }
     setSavingAddress(false);
@@ -265,6 +292,7 @@ export default function CartScreen() {
     if (addr.lat && addr.lng) {
       setCoords({ lat: addr.lat, lng: addr.lng });
     }
+    log.debug("Saved address selected", { label: addr.label });
   }
 
   async function saveCart(items: CartItem[]) {
@@ -288,6 +316,7 @@ export default function CartScreen() {
   }
 
   function clearCart() {
+    log.info("Cart cleared");
     Alert.alert("Clear Cart", "Remove all items?", [
       { text: "Cancel", style: "cancel" },
       { text: "Clear", style: "destructive", onPress: () => saveCart([]) },
@@ -321,11 +350,11 @@ export default function CartScreen() {
     if (orderType === "delivery_later" && (!scheduledDate || !scheduledTime))
       return Alert.alert("Schedule Required", "Please set date and time for later delivery.");
 
-    // Check delivery coverage for delivery orders
     if ((orderType === "delivery_now" || orderType === "delivery_later") && coords) {
       const radiusKm = settings?.delivery_radius_km || 10;
       const distance = calcDistance(STORE_LAT, STORE_LNG, coords.lat, coords.lng);
       if (distance > radiusKm) {
+        log.warn("Delivery out of range", { distance, radiusKm });
         return Alert.alert(
           "Out of Delivery Area",
           `Your location is ${distance.toFixed(1)} km away. We currently deliver within ${radiusKm} km of our store. Please choose a closer address or select Pick Up / Dine In.`
@@ -333,7 +362,7 @@ export default function CartScreen() {
       }
     }
 
-    // Validate stock availability before placing order
+    log.info("Checkout started", { itemCount: cart.length, orderType, paymentMethod, total });
     setPlacing(true);
     try {
       const stockCheck = await validateStock(cart.map((c) => ({
@@ -343,11 +372,12 @@ export default function CartScreen() {
       })));
       if (!stockCheck.valid) {
         setPlacing(false);
+        log.warn("Stock validation failed", { issues: stockCheck.issues });
         return Alert.alert("Stock Issue", stockCheck.issues.join("\n") + "\n\nPlease adjust your cart and try again.");
       }
+      log.info("Stock validation passed");
     } catch (e) {
-      // If stock validation fails, continue with order (graceful degradation)
-      console.error("Stock validation error:", e);
+      log.error("Stock validation error", e);
     }
 
     const profile = await getProfile(user.uid);
@@ -376,6 +406,7 @@ export default function CartScreen() {
         scheduled_time: scheduledTime || undefined,
       });
 
+      log.info("Order created", { orderId: result.id, orderNumber: result.order_number, total });
       await AsyncStorage.removeItem(CART_KEY);
       setCart([]);
       if (paymentMethod === "gcash") {
@@ -384,6 +415,9 @@ export default function CartScreen() {
         Alert.alert("Order Placed!", `Your order number is:\n\n${result.order_number}\n\nTrack it in the Orders tab.`);
       }
     } catch (e: any) {
+      log.error("Order creation failed", e);
+      // Rollback any stock that was tentatively decremented during validation
+      rollbackStock(cart.map((c) => ({ menu_item_id: c.menu_item_id, quantity: c.quantity }))).catch(() => {});
       Alert.alert("Error", e.message || "Failed to place order.");
     }
     setPlacing(false);
@@ -414,7 +448,7 @@ export default function CartScreen() {
             <Ionicons name="cart-outline" size={64} color="#ddd" />
             <Text style={styles.emptyText}>Your cart is empty</Text>
             <Text style={styles.emptySubtext}>Browse the menu and add items!</Text>
-            <TouchableOpacity style={styles.browseBtn} onPress={() => router.replace("/(tabs)")}>
+            <TouchableOpacity style={styles.browseBtn} onPress={() => router.replace("/(tabs)/menu" as any)}>
               <Ionicons name="fast-food-outline" size={18} color="#fff" />
               <Text style={styles.browseBtnText}>Browse Menu</Text>
             </TouchableOpacity>
@@ -686,9 +720,12 @@ export default function CartScreen() {
                 setNotifyingGcash(true);
                 try {
                   await notifyGcashPayment(gcashOrder.orderId, customerName, phone, gcashOrder.amount);
-                  Alert.alert("Notification Sent", "The store has been notified of your payment. Track your order in the Orders tab.");
-                  setGcashOrder(null);
+                  log.info("GCash notification sent", { orderId: gcashOrder.orderId, amount: gcashOrder.amount });
+                  Alert.alert("Notification Sent", "The store has been notified of your payment. Track your order in the Orders tab.", [
+                    { text: "View Orders", onPress: () => { setGcashOrder(null); router.replace("/(tabs)/collections"); } }
+                  ]);
                 } catch (e: any) {
+                  log.error("GCash notification failed", e);
                   Alert.alert("Error", e.message || "Failed to notify store.");
                 }
                 setNotifyingGcash(false);
@@ -698,8 +735,8 @@ export default function CartScreen() {
               {notifyingGcash ? <ActivityIndicator color="#fff" /> : <Ionicons name="notifications" size={18} color="#fff" />}
               <Text style={styles.gcashNotifyBtnText}>Notify Store of Payment</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.gcashConfirmLater} onPress={() => setGcashOrder(null)}>
-              <Text style={styles.gcashConfirmLaterText}>I'll pay later</Text>
+            <TouchableOpacity style={styles.gcashConfirmLater} onPress={() => { setGcashOrder(null); router.replace("/(tabs)/collections"); }}>
+              <Text style={styles.gcashConfirmLaterText}>View in Orders</Text>
             </TouchableOpacity>
           </View>
         </View>

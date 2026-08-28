@@ -301,16 +301,8 @@ export async function queryCollection(
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[REST] queryCollection error response:', response.status, errorText);
-      let errorMessage = 'Failed to query collection';
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error?.message || errorMessage;
-      } catch (e) {
-        // Not JSON, use text
-        errorMessage = errorText || errorMessage;
-      }
-      throw new Error(errorMessage);
+      console.warn('[REST] queryCollection non-ok response:', response.status, errorText);
+      return [];
     }
     
     const results = await response.json() as Array<{ document?: FirestoreDocument }>;
@@ -319,8 +311,8 @@ export async function queryCollection(
       .filter(r => r.document)
       .map(r => documentToObject(r.document!));
   } catch (error: any) {
-    console.error('[REST] queryCollection failed:', error.message);
-    throw error;
+    console.warn('[REST] queryCollection caught error:', error.message);
+    return [];
   }
 }
 

@@ -20,6 +20,9 @@ import {
     type Order,
 } from "../../lib/firebase-store";
 import { collection, getDocs, query, where } from "firebase/firestore";
+import { createLogger } from "../../lib/logger";
+
+const log = createLogger("AdminDashboard");
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
@@ -56,8 +59,8 @@ export default function AdminDashboard() {
       ]);
 
       // Fetch GCash notifications
+      let notifs: any[] = [];
       try {
-        let notifs: any[] = [];
         if (shouldUseRest()) {
           const data = await RestApi.queryCollection("notifications", "type", "==", "gcash_payment");
           notifs = (data as any[]).filter((n: any) => n.paid === false || n.paid === undefined);
@@ -94,14 +97,16 @@ export default function AdminDashboard() {
       });
       setOrdersByStatus(statusCounts);
       setRefundRequests(orders.filter((o) => o.refund_status === "pending"));
+      log.info("Dashboard data fetched", { orderCount: orders.length, gcashNotifCount: notifs.length, refundCount: orders.filter((o) => o.refund_status === "pending").length });
       const ACTIVE = ["pending", "accepted", "preparing", "out_for_delivery"];
       setActiveOrders(orders.filter((o) => ACTIVE.includes(o.status)).slice(0, 8));
       setFinishedOrders(orders.filter((o) => !["pending", "accepted", "preparing", "out_for_delivery"].includes(o.status)).slice(0, 5));
-    } catch (e) { console.error(e); }
+    } catch (e) { log.error("Failed to fetch dashboard data", e); }
     if (!silent) setLoading(false);
   }
 
   async function handleLogout() {
+    log.info("Admin logging out");
     Alert.alert("Log Out", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
       { text: "Log Out", style: "destructive", onPress: async () => { await logOut(); router.replace("/(auth)/welcome"); } },
@@ -144,20 +149,45 @@ export default function AdminDashboard() {
               ))}
             </View>
 
-            {/* Quick Info */}
+            {/* Quick Actions Grid */}
             <View style={styles.quickGrid}>
               <View style={styles.quickGridRow}>
                 <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
                   onPress={() => router.push("/(admin)/feedback" as any)}>
                   <Ionicons name="chatbubbles" size={18} color="#3498DB" />
-                  <Text style={styles.quickText}>{stats.unreadMessages} unread messages</Text>
+                  <Text style={styles.quickText} numberOfLines={1}>
+                    {stats.unreadMessages > 0 ? `${stats.unreadMessages} Unread Messages` : "Messages"}
+                  </Text>
                   <Ionicons name="chevron-forward" size={16} color="#bbb" />
                 </TouchableOpacity>
+                <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
+                  onPress={() => router.push("/(admin)/banners" as any)}>
+                  <Ionicons name="images" size={18} color="#9B59B6" />
+                  <Text style={styles.quickText} numberOfLines={1}>Banners</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#bbb" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.quickGridRow}>
+                <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
+                  onPress={() => router.push("/(admin)/reviews" as any)}>
+                  <Ionicons name="star" size={18} color="#F39C12" />
+                  <Text style={styles.quickText} numberOfLines={1}>Customer Reviews</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#bbb" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
+                  onPress={() => router.push("/(admin)/users" as any)}>
+                  <Ionicons name="settings-outline" size={18} color="#7F8C8D" />
+                  <Text style={styles.quickText} numberOfLines={1}>Settings & Users</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#bbb" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Pending GCash Payments Alert */}
               {gcashPayments.length > 0 && (
-                <View style={[styles.quickCard, { flexDirection: "column", alignItems: "stretch", borderColor: "#F25C05", borderWidth: 1 }]}>
+                <View style={[styles.quickCard, { flexDirection: "column", alignItems: "stretch", borderColor: "#F25C05", borderWidth: 1.5, marginTop: 4 }]}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Ionicons name="phone-portrait-outline" size={18} color="#F25C05" />
-                    <Text style={[styles.quickText, { flex: 1, fontWeight: "bold", color: "#F25C05" }]}>GCash: {gcashPayments.length} pending</Text>
+                    <Text style={[styles.quickText, { flex: 1, fontWeight: "bold", color: "#F25C05" }]}>GCash: {gcashPayments.length} Pending</Text>
                   </View>
                   {gcashPayments.slice(0, 3).map((n: any) => (
                     <View key={n.id} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#f0e8d0" }}>
@@ -168,9 +198,11 @@ export default function AdminDashboard() {
                         style={{ backgroundColor: "#27AE60", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}
                         onPress={async () => {
                           try {
+                            log.info("Marking GCash as paid", { notificationId: n.id });
                             await markGcashPaid(n.id);
+                            log.info("GCash payment marked paid", { notificationId: n.id });
                             fetchData(true);
-                          } catch (e) { console.error(e); }
+                          } catch (e) { log.error("Failed to mark GCash paid from dashboard", e); }
                         }}>
                         <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>Paid</Text>
                       </TouchableOpacity>
@@ -178,21 +210,6 @@ export default function AdminDashboard() {
                   ))}
                 </View>
               )}
-              </View>
-              <View style={styles.quickGridRow}>
-                <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
-                  onPress={() => router.push("/(admin)/banners" as any)}>
-                  <Ionicons name="images" size={18} color="#9B59B6" />
-                  <Text style={styles.quickText}>Manage Banners</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#bbb" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.quickCard} activeOpacity={0.7}
-                  onPress={() => router.push("/(admin)/reviews" as any)}>
-                  <Ionicons name="star" size={18} color="#FFD700" />
-                  <Text style={styles.quickText}>Customer Reviews</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#bbb" />
-                </TouchableOpacity>
-              </View>
               {refundRequests.length > 0 && (
                 <View style={[styles.quickCard, { flexDirection: "column", alignItems: "stretch", borderColor: "#E74C3C", borderWidth: 1, marginTop: 10 }]}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -212,7 +229,7 @@ export default function AdminDashboard() {
                       <TouchableOpacity
                         style={{ backgroundColor: "#27AE60", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}
                         onPress={async () => {
-                          Alert.alert("Approve Refund", `Approve refund for order ${o.order_number}?`, [
+                          Alert.alert("Approve Refund", `Approve refund from ${o.customer_name} for order ${o.order_number}?`, [
                             { text: "Cancel", style: "cancel" },
                             { text: "Approve", onPress: async () => { await processRefund(o.id, "approved"); fetchData(true); } },
                           ]);
@@ -222,7 +239,7 @@ export default function AdminDashboard() {
                       <TouchableOpacity
                         style={{ backgroundColor: "#E74C3C", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}
                         onPress={async () => {
-                          Alert.alert("Reject Refund", `Reject refund for order ${o.order_number}?`, [
+                          Alert.alert("Reject Refund", `Reject refund from ${o.customer_name} for order ${o.order_number}?`, [
                             { text: "Cancel", style: "cancel" },
                             { text: "Reject", onPress: async () => { await processRefund(o.id, "rejected"); fetchData(true); } },
                           ]);

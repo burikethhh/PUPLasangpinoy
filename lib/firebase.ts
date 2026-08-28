@@ -422,6 +422,12 @@ export function getCurrentUser() {
   return auth.currentUser;
 }
 
+export async function sendFirebaseUserVerification(targetUser?: User | null) {
+  const u = targetUser || auth.currentUser;
+  if (!u) throw new Error("No user logged in");
+  return sendEmailVerification(u);
+}
+
 // ==================== PROFILE FUNCTIONS ====================
 
 export async function getProfile(userId: string): Promise<Profile | null> {

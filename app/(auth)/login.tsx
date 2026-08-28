@@ -21,6 +21,9 @@ import {
     resetPassword,
     signIn,
 } from "../../lib/firebase";
+import { createLogger } from "../../lib/logger";
+
+const log = createLogger("Login");
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -42,7 +45,7 @@ export default function LoginScreen() {
     } else if (profile?.role === "staff") {
       router.replace("/(staff)" as any);
     } else if (profile && !profile.email_verified) {
-      router.replace("/(auth)/verify-email");
+      router.replace("/(auth)/verify-email" as any);
     } else {
       router.replace("/(tabs)");
     }
@@ -66,11 +69,14 @@ export default function LoginScreen() {
 
   async function handleSignIn() {
     if (!validate()) return;
+    log.info("Sign in attempt", { email });
     setLoading(true);
     try {
       const userCredential = await signIn(email, password);
+      log.info("Sign in successful", { email, uid: userCredential.user.uid });
       await handleAuthSuccess(userCredential.user.uid);
     } catch (error: any) {
+      log.error("Sign in failed", error);
       let message = error.message;
       if (error.code === "auth/user-not-found") {
         message = "No account found with this email.";

@@ -20,7 +20,7 @@ import {
     logOut, updateMyProfile, type Profile,
 } from "../../lib/firebase";
 import { getOrdersByUser, onLocationUpdate, type LiveLocation, type Order } from "../../lib/firebase-store";
-import { analyzeImageWithQwen } from "../../lib/qwen-ai";
+import { analyzeImageWithQwen, chatWithLamionAI } from "../../lib/qwen-ai";
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -32,7 +32,7 @@ export default function ProfileScreen() {
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
 
-  // Ask AI state
+  // Ask AI state (FOFI Delivery)
   const [aiVisible, setAiVisible] = useState(false);
   const [aiMessages, setAiMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
   const [aiInput, setAiInput] = useState("");
@@ -41,6 +41,15 @@ export default function ProfileScreen() {
   const [aiDriverLoc, setAiDriverLoc] = useState<LiveLocation | null>(null);
   const aiScrollRef = useRef<ScrollView>(null);
   const aiUnsubRef = useRef<(() => void) | null>(null);
+
+  // Lamion AI state (Filipino Food Expert)
+  const [lamionVisible, setLamionVisible] = useState(false);
+  const [lamionMessages, setLamionMessages] = useState<{ role: "user" | "ai"; text: string }[]>([
+    { role: "ai", text: "Mabuhay! I am Lamion AI, your dedicated Filipino culinary expert. Ask me anything about Filipino foods, traditional cooking techniques, authentic recipes, or regional specialties!" }
+  ]);
+  const [lamionInput, setLamionInput] = useState("");
+  const [lamionThinking, setLamionThinking] = useState(false);
+  const lamionScrollRef = useRef<ScrollView>(null);
 
   useFocusEffect(useCallback(() => { loadProfile(); }, []));
 
@@ -62,6 +71,9 @@ export default function ProfileScreen() {
 
   async function saveProfile() {
     if (!editFields.username.trim()) return Alert.alert("Error", "Name cannot be empty.");
+    if (editFields.phone.trim() && !/^09\d{9}$/.test(editFields.phone.replace(/\s/g, ""))) {
+      return Alert.alert("Invalid Phone", "Contact number must be exactly 11 digits starting with 09 (e.g. 09XXXXXXXXX).");
+    }
     try {
       await updateMyProfile({
         username: editFields.username.trim(),
@@ -211,6 +223,29 @@ export default function ProfileScreen() {
     }, 700);
   }
 
+  async function handleLamionQuery(question: string) {
+    if (!question.trim() || lamionThinking) return;
+    const userMsg = question.trim();
+    setLamionMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setLamionInput("");
+    setLamionThinking(true);
+    setTimeout(() => lamionScrollRef.current?.scrollToEnd({ animated: true }), 60);
+
+    try {
+      const history = lamionMessages.map(m => ({
+        role: (m.role === "ai" ? "assistant" : "user") as "assistant" | "user",
+        content: m.text,
+      }));
+      const response = await chatWithLamionAI(userMsg, history);
+      setLamionMessages(prev => [...prev, { role: "ai", text: response }]);
+    } catch (e: any) {
+      setLamionMessages(prev => [...prev, { role: "ai", text: "Pasensya na, I encountered an error connecting to Lamion AI. Please try again in a moment." }]);
+    } finally {
+      setLamionThinking(false);
+      setTimeout(() => lamionScrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }
+
   function handleCloseAi() {
     setAiVisible(false);
     aiUnsubRef.current?.();
@@ -229,6 +264,12 @@ export default function ProfileScreen() {
     const t = setTimeout(() => aiScrollRef.current?.scrollToEnd({ animated: true }), 60);
     return () => clearTimeout(t);
   }, [aiMessages, aiThinking, aiVisible]);
+
+  useEffect(() => {
+    if (!lamionVisible) return;
+    const t = setTimeout(() => lamionScrollRef.current?.scrollToEnd({ animated: true }), 60);
+    return () => clearTimeout(t);
+  }, [lamionMessages, lamionThinking, lamionVisible]);
 
   async function scanWithCamera() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -400,6 +441,16 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.exploreRow} onPress={() => setLamionVisible(true)}>
+            <View style={[styles.exploreIcon, { backgroundColor: "#FF980022" }]}>
+              <Ionicons name="sparkles" size={20} color="#FF9800" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.exploreName}>Ask Lamion AI</Text>
+              <Text style={styles.exploreSub}>Filipino food expert • Recipes, tips & cuisine guide</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.exploreRow, { borderBottomWidth: 0 }]} onPress={handleAskAiOpen}>
             <View style={[styles.exploreIcon, { backgroundColor: "#F25C0522" }]}>
               <Ionicons name="chatbubble-ellipses" size={20} color="#F25C05" />
@@ -411,6 +462,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color="#ccc" />
           </TouchableOpacity>
         </View>
+
 
 
 
@@ -429,7 +481,9 @@ export default function ProfileScreen() {
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1 }}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalCard}>
                 <View style={styles.modalHeader}>
@@ -438,31 +492,29 @@ export default function ProfileScreen() {
                     <Ionicons name="close" size={24} color="#888" />
                   </TouchableOpacity>
                 </View>
-                <View style={{ maxHeight: "70%" }}>
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                    <Text style={styles.inputLabel}>Display Name</Text>
-                    <TextInput style={styles.input} value={editFields.username}
-                      onChangeText={(v) => setEditFields((f) => ({ ...f, username: v }))}
-                      placeholder="Your name" placeholderTextColor="#aaa" />
-                    <Text style={styles.inputLabel}>Phone</Text>
-                    <TextInput style={styles.input} value={editFields.phone}
-                      onChangeText={(v) => setEditFields((f) => ({ ...f, phone: v }))}
-                      placeholder="09XX XXX XXXX" keyboardType="phone-pad" placeholderTextColor="#aaa"
-                      maxLength={11} />
-                    <Text style={styles.inputLabel}>Delivery Address</Text>
-                    <TextInput style={[styles.input, { minHeight: 60 }]} value={editFields.address}
-                      onChangeText={(v) => setEditFields((f) => ({ ...f, address: v }))}
-                      placeholder="Full address" multiline placeholderTextColor="#aaa" />
-                    <View style={styles.modalBtns}>
-                      <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
-                        <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
-                        <Text style={{ color: "#fff", fontWeight: "bold" }}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </ScrollView>
-                </View>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                  <Text style={styles.inputLabel}>Display Name</Text>
+                  <TextInput style={styles.input} value={editFields.username}
+                    onChangeText={(v) => setEditFields((f) => ({ ...f, username: v }))}
+                    placeholder="Your name" placeholderTextColor="#aaa" />
+                  <Text style={styles.inputLabel}>Phone</Text>
+                  <TextInput style={styles.input} value={editFields.phone}
+                    onChangeText={(v) => setEditFields((f) => ({ ...f, phone: v }))}
+                    placeholder="09XX XXX XXXX" keyboardType="phone-pad" placeholderTextColor="#aaa"
+                    maxLength={11} />
+                  <Text style={styles.inputLabel}>Delivery Address</Text>
+                  <TextInput style={[styles.input, { minHeight: 60 }]} value={editFields.address}
+                    onChangeText={(v) => setEditFields((f) => ({ ...f, address: v }))}
+                    placeholder="Full address" multiline placeholderTextColor="#aaa" />
+                  <View style={styles.modalBtns}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
+                      <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
+                      <Text style={{ color: "#fff", fontWeight: "bold" }}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </View>
             </View>
           </KeyboardAvoidingView>
@@ -546,6 +598,72 @@ export default function ProfileScreen() {
                   </View>
                 </View>
               ) : null}
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* Lamion AI Filipino Food Chat Modal */}
+        <Modal visible={lamionVisible} animationType="slide" transparent onRequestClose={() => setLamionVisible(false)}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
+            <View style={[styles.aiModal, { maxHeight: "88%" }]}>
+              <View style={styles.aiHeader}>
+                <View style={styles.aiHeaderLeft}>
+                  <Ionicons name="sparkles" size={22} color="#FF9800" />
+                  <View>
+                    <Text style={styles.aiTitle}>Lamion AI - Filipino Food Expert</Text>
+                    <Text style={styles.aiSub}>Customized Culinary AI • Authentic Filipino Cuisine</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setLamionVisible(false)}>
+                  <Ionicons name="close" size={22} color="#888" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.aiChipsScroll} contentContainerStyle={styles.aiChipsRow}>
+                {[
+                  "How to cook Chicken Adobo?",
+                  "What makes Sinigang sour?",
+                  "Origin of Pork Sisig",
+                  "Crispy Lechon Kawali tips",
+                  "Substitute for Calamansi?",
+                  "Popular Filipino street foods",
+                ].map((q) => (
+                  <TouchableOpacity key={q} style={[styles.aiChip, { borderColor: "#FF980040", backgroundColor: "#FFF8E1" }]} onPress={() => handleLamionQuery(q)}>
+                    <Text style={[styles.aiChipText, { color: "#E67E22" }]}>{q}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <ScrollView ref={lamionScrollRef} style={styles.aiMessages} contentContainerStyle={{ padding: 12, gap: 10 }} showsVerticalScrollIndicator={false}>
+                {lamionMessages.map((msg, i) => (
+                  <View key={i} style={[styles.aiBubble, msg.role === "user" ? styles.aiBubbleUser : styles.aiBubbleAi]}>
+                    <Text style={[styles.aiBubbleText, msg.role === "user" ? styles.aiBubbleTextUser : styles.aiBubbleTextAi]}>{msg.text}</Text>
+                  </View>
+                ))}
+                {lamionThinking && (
+                  <View style={styles.aiBubbleAi}>
+                    <ActivityIndicator size="small" color="#FF9800" />
+                  </View>
+                )}
+              </ScrollView>
+
+              <View style={styles.aiInputRow}>
+                <TextInput
+                  style={styles.aiInput}
+                  value={lamionInput}
+                  onChangeText={setLamionInput}
+                  placeholder="Ask about Filipino foods, recipes, tips..."
+                  placeholderTextColor="#aaa"
+                  onSubmitEditing={() => handleLamionQuery(lamionInput)}
+                  returnKeyType="send"
+                />
+                <TouchableOpacity
+                  style={[styles.aiSendBtn, { backgroundColor: "#FF9800" }, (!lamionInput.trim() || lamionThinking) && { opacity: 0.4 }]}
+                  onPress={() => handleLamionQuery(lamionInput)}
+                  disabled={!lamionInput.trim() || lamionThinking}>
+                  <Ionicons name="send" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
             </View>
           </KeyboardAvoidingView>
         </Modal>

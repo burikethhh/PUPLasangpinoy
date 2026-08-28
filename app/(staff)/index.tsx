@@ -9,7 +9,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { OrderStatus } from "../../constants/order";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_TYPE_LABELS } from "../../constants/order";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
-import { getOrders, updateOrderStatus, type Order } from "../../lib/firebase-store";
+import { getOrders, onAllOrdersUpdate, updateOrderStatus, type Order } from "../../lib/firebase-store";
+import { createLogger } from "../../lib/logger";
+
+const log = createLogger("Staff");
 
 export default function StaffOrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -33,14 +36,14 @@ export default function StaffOrdersScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchOrders(); }, []));
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchOrders(true);
-    }, 8000);
-    return () => clearInterval(intervalId);
-  }, []);
+  useFocusEffect(useCallback(() => {
+    fetchOrders();
+    const unsub = onAllOrdersUpdate((allData) => {
+      setOrders(allData);
+      setLoading(false);
+    });
+    return () => unsub?.();
+  }, []));
 
   async function fetchOrders(silent = false) {
     if (!silent) setLoading(true);
@@ -48,8 +51,9 @@ export default function StaffOrdersScreen() {
       // Staff sees accepted and preparing orders
       const all = await getOrders();
       setOrders(all);
+      log.info("Orders fetched", { count: all.length });
     } catch (e) {
-      console.error("Error fetching orders:", e);
+      log.error("Failed to fetch orders", e);
     }
     if (!silent) setLoading(false);
   }
@@ -61,6 +65,7 @@ export default function StaffOrdersScreen() {
   }
 
   async function handleMarkPrepared(order: Order) {
+    log.info("Marking order as prepared", { orderId: order.id, orderNumber: order.order_number });
     Alert.alert("Mark as Prepared", `Mark order ${order.order_number} as prepared?`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -68,9 +73,11 @@ export default function StaffOrdersScreen() {
         onPress: async () => {
           try {
             await updateOrderStatus(order.id, "out_for_delivery", { prepared_by: staffName, driver_name: staffName, driver_phone: staffPhone });
+            log.info("Order marked as prepared", { orderId: order.id });
             Alert.alert("Done", "Order marked as prepared and out for delivery!");
             fetchOrders(true);
           } catch (e: any) {
+            log.error("Failed to mark order as prepared", e);
             Alert.alert("Error", e.message);
           }
         },
@@ -174,17 +181,34 @@ export default function StaffOrdersScreen() {
               <TouchableOpacity
                 style={[styles.preparedBtn, { flex: 1, backgroundColor: "#E74C3C" }]}
                 onPress={() => {
-                  Alert.alert("Issue Encountered", `Report an issue with order ${item.order_number}?`, [
+                  Alert.prompt?.(
+                    "Issue Encountered",
+                    `Describe the issue with order ${item.order_number}:`,
+                      async (reason: string) => {
+                        if (!reason?.trim()) return;
+                        try {
+                          log.info("Issue reported for order", { orderId: item.id, reason: reason.trim() });
+                          await updateOrderStatus(item.id, "issue_encountered", { issue_reason: reason.trim() });
+                          Alert.alert("Done", "Issue reported. Admin will review.");
+                          fetchOrders(true);
+                        } catch (e: any) {
+                          log.error("Failed to report issue", e);
+                          Alert.alert("Error", e.message);
+                        }
+                      },
+                  ) ?? Alert.alert("Issue Encountered", `Report an issue with order ${item.order_number}?`, [
                     { text: "Cancel", style: "cancel" },
                     {
                       text: "Report Issue",
                       style: "destructive",
                       onPress: async () => {
                         try {
-                          await updateOrderStatus(item.id, "issue_encountered");
+                          log.info("Issue reported for order (no reason)", { orderId: item.id });
+                          await updateOrderStatus(item.id, "issue_encountered", { issue_reason: "No reason provided" });
                           Alert.alert("Done", "Issue reported. Admin will review.");
                           fetchOrders(true);
                         } catch (e: any) {
+                          log.error("Failed to report issue (no reason)", e);
                           Alert.alert("Error", e.message);
                         }
                       },
@@ -201,7 +225,10 @@ export default function StaffOrdersScreen() {
         {item.status === "out_for_delivery" && (
           <TouchableOpacity
             style={styles.startDeliveryBtn}
-            onPress={() => (router as any).push({ pathname: "/track-delivery", params: { orderId: item.id, role: "staff" } })}>
+            onPress={() => {
+              log.info("Starting delivery tracking", { orderId: item.id, orderNumber: item.order_number });
+              (router as any).push({ pathname: "/track-delivery", params: { orderId: item.id, role: "staff" } });
+            }}>
             <Ionicons name="navigate" size={16} color="#fff" />
             <Text style={styles.startDeliveryBtnText}>Start Delivery Tracking</Text>
           </TouchableOpacity>
@@ -213,7 +240,7 @@ export default function StaffOrdersScreen() {
           </TouchableOpacity>
         )}
         {filter === "archived" && (
-          <TouchableOpacity style={[styles.archiveBtn, { marginTop: 10 }]} onPress={() => handleUnarchive(item.id)}>
+          <TouchableOpacity style={styles.archiveBtn} onPress={() => handleUnarchive(item.id)}>
             <Ionicons name="arrow-undo-outline" size={14} color="#F25C05" />
             <Text style={[styles.archiveBtnText, { color: "#F25C05" }]}>Unarchive</Text>
           </TouchableOpacity>
@@ -224,28 +251,37 @@ export default function StaffOrdersScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Orders</Text>
+      <Text style={styles.title}>Orders Queue</Text>
 
-      {/* Filter Dropdown */}
-      <TouchableOpacity style={styles.filterDropdownBtn} onPress={() => setFilterDropdown(true)}>
-        <Ionicons name="filter" size={16} color="#F25C05" />
-        <Text style={styles.filterDropdownText}>{filterLabel(filter)}</Text>
-        <Ionicons name="chevron-down" size={16} color="#888" />
+      {/* Filter dropdown button */}
+      <TouchableOpacity
+        style={styles.filterDropdownBtn}
+        onPress={() => setFilterDropdown(true)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="filter" size={18} color="#F25C05" />
+        <Text style={styles.filterDropdownText}>
+          Filter: {filterLabel(filter)}
+        </Text>
+        <Ionicons name="chevron-down" size={18} color="#888" />
       </TouchableOpacity>
 
+      {/* Dropdown Modal */}
       <Modal visible={filterDropdown} transparent animationType="fade" onRequestClose={() => setFilterDropdown(false)}>
         <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setFilterDropdown(false)}>
           <View style={styles.dropdownMenu}>
-            <Text style={styles.dropdownTitle}>Filter Orders</Text>
+            <Text style={styles.dropdownTitle}>Filter by Status</Text>
             {filters.map((f) => {
               const active = filter === f;
-              const color = f === "all" ? "#F25C05" : f === "archived" ? "#888" : ORDER_STATUS_COLORS[f] || "#888";
+              const color = f === "all" ? "#2E1A06" : f === "archived" ? "#888" : ORDER_STATUS_COLORS[f] || "#888";
               return (
-                <TouchableOpacity key={f}
-                  style={[styles.dropdownItem, active && { backgroundColor: color + "15" }]}
-                  onPress={() => { setFilter(f); setFilterDropdown(false); }}>
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.dropdownItem, active && { backgroundColor: "#FEF3EC" }]}
+                  onPress={() => { setFilter(f); setFilterDropdown(false); }}
+                >
                   <View style={[styles.dropdownDot, { backgroundColor: color }]} />
-                  <Text style={[styles.dropdownItemText, active && { color, fontWeight: "bold" }]}>
+                  <Text style={[styles.dropdownItemText, active && { color: "#F25C05", fontWeight: "bold" }]}>
                     {filterLabel(f)}
                   </Text>
                   {active && <Ionicons name="checkmark" size={18} color={color} />}

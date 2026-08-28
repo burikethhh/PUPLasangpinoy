@@ -9,10 +9,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser } from "../../lib/firebase";
-import { getOrdersByUser, requestRefund, addReview, updateOrderStatus, type Order } from "../../lib/firebase-store";
+import { getOrdersByUser, onOrdersByUserUpdate, requestRefund, processRefund, addReview, updateOrderStatus, type Order } from "../../lib/firebase-store";
 import { uploadToCloudinary } from "../../lib/cloudinary";
+import { createLogger } from "../../lib/logger";
 
-const ACTIVE_STATUSES = ["accepted", "preparing", "out_for_delivery"];
+const log = createLogger("Orders");
+
+const ACTIVE_STATUSES = ["accepted", "preparing", "issue_encountered", "out_for_delivery"];
 const PENDING_STATUS = "pending";
 const DONE_STATUSES = ["delivered", "unable_to_fulfill", "cancelled"];
 
@@ -26,6 +29,11 @@ export default function OrdersScreen() {
   const [refundReason, setRefundReason] = useState("");
   const [refunding, setRefunding] = useState(false);
   const [refundImage, setRefundImage] = useState("");
+  const [refundAccountName, setRefundAccountName] = useState("");
+  const [refundAccountNumber, setRefundAccountNumber] = useState("");
+  const [refundMethod, setRefundMethod] = useState("gcash");
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
@@ -35,18 +43,28 @@ export default function OrdersScreen() {
   const [reviewImage, setReviewImage] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  useFocusEffect(useCallback(() => { fetchOrders(); }, []));
-
-  useEffect(() => {
-    const intervalId = setInterval(() => { fetchOrders(true); }, 8000);
-    return () => clearInterval(intervalId);
-  }, []);
+  useFocusEffect(useCallback(() => {
+    fetchOrders();
+    const user = getCurrentUser();
+    if (!user) return;
+    const unsub = onOrdersByUserUpdate(user.uid, (data) => {
+      setOrders(data);
+      setLoading(false);
+    });
+    return () => unsub?.();
+  }, []));
 
   async function fetchOrders(silent = false) {
     if (!silent) setLoading(true);
     const user = getCurrentUser();
     if (!user) { if (!silent) setLoading(false); return; }
-    try { setOrders(await getOrdersByUser(user.uid)); } catch (e) { console.error(e); }
+    try {
+      const data = await getOrdersByUser(user.uid);
+      setOrders(data);
+      log.info("Orders fetched", { count: data.length });
+    } catch (e) {
+      log.error("Failed to fetch orders", e);
+    }
     if (!silent) setLoading(false);
   }
 
@@ -154,8 +172,28 @@ export default function OrdersScreen() {
               styles.refundText,
               item.refund_status === "approved" || item.refund_status === "completed" ? { color: "#27AE60" } : item.refund_status === "rejected" ? { color: "#E74C3C" } : { color: "#F39C12" },
             ]}>
-              Refund: {item.refund_status.toUpperCase()}
+              {item.refund_status === "approved" && !item.refund_account_name
+                ? "Refund: APPROVED — Fill in your details below"
+                : `Refund: ${item.refund_status.toUpperCase()}`}
             </Text>
+          </View>
+        )}
+        {item.refund_status === "rejected" && item.refund_rejection_reason && (
+          <View style={[styles.issueBanner, { backgroundColor: "#FFF5F5" }]}>
+            <Ionicons name="close-circle" size={14} color="#E74C3C" />
+            <Text style={[styles.issueBannerText, { color: "#E74C3C" }]}>Rejection reason: {item.refund_rejection_reason}</Text>
+          </View>
+        )}
+        {item.refund_status === "approved" && !item.refund_account_name && (
+          <TouchableOpacity style={[styles.refundBtn, { backgroundColor: "#3498DB" }]} onPress={() => { setRefundOrderId(item.id); setRefundReason(""); }}>
+            <Ionicons name="create-outline" size={14} color="#fff" />
+            <Text style={styles.refundBtnText}>Fill Refund Details</Text>
+          </TouchableOpacity>
+        )}
+        {item.refund_status === "approved" && item.refund_account_name && (
+          <View style={[styles.refundBox, { backgroundColor: "#E8F4FD" }]}>
+            <Ionicons name="checkmark-circle" size={14} color="#3498DB" />
+            <Text style={[styles.refundText, { color: "#3498DB" }]}>Refund details submitted. Waiting for store to process.</Text>
           </View>
         )}
         {isFinished && item.payment_method === "gcash" && (!item.refund_status || item.refund_status === "none") && (
@@ -168,21 +206,8 @@ export default function OrdersScreen() {
         {/* Cancel Order button — only when pending or issue_encountered */}
         {(item.status === "pending" || item.status === "issue_encountered") && (
           <TouchableOpacity style={styles.cancelBtn} onPress={() => {
-            Alert.alert(
-              "Cancel Order",
-              "Are you sure you want to cancel this order? This cannot be undone.",
-              [
-                { text: "Keep Order", style: "cancel" },
-                { text: "Cancel Order", style: "destructive", onPress: async () => {
-                  try {
-                    await updateOrderStatus(item.id, "cancelled");
-                    fetchOrders(true);
-                  } catch (e: any) {
-                    Alert.alert("Error", e.message || "Failed to cancel order.");
-                  }
-                }},
-              ],
-            );
+            setCancelOrderId(item.id);
+            setCancelReason("");
           }}>
             <Ionicons name="close-circle-outline" size={14} color="#E74C3C" />
             <Text style={styles.cancelBtnText}>Cancel Order</Text>
@@ -194,6 +219,12 @@ export default function OrdersScreen() {
           <View style={styles.issueBanner}>
             <Ionicons name="warning" size={14} color="#E67E22" />
             <Text style={styles.issueBannerText}>There's an issue with your order. You may cancel or wait for the store to resolve it.</Text>
+          </View>
+        )}
+        {item.issue_reason && (
+          <View style={[styles.issueBanner, { backgroundColor: "#FFF3E0" }]}>
+            <Ionicons name="alert-circle" size={14} color="#E67E22" />
+            <Text style={[styles.issueBannerText, { color: "#E67E22" }]}>Issue: {item.issue_reason}</Text>
           </View>
         )}
 
@@ -326,70 +357,169 @@ export default function OrdersScreen() {
         />
       )}
       {/* Refund Request Modal */}
-      {refundOrderId && (
-        <View style={styles.overlay}>
-          <View style={styles.refundModal}>
-            <Text style={styles.refundModalTitle}>Request Refund</Text>
-            <Text style={styles.refundModalSub}>Please provide a reason and photo evidence for your refund request.</Text>
-            <TextInput
-              style={styles.refundModalInput}
-              placeholder="Reason for refund..."
-              placeholderTextColor="#aaa"
-              value={refundReason}
-              onChangeText={setRefundReason}
-              multiline
-            />
-            {refundImage ? (
-              <View>
-                <Image source={{ uri: refundImage }} style={styles.refundPreviewImage} />
-                <TouchableOpacity style={styles.removeImageBtn} onPress={() => setRefundImage("")}>
-                  <Ionicons name="close-circle" size={22} color="#E74C3C" />
+      {refundOrderId && (() => {
+        const order = orders.find((o) => o.id === refundOrderId);
+        const isApproved = order?.refund_status === "approved";
+        return (
+          <View style={styles.overlay}>
+            <View style={styles.refundModal}>
+              <Text style={styles.refundModalTitle}>{isApproved ? "Refund Details" : "Request Refund"}</Text>
+              <Text style={styles.refundModalSub}>
+                {isApproved
+                  ? "Your refund has been approved! Please provide your account details where we should send the refund."
+                  : "Please provide a reason and photo evidence for your refund request."}
+              </Text>
+              {!isApproved && (
+                <>
+                  <TextInput
+                    style={styles.refundModalInput}
+                    placeholder="Reason for refund..."
+                    placeholderTextColor="#aaa"
+                    value={refundReason}
+                    onChangeText={setRefundReason}
+                    multiline
+                  />
+                  {refundImage ? (
+                    <View>
+                      <Image source={{ uri: refundImage }} style={styles.refundPreviewImage} />
+                      <TouchableOpacity style={styles.removeImageBtn} onPress={() => setRefundImage("")}>
+                        <Ionicons name="close-circle" size={22} color="#E74C3C" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.refundImageBtn} onPress={async () => {
+                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+                      if (!result.canceled && result.assets[0]) {
+                        setRefundImage(result.assets[0].uri);
+                      }
+                    }}>
+                      <Ionicons name="camera-outline" size={18} color="#F25C05" />
+                      <Text style={styles.refundImageBtnText}>Add Photo Evidence</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+              {isApproved && (
+                <>
+                  <Text style={{ fontSize: 12, color: "#888", fontWeight: "600", marginTop: 8 }}>Refund Method</Text>
+                  <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
+                    {["gcash", "bank", "other"].map((m) => (
+                      <TouchableOpacity key={m}
+                        style={[{ flex: 1, borderRadius: 10, padding: 10, alignItems: "center", borderWidth: 1.5, borderColor: refundMethod === m ? "#F25C05" : "#ddd", backgroundColor: refundMethod === m ? "#FEF3EC" : "#fff" }]}
+                        onPress={() => setRefundMethod(m)}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: refundMethod === m ? "#F25C05" : "#888" }}>{m === "gcash" ? "GCash" : m === "bank" ? "Bank" : "Other"}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    style={[styles.refundModalInput, { marginTop: 10 }]}
+                    placeholder="Account holder name"
+                    placeholderTextColor="#aaa"
+                    value={refundAccountName}
+                    onChangeText={setRefundAccountName}
+                  />
+                  <TextInput
+                    style={styles.refundModalInput}
+                    placeholder="Account number (e.g. 09XX XXX XXXX)"
+                    placeholderTextColor="#aaa"
+                    value={refundAccountNumber}
+                    onChangeText={setRefundAccountNumber}
+                    keyboardType="phone-pad"
+                  />
+                </>
+              )}
+              <View style={styles.modalBtns}>
+                <TouchableOpacity style={styles.modalCancel} onPress={() => { setRefundOrderId(null); setRefundImage(""); setRefundAccountName(""); setRefundAccountNumber(""); }}>
+                  <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalConfirmRefund, ((!isApproved && !refundReason.trim()) || (isApproved && (!refundAccountName.trim() || !refundAccountNumber.trim())) || refunding) && { opacity: 0.6 }]}
+                  onPress={async () => {
+                    setRefunding(true);
+                    try {
+                      if (isApproved) {
+                        await processRefund(refundOrderId, "approved", {
+                          refund_account_name: refundAccountName.trim(),
+                          refund_account_number: refundAccountNumber.trim(),
+                          refund_method: refundMethod,
+                        });
+                        log.info("Refund details submitted", { orderId: refundOrderId });
+                        Alert.alert("Refund Details Submitted", "Your refund details have been submitted. The store will review and process your refund.");
+                      } else {
+                        if (!refundReason.trim()) { setRefunding(false); return; }
+                        let imageUrl = "";
+                        if (refundImage) {
+                          imageUrl = await uploadToCloudinary(refundImage, "foodfix/refunds");
+                        }
+                        await requestRefund(refundOrderId, refundReason.trim(), imageUrl);
+                        log.info("Refund requested", { orderId: refundOrderId, reason: refundReason.trim() });
+                        Alert.alert("Refund Requested", "Your refund request has been submitted. The store will review it shortly.");
+                      }
+                      setRefundOrderId(null);
+                      setRefundReason("");
+                      setRefundImage("");
+                      setRefundAccountName("");
+                      setRefundAccountNumber("");
+                      fetchOrders(true);
+                    } catch (e: any) {
+                      log.error("Refund submission failed", e);
+                      Alert.alert("Error", e.message || "Failed to submit.");
+                    }
+                    setRefunding(false);
+                  }}
+                  disabled={((!isApproved && !refundReason.trim()) || (isApproved && (!refundAccountName.trim() || !refundAccountNumber.trim())) || refunding)}
+                >
+                  {refunding ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "bold" }}>{isApproved ? "Submit Details" : "Submit"}</Text>}
                 </TouchableOpacity>
               </View>
-            ) : (
-              <TouchableOpacity style={styles.refundImageBtn} onPress={async () => {
-                const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
-                if (!result.canceled && result.assets[0]) {
-                  setRefundImage(result.assets[0].uri);
-                }
-              }}>
-                <Ionicons name="camera-outline" size={18} color="#F25C05" />
-                <Text style={styles.refundImageBtnText}>Add Photo Evidence</Text>
-              </TouchableOpacity>
-            )}
+            </View>
+          </View>
+        );
+      })()}
+
+      {/* Cancel Order Reason Modal */}
+      {cancelOrderId && (
+        <View style={styles.overlay}>
+          <View style={styles.refundModal}>
+            <Text style={styles.refundModalTitle}>Cancel Order</Text>
+            <Text style={styles.refundModalSub}>Please provide a reason for cancelling this order.</Text>
+            <TextInput
+              style={styles.refundModalInput}
+              placeholder="Reason for cancellation..."
+              placeholderTextColor="#aaa"
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              multiline
+            />
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => { setRefundOrderId(null); setRefundImage(""); }}>
-                <Text style={{ color: "#888", fontWeight: "600" }}>Cancel</Text>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setCancelOrderId(null)}>
+                <Text style={{ color: "#888", fontWeight: "600" }}>Keep Order</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalConfirmRefund, (!refundReason.trim() || refunding) && { opacity: 0.6 }]}
+                style={[styles.modalConfirmRefund, { backgroundColor: "#E74C3C" }, (!cancelReason.trim()) && { opacity: 0.6 }]}
                 onPress={async () => {
-                  if (!refundReason.trim()) return;
-                  setRefunding(true);
+                  if (!cancelReason.trim()) return;
                   try {
-                    let imageUrl = "";
-                    if (refundImage) {
-                      imageUrl = await uploadToCloudinary(refundImage, "foodfix/refunds");
-                    }
-                    await requestRefund(refundOrderId, refundReason.trim(), imageUrl);
-                    Alert.alert("Refund Requested", "Your refund request has been submitted. The store will review it shortly.");
-                    setRefundOrderId(null);
-                    setRefundReason("");
-                    setRefundImage("");
+                    await updateOrderStatus(cancelOrderId, "cancelled", { reject_reason: cancelReason.trim() });
+                    log.info("Order cancelled", { orderId: cancelOrderId, reason: cancelReason.trim() });
+                    Alert.alert("Order Cancelled", "Your order has been cancelled.");
+                    setCancelOrderId(null);
+                    setCancelReason("");
                     fetchOrders(true);
                   } catch (e: any) {
-                    Alert.alert("Error", e.message || "Failed to submit refund request.");
+                    log.error("Cancel order failed", e);
+                    Alert.alert("Error", e.message || "Failed to cancel order.");
                   }
-                  setRefunding(false);
                 }}
-                disabled={!refundReason.trim() || refunding}
+                disabled={!cancelReason.trim()}
               >
-                {refunding ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "bold" }}>Submit</Text>}
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>Cancel Order</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       )}
+
       {/* Feedback Modal */}
       {reviewModalVisible && reviewOrder && (
         <View style={styles.overlay}>
@@ -468,10 +598,12 @@ export default function OrdersScreen() {
                       comment: reviewComment.trim(),
                       image_url: imageUrl || undefined,
                     });
+                    log.info("Review submitted", { orderId: reviewOrder.id, rating: reviewRating });
                     Alert.alert("Thank You!", "Your feedback has been submitted.");
                     setReviewModalVisible(false);
                     fetchOrders(true);
                   } catch (e: any) {
+                    log.error("Review submission failed", e);
                     Alert.alert("Error", e.message || "Failed to submit feedback.");
                   }
                   setSubmittingReview(false);

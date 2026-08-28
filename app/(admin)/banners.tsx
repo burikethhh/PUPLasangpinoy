@@ -1,4 +1,4 @@
-﻿import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect } from "expo-router";
 import { addDoc, collection, deleteDoc, doc, getDocs, updateDoc } from "firebase/firestore";
@@ -12,12 +12,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { db } from "../../lib/firebase";
 import { type Banner } from "../../lib/firebase-store";
 
+import * as ImagePicker from "expo-image-picker";
+import { uploadToCloudinary } from "../../lib/cloudinary";
+
 const { width } = Dimensions.get("window");
 
 export default function AdminBanners() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pickingImage, setPickingImage] = useState(false);
   
   const [modalVisible, setModalVisible] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -59,6 +63,30 @@ export default function AdminBanners() {
     setModalVisible(true);
   }
 
+  async function pickBannerImage() {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]?.uri) {
+        setPickingImage(true);
+        let finalUrl = result.assets[0].uri;
+        try {
+          finalUrl = await uploadToCloudinary(result.assets[0].uri, "foodfix/banners");
+        } catch (e: any) {
+          console.warn("Cloudinary upload failed, using local URI fallback", e);
+        }
+        setForm(f => ({ ...f, imageUrl: finalUrl }));
+        setPickingImage(false);
+      }
+    } catch (e: any) {
+      setPickingImage(false);
+      Alert.alert("Error", e.message || "Failed to pick image");
+    }
+  }
+
   async function handleSave() {
     if (!form.name.trim() || !form.imageUrl.trim()) {
       Alert.alert("Error", "Please fill in all fields.");
@@ -66,16 +94,23 @@ export default function AdminBanners() {
     }
     setSaving(true);
     try {
+      let finalImageUrl = form.imageUrl.trim();
+      if (!finalImageUrl.startsWith("http://") && !finalImageUrl.startsWith("https://")) {
+        try {
+          finalImageUrl = await uploadToCloudinary(finalImageUrl, "foodfix/banners");
+        } catch (e) {}
+      }
+
       if (editId) {
         await updateDoc(doc(db, "banners", editId), {
           name: form.name.trim(),
-          imageUrl: form.imageUrl.trim(),
+          imageUrl: finalImageUrl,
           active: form.active,
         });
       } else {
         await addDoc(collection(db, "banners"), {
           name: form.name.trim(),
-          imageUrl: form.imageUrl.trim(),
+          imageUrl: finalImageUrl,
           active: form.active,
           createdAt: new Date()
         });
@@ -152,8 +187,26 @@ export default function AdminBanners() {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Image URL</Text>
-              <TextInput style={styles.input} value={form.imageUrl} onChangeText={(t) => setForm({...form, imageUrl: t})} placeholder="https://..." placeholderTextColor="#aaa" />
+              <Text style={styles.label}>Banner Image</Text>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: "#FEF3EC", borderWidth: 1.5, borderColor: "#F25C05", borderStyle: "dashed", borderRadius: 10, padding: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
+                  onPress={pickBannerImage}
+                  disabled={pickingImage}
+                >
+                  {pickingImage ? <ActivityIndicator size="small" color="#F25C05" /> : (
+                    <>
+                      <Ionicons name="cloud-upload-outline" size={18} color="#F25C05" />
+                      <Text style={{ color: "#F25C05", fontWeight: "bold", fontSize: 13 }}>Choose from Gallery</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {form.imageUrl ? (
+                <View style={{ marginTop: 10, borderRadius: 10, overflow: "hidden", height: 100, backgroundColor: "#f0e8d0" }}>
+                  <Image source={{ uri: form.imageUrl }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                </View>
+              ) : null}
             </View>
 
             <View style={[styles.formGroup, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
