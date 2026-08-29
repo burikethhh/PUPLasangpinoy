@@ -11,8 +11,8 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || ""
 };
 
-console.log('🔧 Firebase Firestore Diagnostic Tool\n');
-console.log('📋 Configuration:');
+console.log('[SETUP] Firebase Firestore Diagnostic Tool\n');
+console.log('[TASK] Configuration:');
 console.log(`   Project ID: ${firebaseConfig.projectId}`);
 console.log(`   Auth Domain: ${firebaseConfig.authDomain}`);
 console.log(`   App ID: ${firebaseConfig.appId}\n`);
@@ -21,11 +21,11 @@ async function diagnose() {
   try {
     console.log('1️⃣ Initializing Firebase app...');
     const app = initializeApp(firebaseConfig);
-    console.log('   ✅ Firebase app initialized\n');
+    console.log('   [OK] Firebase app initialized\n');
 
     console.log('2️⃣ Getting Firestore instance...');
     const db = getFirestore(app);
-    console.log('   ✅ Firestore instance obtained\n');
+    console.log('   [OK] Firestore instance obtained\n');
 
     console.log('3️⃣ Attempting to write a test document...');
     const testRef = doc(db, 'test_connection', 'diagnostic_test');
@@ -35,30 +35,30 @@ async function diagnose() {
       test_number: Math.random()
     };
     
-    console.log('   📝 Writing to: test_connection/diagnostic_test');
-    console.log('   📦 Data:', testData);
+    console.log('   [NOTE] Writing to: test_connection/diagnostic_test');
+    console.log('   [PKG] Data:', testData);
     
     await setDoc(testRef, testData);
-    console.log('   ✅ Write successful!\n');
+    console.log('   [OK] Write successful!\n');
 
     console.log('4️⃣ Attempting to read the document back...');
     const docSnap = await getDoc(testRef);
     
     if (docSnap.exists()) {
-      console.log('   ✅ Read successful!');
-      console.log('   📄 Document data:', docSnap.data());
-      console.log('\n✅ ALL TESTS PASSED! Firestore is working correctly.\n');
+      console.log('   [OK] Read successful!');
+      console.log('   [DOC] Document data:', docSnap.data());
+      console.log('\n[OK] ALL TESTS PASSED! Firestore is working correctly.\n');
     } else {
-      console.log('   ⚠️ Document does not exist after writing');
+      console.log('   [WARN]️ Document does not exist after writing');
     }
 
   } catch (error: any) {
-    console.error('\n❌ ERROR OCCURRED:\n');
+    console.error('\n[FAIL] ERROR OCCURRED:\n');
     console.error('Error code:', error.code);
     console.error('Error message:', error.message);
     console.error('\nFull error:', error);
     
-    console.error('\n📋 Troubleshooting suggestions:');
+    console.error('\n[TASK] Troubleshooting suggestions:');
     
     if (error.code === 'permission-denied') {
       console.error('   • Check Firestore rules in Firebase Console');

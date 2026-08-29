@@ -71,7 +71,7 @@ async function saveProfile(token: string, uid: string, profileData: any) {
     const text = await res.text();
     console.warn(`Failed to save profile for ${uid}:`, res.status, text);
   } else {
-    console.log(`✅ Profile saved for ${profileData.username} (${profileData.role})`);
+    console.log(`[OK] Profile saved for ${profileData.username} (${profileData.role})`);
   }
 }
 
@@ -113,7 +113,7 @@ async function main() {
   for (const acc of accounts) {
     try {
       const user = await createOrSignInUser(acc.email, acc.password);
-      console.log(`👤 Auth user ready: ${acc.email} (UID: ${user.uid})`);
+      console.log(`[USER] Auth user ready: ${acc.email} (UID: ${user.uid})`);
       await saveProfile(user.token, user.uid, {
         email: acc.email,
         username: acc.username,
@@ -125,11 +125,11 @@ async function main() {
         created_at: new Date(),
       });
     } catch (e: any) {
-      console.error(`❌ Error with ${acc.email}:`, e.message);
+      console.error(`[FAIL] Error with ${acc.email}:`, e.message);
     }
   }
 
-  console.log('\n🎉 Seed complete!');
+  console.log('\n[DONE] Seed complete!');
 }
 
 main();

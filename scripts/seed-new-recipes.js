@@ -386,19 +386,19 @@ const newRecipes = [
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log("\n🌱  LasangPinoy — Seeding New Recipes");
+  console.log("\n[SEED]  LasangPinoy — Seeding New Recipes");
   console.log("════════════════════════════════════════\n");
   console.log(`  Total recipes to seed: ${newRecipes.length}\n`);
 
-  process.stdout.write("  🔐  Authenticating with Firebase... ");
+  process.stdout.write("  [AUTH]  Authenticating with Firebase... ");
   const idToken = await getFirebaseToken();
-  process.stdout.write("✅ Token acquired\n\n");
+  process.stdout.write("[OK] Token acquired\n\n");
 
   let successCount = 0;
   let failCount = 0;
 
   for (const recipe of newRecipes) {
-    process.stdout.write(`  📷  Uploading image for "${recipe.title}"... `);
+    process.stdout.write(`  [PHOTO]  Uploading image for "${recipe.title}"... `);
 
     let cloudinaryUrl = recipe.image_url; // fallback to original if upload fails
 
@@ -407,14 +407,14 @@ async function main() {
         recipe.image_url,
         recipe.id,
       );
-      process.stdout.write("✅ Cloudinary\n");
+      process.stdout.write("[OK] Cloudinary\n");
     } catch (err) {
       process.stdout.write(
-        `⚠️  Using original URL (${err.message.slice(0, 60)})\n`,
+        `[WARN]️  Using original URL (${err.message.slice(0, 60)})\n`,
       );
     }
 
-    process.stdout.write(`  🍲  Seeding "${recipe.title}" to Firestore... `);
+    process.stdout.write(`  [DISH]  Seeding "${recipe.title}" to Firestore... `);
 
     try {
       await saveRecipe(
@@ -422,10 +422,10 @@ async function main() {
         { ...recipe, image_url: cloudinaryUrl },
         idToken,
       );
-      process.stdout.write("✅ Done\n");
+      process.stdout.write("[OK] Done\n");
       successCount++;
     } catch (err) {
-      process.stdout.write(`❌ FAILED: ${err.message.slice(0, 80)}\n`);
+      process.stdout.write(`[FAIL] FAILED: ${err.message.slice(0, 80)}\n`);
       failCount++;
     }
 
@@ -435,12 +435,12 @@ async function main() {
   }
 
   console.log("════════════════════════════════════════");
-  console.log(`✅  Seeded:  ${successCount} recipes`);
-  if (failCount > 0) console.log(`❌  Failed:  ${failCount} recipes`);
+  console.log(`[OK]  Seeded:  ${successCount} recipes`);
+  if (failCount > 0) console.log(`[FAIL]  Failed:  ${failCount} recipes`);
   console.log("════════════════════════════════════════\n");
 }
 
 main().catch((err) => {
-  console.error("\n❌ Fatal error:", err.message);
+  console.error("\n[FAIL] Fatal error:", err.message);
   process.exit(1);
 });

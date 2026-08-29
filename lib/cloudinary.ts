@@ -94,7 +94,7 @@ export async function uploadToCloudinary(
     const data: CloudinaryUploadResult = await response.json();
 
     console.log(
-      `[Cloudinary] ✅ Uploaded: ${data.public_id} ` +
+      `[Cloudinary] [OK] Uploaded: ${data.public_id} ` +
         `(${data.width}×${data.height}, ${Math.round(data.bytes / 1024)} KB)`,
     );
 

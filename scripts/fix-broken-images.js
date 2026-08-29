@@ -81,10 +81,10 @@ async function main() {
   for (const [id, url] of Object.entries(IMAGE_FIXES)) {
     try {
       await updateImageUrl(id, url, token);
-      console.log(`  ✓ ${id} → updated`);
+      console.log(`  [OK] ${id} → updated`);
       updated++;
     } catch (e) {
-      console.log(`  ✗ ${id}: ${e.message}`);
+      console.log(`  [FAIL] ${id}: ${e.message}`);
       failed++;
     }
     // Small delay to avoid Firestore rate limits

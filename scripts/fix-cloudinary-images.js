@@ -81,7 +81,7 @@ async function downloadImage(url) {
   const buffer = Buffer.from(arrayBuffer);
 
   console.log(
-    `    ✔  Downloaded ${(buffer.length / 1024).toFixed(1)} KB  (${contentType})`,
+    `    [OK]  Downloaded ${(buffer.length / 1024).toFixed(1)} KB  (${contentType})`,
   );
   return { buffer, contentType };
 }
@@ -121,13 +121,13 @@ async function uploadToCloudinary(buffer, contentType, publicId) {
     "/upload/",
     "/upload/f_auto,q_auto,w_800/",
   );
-  console.log(`    ✔  Cloudinary URL: ${optimisedUrl}`);
+  console.log(`    [OK]  Cloudinary URL: ${optimisedUrl}`);
   return optimisedUrl;
 }
 
 // ── Step 3: Get Firebase ID token ─────────────────────────────────────────────
 async function getFirebaseToken() {
-  console.log("\n🔑  Signing in to Firebase …");
+  console.log("\n[KEY]  Signing in to Firebase …");
 
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_KEY}`,
@@ -149,13 +149,13 @@ async function getFirebaseToken() {
     );
   }
 
-  console.log("    ✔  Authenticated\n");
+  console.log("    [OK]  Authenticated\n");
   return data.idToken;
 }
 
 // ── Step 4: PATCH only the image_url field in Firestore ───────────────────────
 async function patchImageUrl(recipeId, imageUrl, idToken) {
-  console.log(`    📝  Patching Firestore document "recipes/${recipeId}" …`);
+  console.log(`    [NOTE]  Patching Firestore document "recipes/${recipeId}" …`);
 
   // Using ?updateMask.fieldPaths=image_url ensures ONLY this field is written
   const endpoint =
@@ -179,7 +179,7 @@ async function patchImageUrl(recipeId, imageUrl, idToken) {
     throw new Error(`Firestore PATCH failed for "${recipeId}": ${errText}`);
   }
 
-  console.log(`    ✔  Firestore updated`);
+  console.log(`    [OK]  Firestore updated`);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ async function main() {
 
   for (const recipe of RECIPES) {
     console.log(
-      `\n[${RECIPES.indexOf(recipe) + 1}/${RECIPES.length}]  📸  ${recipe.id}`,
+      `\n[${RECIPES.indexOf(recipe) + 1}/${RECIPES.length}]  [PHOTO]  ${recipe.id}`,
     );
     console.log("─────────────────────────────────────────");
 
@@ -219,13 +219,13 @@ async function main() {
       // 3. Update Firestore
       await patchImageUrl(recipe.id, cloudinaryUrl, idToken);
 
-      results.push({ id: recipe.id, status: "✅ SUCCESS", url: cloudinaryUrl });
+      results.push({ id: recipe.id, status: "[OK] SUCCESS", url: cloudinaryUrl });
       successCount++;
     } catch (err) {
-      console.error(`    ❌  FAILED: ${err.message}`);
+      console.error(`    [FAIL]  FAILED: ${err.message}`);
       results.push({
         id: recipe.id,
-        status: "❌ FAILED",
+        status: "[FAIL] FAILED",
         error: err.message,
         url: null,
       });
@@ -239,8 +239,8 @@ async function main() {
   );
   console.log("║                        SUMMARY                          ║");
   console.log("╚══════════════════════════════════════════════════════════╝\n");
-  console.log(`  ✅  Succeeded : ${successCount}`);
-  console.log(`  ❌  Failed    : ${failCount}`);
+  console.log(`  [OK]  Succeeded : ${successCount}`);
+  console.log(`  [FAIL]  Failed    : ${failCount}`);
   console.log("\n──────────────────────────────────────────────────────────");
 
   for (const r of results) {
@@ -260,6 +260,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("\n💥  Unhandled error:", err.message);
+  console.error("\n[ERR]  Unhandled error:", err.message);
   process.exit(1);
 });

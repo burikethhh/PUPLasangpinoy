@@ -202,27 +202,27 @@ const recipes = [
 ];
 
 async function seedData() {
-  console.log('🌱 Starting Firebase Seeding (REST API method)\n');
+  console.log('[SEED] Starting Firebase Seeding (REST API method)\n');
   
   try {
     // Seed regions
-    console.log('📍 Seeding regions...');
+    console.log('[LOC] Seeding regions...');
     for (const region of regions) {
       await createDocument('regions', region.id, region);
-      console.log(`   ✅ Created region: ${region.name}`);
+      console.log(`   [OK] Created region: ${region.name}`);
     }
-    console.log(`✅ ${regions.length} regions created!\n`);
+    console.log(`[OK] ${regions.length} regions created!\n`);
     
     // Seed recipes
-    console.log('🍲 Seeding recipes...');
+    console.log('[DISH] Seeding recipes...');
     for (const recipe of recipes) {
       await createDocument('recipes', recipe.id, recipe);
-      console.log(`   ✅ Created recipe: ${recipe.title}`);
+      console.log(`   [OK] Created recipe: ${recipe.title}`);
     }
-    console.log(`✅ ${recipes.length} recipes created!\n`);
+    console.log(`[OK] ${recipes.length} recipes created!\n`);
     
     // Create admin profile (you'll need to create the user via Firebase Auth Console)
-    console.log('👤 Creating admin profile placeholder...');
+    console.log('[USER] Creating admin profile placeholder...');
     const adminProfile = {
       email: process.env.ADMIN_EMAIL || '<your-admin-email>',
       username: 'Admin',
@@ -230,8 +230,8 @@ async function seedData() {
       created_at: new Date()
     };
     await createDocument('profiles', 'admin_placeholder', adminProfile);
-    console.log('   ✅ Admin profile placeholder created');
-    console.log('   ⚠️  You need to create the actual user in Firebase Auth Console:\n');
+    console.log('   [OK] Admin profile placeholder created');
+    console.log('   [WARN]️  You need to create the actual user in Firebase Auth Console:\n');
     console.log('   1. Go to: https://console.firebase.google.com/project/lasangpinoy-mobile/authentication/users');
     console.log('   2. Click "Add user"');
     console.log('   3. Email: <your-admin-email>');
@@ -239,14 +239,14 @@ async function seedData() {
     console.log('   5. Copy the User UID');
     console.log('   6. Update the profile document ID from "admin_placeholder" to the actual UID\n');
     
-    console.log('✅ Seeding completed successfully!\n');
-    console.log('📊 Summary:');
+    console.log('[OK] Seeding completed successfully!\n');
+    console.log('[METRIC] Summary:');
     console.log(`   - ${regions.length} regions`);
     console.log(`   - ${recipes.length} recipes`);
     console.log(`   - 1 admin profile (needs Auth user creation)`);
     
   } catch (error: any) {
-    console.error('❌ Seeding failed:', error.message);
+    console.error('[FAIL] Seeding failed:', error.message);
     process.exit(1);
   }
 }

@@ -65,14 +65,14 @@ function _log(
       console.debug(`${tag} ${message}`, ...(data !== undefined ? [data] : []));
       break;
     case "info":
-      console.info(`${tag} ℹ ${message}`, ...(data !== undefined ? [data] : []));
+      console.info(`${tag} [INFO] ${message}`, ...(data !== undefined ? [data] : []));
       break;
     case "warn":
-      console.warn(`${tag} ⚠ ${message}`, ...(data !== undefined ? [data] : []));
+      console.warn(`${tag} [WARN] ${message}`, ...(data !== undefined ? [data] : []));
       break;
     case "error":
       console.error(
-        `${tag} ✖ ${message}`,
+        `${tag} [ERROR] ${message}`,
         ...(data !== undefined ? [data] : []),
       );
       break;

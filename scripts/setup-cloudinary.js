@@ -21,7 +21,7 @@ const [, , CLOUD_NAME, API_KEY, API_SECRET] = process.argv;
 // ── Validate args ─────────────────────────────────────────────────────────────
 if (!CLOUD_NAME || !API_KEY || !API_SECRET) {
   console.error(`
-  ❌  Missing arguments.
+  [FAIL]  Missing arguments.
 
   Usage:
     node scripts/setup-cloudinary.js CLOUD_NAME API_KEY API_SECRET
@@ -69,13 +69,13 @@ async function createUploadPreset() {
 
   if (!res.ok) {
     if (data.error?.message?.toLowerCase().includes('already exists')) {
-      console.log(`  ℹ️  Preset "${PRESET_NAME}" already exists — no changes made.`);
+      console.log(`  [INFO]️  Preset "${PRESET_NAME}" already exists — no changes made.`);
       return;
     }
     throw new Error(data.error?.message || JSON.stringify(data));
   }
 
-  console.log(`  ✅  Preset created:`);
+  console.log(`  [OK]  Preset created:`);
   console.log(`      Name:     ${data.name}`);
   console.log(`      Unsigned: ${data.unsigned}`);
   console.log(`      Folder:   ${data.asset_folder || FOLDER}`);
@@ -102,14 +102,14 @@ async function verifyCredentials() {
   const storageMB = ((usage.storage?.usage ?? 0) / 1024 / 1024).toFixed(1);
   const limitGB   = ((usage.storage?.limit  ?? 0) / 1024 / 1024 / 1024).toFixed(0);
 
-  console.log(`  ✅  Credentials verified`);
+  console.log(`  [OK]  Credentials verified`);
   console.log(`      Plan:    ${usage.plan ?? 'Free'}`);
   console.log(`      Storage: ${storageMB} MB used / ${limitGB} GB free-tier limit`);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('\n🌤   Cloudinary Setup — LasangPinoy');
+  console.log('\n[CLOUD]   Cloudinary Setup — LasangPinoy');
   console.log('─────────────────────────────────────────');
   console.log(`  Cloud Name : ${CLOUD_NAME}`);
   console.log(`  API Key    : ${API_KEY}`);
@@ -124,7 +124,7 @@ async function main() {
     await createUploadPreset();
 
     console.log('\n─────────────────────────────────────────');
-    console.log('✅  Setup complete!\n');
+    console.log('[OK]  Setup complete!\n');
     console.log('Add these two lines to your .env file:\n');
     console.log(`  EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=${CLOUD_NAME}`);
     console.log(`  EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${PRESET_NAME}`);
@@ -133,7 +133,7 @@ async function main() {
     console.log('─────────────────────────────────────────\n');
 
   } catch (err) {
-    console.error('\n❌  Setup failed:', err.message, '\n');
+    console.error('\n[FAIL]  Setup failed:', err.message, '\n');
     process.exit(1);
   }
 }

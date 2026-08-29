@@ -7,7 +7,7 @@ async function testFirestoreREST() {
   
   const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${collectionName}/${documentId}`;
   
-  console.log('🧪 Testing Firestore via REST API\n');
+  console.log('[TEST] Testing Firestore via REST API\n');
   console.log(`URL: ${url}\n`);
   
   const data = {
@@ -19,7 +19,7 @@ async function testFirestoreREST() {
   };
   
   try {
-    console.log('📝 Attempting to write document...');
+    console.log('[NOTE] Attempting to write document...');
     const response = await fetch(url, {
       method: 'PATCH',
       headers: {
@@ -32,14 +32,14 @@ async function testFirestoreREST() {
     const result = await response.json();
     
     if (response.ok) {
-      console.log('✅ Write successful!');
+      console.log('[OK] Write successful!');
       console.log('Response:', JSON.stringify(result, null, 2));
     } else {
-      console.log('❌ Write failed');
+      console.log('[FAIL] Write failed');
       console.log('Error:', JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    console.error('❌ Request failed:', error);
+    console.error('[FAIL] Request failed:', error);
   }
 }
 

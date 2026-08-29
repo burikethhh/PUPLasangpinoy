@@ -180,7 +180,7 @@ export default function SubmitDishScreen() {
               <View style={styles.previewWrap}>
                 <Text style={styles.previewLabel}>Selected Image:</Text>
                 <View style={styles.previewBox}>
-                  <Text style={styles.previewPlaceholder}>Image selected ✓</Text>
+                  <Text style={styles.previewPlaceholder}>Image selected [OK]</Text>
                 </View>
               </View>
             )}

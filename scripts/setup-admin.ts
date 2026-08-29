@@ -36,7 +36,7 @@ function toFirestoreDocument(data: any) {
 }
 
 async function createAuthUser(email: string, password: string) {
-  console.log(`📧 Creating Firebase Auth user: ${email}`);
+  console.log(`[EMAIL] Creating Firebase Auth user: ${email}`);
   
   const response = await fetch(AUTH_SIGNUP_URL, {
     method: 'POST',
@@ -51,7 +51,7 @@ async function createAuthUser(email: string, password: string) {
   if (!response.ok) {
     const error = await response.json();
     if (error.error?.message === 'EMAIL_EXISTS') {
-      console.log('   ⚠️  User already exists, fetching existing user...');
+      console.log('   [WARN]️  User already exists, fetching existing user...');
       // User exists, we'll return a placeholder UID
       // In production, you'd want to use Firebase Admin SDK to get the actual UID
       throw new Error('User already exists. Please delete the existing user first or use a different email.');
@@ -60,8 +60,8 @@ async function createAuthUser(email: string, password: string) {
   }
   
   const data = await response.json();
-  console.log(`   ✅ Auth user created successfully!`);
-  console.log(`   🆔 User UID: ${data.localId}`);
+  console.log(`   [OK] Auth user created successfully!`);
+  console.log(`   [ID] User UID: ${data.localId}`);
   
   return {
     uid: data.localId,
@@ -71,7 +71,7 @@ async function createAuthUser(email: string, password: string) {
 }
 
 async function createFirestoreProfile(uid: string, email: string, username: string, isAdmin: boolean) {
-  console.log(`\n📝 Creating Firestore profile for UID: ${uid}`);
+  console.log(`\n[NOTE] Creating Firestore profile for UID: ${uid}`);
   
   const profileData = {
     email: email,
@@ -94,7 +94,7 @@ async function createFirestoreProfile(uid: string, email: string, username: stri
     throw new Error(`Failed to create profile: ${response.status} - ${error}`);
   }
   
-  console.log('   ✅ Profile created successfully!');
+  console.log('   [OK] Profile created successfully!');
   return await response.json();
 }
 
@@ -114,7 +114,7 @@ async function deleteDocument(collectionName: string, documentId: string) {
 }
 
 async function setupAdmin() {
-  console.log('🔧 Firebase Admin Setup\n');
+  console.log('[SETUP] Firebase Admin Setup\n');
   console.log('═══════════════════════════════════════════\n');
   
   const adminEmail = process.env.ADMIN_EMAIL || '';
@@ -129,28 +129,28 @@ async function setupAdmin() {
     await createFirestoreProfile(authUser.uid, authUser.email, adminUsername, true);
     
     // Step 3: Delete the placeholder profile
-    console.log('\n🗑️  Cleaning up placeholder profile...');
+    console.log('\n[DELETE]️  Cleaning up placeholder profile...');
     try {
       await deleteDocument('profiles', 'admin_placeholder');
-      console.log('   ✅ Placeholder deleted');
+      console.log('   [OK] Placeholder deleted');
     } catch (err) {
-      console.log('   ℹ️  No placeholder to delete');
+      console.log('   [INFO]️  No placeholder to delete');
     }
     
     console.log('\n═══════════════════════════════════════════');
-    console.log('✅ Admin Setup Complete!\n');
-    console.log('📊 Admin Account Details:');
+    console.log('[OK] Admin Setup Complete!\n');
+    console.log('[METRIC] Admin Account Details:');
     console.log(`   Email: ${adminEmail}`);
     console.log(`   Password: ${adminPassword}`);
     console.log(`   User UID: ${authUser.uid}`);
     console.log(`   Admin Status: Yes`);
-    console.log('\n🚀 You can now log in to the app!\n');
+    console.log('\n[LAUNCH] You can now log in to the app!\n');
     
   } catch (error: any) {
-    console.error('\n❌ Setup failed:', error.message);
+    console.error('\n[FAIL] Setup failed:', error.message);
     
     if (error.message.includes('EMAIL_EXISTS') || error.message.includes('already exists')) {
-      console.error('\n📋 To fix this:');
+      console.error('\n[TASK] To fix this:');
       console.error('   1. Delete the existing user in Firebase Console:');
       console.error('      https://console.firebase.google.com/project/lasangpinoy-mobile/authentication/users');
       console.error('   2. Run this script again');

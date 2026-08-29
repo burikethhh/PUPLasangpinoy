@@ -12,32 +12,32 @@ const firebaseConfig = {
 };
 
 async function testConnection() {
-  console.log('🔥 Testing Firebase connection...\n');
+  console.log('[FIREBASE] Testing Firebase connection...\n');
   
   try {
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     
-    console.log('✅ Firebase initialized');
+    console.log('[OK] Firebase initialized');
     
     // Try to write a test document
-    console.log('📝 Trying to write test document...');
+    console.log('[NOTE] Trying to write test document...');
     const docRef = await addDoc(collection(db, 'test'), {
       message: 'Hello from seed script!',
       timestamp: new Date()
     });
-    console.log('✅ Test document written with ID:', docRef.id);
+    console.log('[OK] Test document written with ID:', docRef.id);
     
     // Try to read it back
-    console.log('📖 Reading test collection...');
+    console.log('[READ] Reading test collection...');
     const snapshot = await getDocs(collection(db, 'test'));
-    console.log(`✅ Found ${snapshot.size} document(s)`);
+    console.log(`[OK] Found ${snapshot.size} document(s)`);
     
-    console.log('\n🎉 Connection successful! Database is ready.');
+    console.log('\n[DONE] Connection successful! Database is ready.');
     
   } catch (error: any) {
-    console.error('\n❌ Error:', error.message);
-    console.error('\n📋 Possible fixes:');
+    console.error('\n[FAIL] Error:', error.message);
+    console.error('\n[TASK] Possible fixes:');
     console.error('1. Check that Firestore rules are published in Console');
     console.error('2. Make sure rules allow writes (development mode)');
     console.error('3. Wait a few minutes for changes to propagate');

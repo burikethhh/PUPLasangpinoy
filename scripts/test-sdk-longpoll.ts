@@ -12,7 +12,7 @@ const firebaseConfig = {
   databaseURL: "https://lasangpinoy-mobile.firebaseio.com"
 };
 
-console.log('🔧 Testing Firebase SDK with explicit configuration\n');
+console.log('[SETUP] Testing Firebase SDK with explicit configuration\n');
 
 async function test() {
   try {
@@ -36,21 +36,21 @@ async function test() {
       test_number: Math.random()
     };
     
-    console.log('📝 Writing document...');
+    console.log('[NOTE] Writing document...');
     await setDoc(testRef, testData);
-    console.log('✅ Write successful!\n');
+    console.log('[OK] Write successful!\n');
     
-    console.log('📖 Reading document back...');
+    console.log('[READ] Reading document back...');
     const docSnap = await getDoc(testRef);
     
     if (docSnap.exists()) {
-      console.log('✅ Read successful!');
+      console.log('[OK] Read successful!');
       console.log('Data:', docSnap.data());
-      console.log('\n✅ Firebase SDK is now working!\n');
+      console.log('\n[OK] Firebase SDK is now working!\n');
       process.exit(0);
     }
   } catch (error: any) {
-    console.error('❌ Error:', error.message);
+    console.error('[FAIL] Error:', error.message);
     console.error('Code:', error.code);
     process.exit(1);
   }
