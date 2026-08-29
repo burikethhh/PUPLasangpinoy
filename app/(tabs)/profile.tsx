@@ -477,7 +477,7 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version {Constants.expoConfig?.version || "3.2.0"}</Text>
+        <Text style={styles.version}>Version {Constants.expoConfig?.version || "4.1.4"}</Text>
 
         {/* Edit Modal */}
         <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
