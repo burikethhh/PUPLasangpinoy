@@ -25,7 +25,7 @@ jest.mock("../../lib/logger", () => ({
   }),
 }));
 
-import { analyzeImageWithQwen, chatWithQwen, extractJSON, testQwenConnectivity } from "../../lib/qwen-ai";
+import { analyzeImageWithQwen, chatWithQwen, clearScanCache, extractJSON, testQwenConnectivity } from "../../lib/qwen-ai";
 
 // ── Global fetch mock ──────────────────────────────────────
 const mockFetch = jest.fn();
@@ -46,11 +46,12 @@ function mockFetchResponse(status: number, body: object | string) {
 function mockFetchAbort() {
   const err = new Error("The user aborted a request.");
   err.name = "AbortError";
-  mockFetch.mockRejectedValueOnce(err);
+  mockFetch.mockRejectedValue(err);
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
+  clearScanCache();
   // Restore real timers between tests so setTimeout in callQwenAPI works
   jest.useRealTimers();
 });

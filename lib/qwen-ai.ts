@@ -10,6 +10,10 @@ const log = createLogger("QwenAI");
 const scanCache = new Map<string, { result: ScanResult; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
 
+export function clearScanCache(): void {
+  scanCache.clear();
+}
+
 function getCacheKey(base64Image: string, scanMode: string): string {
   return scanMode + ":" + base64Image.slice(0, 100);
 }
@@ -600,6 +604,16 @@ export async function chatWithLamionAI(
       return await callQwenAPI(model, messages, 1000, "chat");
     } catch (err: any) {
       lastError = err;
+      const msg = String(err?.message || "").toLowerCase();
+      if (
+        err?.isAuthError ||
+        err?.isRateLimit ||
+        msg.includes("invalid api key") ||
+        msg.includes("rate limit") ||
+        msg.includes("timed out")
+      ) {
+        throw err;
+      }
       log.warn(`Model ${model} failed: ${err.message} — trying next fallback.`);
     }
   }

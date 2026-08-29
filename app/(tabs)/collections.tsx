@@ -218,7 +218,7 @@ export default function OrdersScreen() {
         {item.status === "issue_encountered" && (
           <View style={styles.issueBanner}>
             <Ionicons name="warning" size={14} color="#E67E22" />
-            <Text style={styles.issueBannerText}>There's an issue with your order. You may cancel or wait for the store to resolve it.</Text>
+            <Text style={styles.issueBannerText}>There&apos;s an issue with your order. You may cancel or wait for the store to resolve it.</Text>
           </View>
         )}
         {item.issue_reason && (

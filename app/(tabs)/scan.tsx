@@ -560,7 +560,7 @@ export default function CartScreen() {
                 <View style={styles.gcashInstructions}>
                   <Ionicons name="information-circle" size={16} color="#3498DB" />
                   <Text style={styles.gcashInstructionText}>
-                    Open your GCash app, send payment to the number above, then tap "I Have Paid" below.
+                    Open your GCash app, send payment to the number above, then tap &quot;I Have Paid&quot; below.
                   </Text>
                 </View>
               </View>

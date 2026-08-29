@@ -173,7 +173,7 @@ export default function VerifyEmailScreen() {
           </View>
           <Text style={styles.title}>Verify Your Email</Text>
           <Text style={styles.subtitle}>
-            We'll send a verification link to{"\n"}
+            We&apos;ll send a verification link to{"\n"}
             <Text style={{ fontWeight: "bold", color: "#2E1A06" }}>{user?.email}</Text>
           </Text>
           <Text style={styles.hint}>
@@ -221,7 +221,7 @@ export default function VerifyEmailScreen() {
         </View>
         <Text style={styles.title}>Verify Your Email</Text>
         <Text style={styles.subtitle}>
-          We'll send a verification code to{"\n"}
+          We&apos;ll send a verification code to{"\n"}
           <Text style={{ fontWeight: "bold", color: "#2E1A06" }}>{user?.email}</Text>
         </Text>
         <Text style={styles.hint}>
