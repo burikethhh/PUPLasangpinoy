@@ -212,7 +212,7 @@ export default function SubmitDishScreen() {
             {scanning && (
               <View style={styles.scanningBox}>
                 <ActivityIndicator size="large" color="#F25C05" />
-                <Text style={styles.scanningText}>Analyzing image...</Text>
+                <Text style={styles.scanningText}>Analyzing image with Lamion AI...</Text>
               </View>
             )}
           </View>

@@ -611,7 +611,7 @@ export default function ProfileScreen() {
                   <Ionicons name="sparkles" size={22} color="#FF9800" />
                   <View>
                     <Text style={styles.aiTitle}>Lamion AI - Filipino Food Expert</Text>
-                    <Text style={styles.aiSub}>Customized Culinary AI • Authentic Filipino Cuisine</Text>
+                    <Text style={styles.aiSub}>Customized AI by Research Team • Authentic Filipino Cuisine</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={() => setLamionVisible(false)}>
