@@ -113,32 +113,14 @@ export default function TrackDeliveryScreen() {
     })();
   }, [orderId, user, isCustomer]); // intentionally excludes myOptIn — runs once on mount
 
-  // Customer foreground location push every 5s — stable interval, never restarts
+  // Ensure the pinned delivery location is registered as the customer destination
   useEffect(() => {
-    if (!isCustomer || !orderId || !user) return;
-    // Clear any existing interval before starting
-    if (customerIntervalRef.current) clearInterval(customerIntervalRef.current);
-
-    (async () => {
-      const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-      const push = async () => {
-        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
-        if (loc) {
-          await upsertLocation(orderId, user.uid, "customer", {
-            lat: loc.coords.latitude, lng: loc.coords.longitude,
-            accuracy: loc.coords.accuracy ?? undefined,
-          }).catch(() => {});
-        }
-      };
-      await push(); // push immediately on mount
-      customerIntervalRef.current = setInterval(push, 5000);
-    })();
-
-    return () => {
-      if (customerIntervalRef.current) { clearInterval(customerIntervalRef.current); customerIntervalRef.current = null; }
-    };
-  }, [isCustomer, orderId, user]); // stable — does NOT include myOptIn
+    if (!orderId || !order?.customer_lat || !order?.customer_lng) return;
+    upsertLocation(orderId, order.customer_id || user?.uid || "customer", "customer", {
+      lat: order.customer_lat,
+      lng: order.customer_lng,
+    }).catch(() => {});
+  }, [orderId, order?.customer_lat, order?.customer_lng]);
 
   // Staff foreground location push every 5s — stable interval, never restarts
   useEffect(() => {
@@ -251,13 +233,14 @@ export default function TrackDeliveryScreen() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // Use saved order delivery address for destination (staff sees this), customer sees their live location
+  // Use saved order pinned delivery address for destination across all sides
   function getDestCoords() {
-    // Staff should always navigate to the delivery address on file
-    if (!isCustomer && order?.customer_lat && order?.customer_lng) return { lat: order.customer_lat, lng: order.customer_lng };
-    // Customer can see their own live location if sharing
-    if (customerLoc) return { lat: customerLoc.lat, lng: customerLoc.lng };
-    if (order?.customer_lat && order?.customer_lng) return { lat: order.customer_lat, lng: order.customer_lng };
+    if (order?.customer_lat && order?.customer_lng) {
+      return { lat: order.customer_lat, lng: order.customer_lng };
+    }
+    if (customerLoc?.lat && customerLoc?.lng) {
+      return { lat: customerLoc.lat, lng: customerLoc.lng };
+    }
     return { lat: storeLatRef.current, lng: storeLngRef.current };
   }
 
@@ -362,11 +345,14 @@ export default function TrackDeliveryScreen() {
     }, 700);
   }
 
-  function getMapHtml(customerLat = (isCustomer ? (customerLoc?.lat ?? order?.customer_lat ?? storeLatRef.current) : (order?.customer_lat ?? storeLatRef.current)), customerLng = (isCustomer ? (customerLoc?.lng ?? order?.customer_lng ?? storeLngRef.current) : (order?.customer_lng ?? storeLngRef.current))) {
+  function getMapHtml(
+    customerLat = order?.customer_lat ?? customerLoc?.lat ?? storeLatRef.current,
+    customerLng = order?.customer_lng ?? customerLoc?.lng ?? storeLngRef.current
+  ) {
     const dLat = driverLoc?.lat ?? storeLatRef.current;
     const dLng = driverLoc?.lng ?? storeLngRef.current;
-    const centerLat = isCustomer ? (customerLat + dLat) / 2 : dLat;
-    const centerLng = isCustomer ? (customerLng + dLng) / 2 : dLng;
+    const centerLat = (customerLat + dLat) / 2;
+    const centerLng = (customerLng + dLng) / 2;
 
     return `<!DOCTYPE html>
 <html><head>
@@ -390,21 +376,19 @@ var custIcon  = L.divIcon({html:'<div style="background:#E74C3C;color:#fff;width
 var driverIcon= L.divIcon({html:'<div style="background:#3498DB;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)">D</div>',className:'',iconSize:[22,22],iconAnchor:[11,11]});
 
 L.marker([${storeLatRef.current},${storeLngRef.current}],{icon:storeIcon}).addTo(map).bindPopup('FOODFIX Store');
-var custMarker = L.marker([${customerLat},${customerLng}],{icon:custIcon}).addTo(map).bindPopup('Delivery Location');
+var custMarker = L.marker([${customerLat},${customerLng}],{icon:custIcon}).addTo(map).bindPopup('Pinned Delivery Location');
 
-// Start with null markers - will be created dynamically on first update
 var driverMarker = null;
-var custMarkerLive = null;
 
-${isCustomer ? `document.getElementById('legend').innerHTML = '<span style="color:#3498DB">&#9679;</span> Driver &bull; <span style="color:#E74C3C">&#9679;</span> You &bull; <span style="color:#F25C05">&#9679;</span> Store';` :
-  `document.getElementById('legend').innerHTML = '<span style="color:#E74C3C">&#9679;</span> Customer &bull; <span style="color:#3498DB">&#9679;</span> You (Driver) &bull; <span style="color:#F25C05">&#9679;</span> Store';`}
+${isCustomer ? `document.getElementById('legend').innerHTML = '<span style="color:#3498DB">&#9679;</span> Driver &bull; <span style="color:#E74C3C">&#9679;</span> Delivery Location &bull; <span style="color:#F25C05">&#9679;</span> Store';` :
+  `document.getElementById('legend').innerHTML = '<span style="color:#E74C3C">&#9679;</span> Delivery Destination &bull; <span style="color:#3498DB">&#9679;</span> You (Driver) &bull; <span style="color:#F25C05">&#9679;</span> Store';`}
 
 document.addEventListener('message', function(e){ handleMsg(e.data); });
 window.addEventListener('message', function(e){ handleMsg(e.data); });
 function fitBoundsIfBoth(){
-  if(driverMarker && custMarkerLive){
-    var group = new L.featureGroup([driverMarker, custMarkerLive]);
-    map.fitBounds(group.getBounds().pad(0.2));
+  if(driverMarker && custMarker){
+    var group = new L.featureGroup([driverMarker, custMarker]);
+    map.fitBounds(group.getBounds().pad(0.25));
   }
 }
 function handleMsg(raw){
@@ -415,14 +399,6 @@ function handleMsg(raw){
         driverMarker = L.marker([d.lat,d.lng],{icon:driverIcon}).addTo(map).bindPopup('Driver');
       } else {
         driverMarker.setLatLng([d.lat, d.lng]);
-      }
-      fitBoundsIfBoth();
-    }
-    if(d.type === 'customerUpdate'){
-      if(!custMarkerLive) {
-        custMarkerLive = L.marker([d.lat,d.lng],{icon:custIcon}).addTo(map).bindPopup('Customer');
-      } else {
-        custMarkerLive.setLatLng([d.lat,d.lng]);
       }
       fitBoundsIfBoth();
     }

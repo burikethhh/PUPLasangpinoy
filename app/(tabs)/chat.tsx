@@ -9,6 +9,34 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentUser, getProfile } from '../../lib/firebase';
 import { deleteConversation, deleteMessage, getMessages, onMessagesUpdate, sendMessage as sendMsg, type Message } from '../../lib/firebase-store';
 
+function formatMessageTimestamp(seconds?: number): string {
+  if (!seconds) return "";
+  const date = new Date(seconds * 1000);
+  const now = new Date();
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) {
+    return `Today, ${timeStr}`;
+  } else if (isYesterday) {
+    return `Yesterday, ${timeStr}`;
+  } else {
+    const dateStr = date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+    return `${dateStr}, ${timeStr}`;
+  }
+}
+
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -109,9 +137,7 @@ export default function ChatScreen() {
           {!isMe && <Text style={styles.senderName}>{item.sender_name || 'Store'}</Text>}
           <Text style={[styles.msgText, isMe && { color: '#fff' }]}>{item.content}</Text>
           <Text style={[styles.timeText, isMe && { color: 'rgba(255,255,255,0.6)' }]}>
-            {item.created_at?.seconds
-              ? new Date(item.created_at.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : ''}
+            {formatMessageTimestamp(item.created_at?.seconds)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -152,6 +178,8 @@ export default function ChatScreen() {
             renderItem={renderMessage}
             keyExtractor={(i) => i.id}
             contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
             onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
             ListEmptyComponent={
@@ -173,6 +201,7 @@ export default function ChatScreen() {
             placeholderTextColor="#aaa" 
             value={inputText} 
             onChangeText={setInputText}
+            onFocus={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200)}
             multiline 
             maxLength={500} 
             returnKeyType="send" 

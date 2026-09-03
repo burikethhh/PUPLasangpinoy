@@ -83,11 +83,11 @@ export default function CartScreen() {
     loadSettings();
     loadProfile();
     loadSavedAddresses();
-    // Always get GPS location for distance calculation
+    // Only get initial GPS location if coords are not already set by pinned/saved address
     ExpoLocation.requestForegroundPermissionsAsync().then(({ status }) => {
       if (status === "granted") {
         ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).then((loc) => {
-          setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+          setCoords((prev) => (prev ? prev : { lat: loc.coords.latitude, lng: loc.coords.longitude }));
         }).catch(() => {});
       }
     }).catch(() => {});

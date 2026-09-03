@@ -32,7 +32,7 @@ service cloud.firestore {
     match /menu_items/{itemId} {
       allow read: if true;
       allow create: if isAdmin();
-      allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).changedKeys().hasOnly(['stock_quantity']));
+      allow update: if isAdmin() || isStaff() || (isSignedIn() && request.resource.data.diff(resource.data).changedKeys().hasOnly(['stock_quantity']));
       allow delete: if isAdmin();
     }
     
@@ -172,15 +172,13 @@ service cloud.firestore {
     
     // ==================== EMAIL VERIFICATIONS ====================
     match /email_verifications/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
     
     // ==================== INVENTORY ADJUSTMENTS ====================
     match /inventory_adjustments/{docId} {
-      allow read: if isSignedIn() && (isAdmin() || isStaff());
-      allow create: if isSignedIn() && (isAdmin() || isStaff());
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin() || isStaff();
     }
 
     // ==================== CONNECTIVITY TEST ====================

@@ -14,6 +14,34 @@ import {
 
 interface Convo { customer_id: string; customer_name: string; last_message: string; unread: number; }
 
+function formatMessageTimestamp(seconds?: number): string {
+  if (!seconds) return "";
+  const date = new Date(seconds * 1000);
+  const now = new Date();
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) {
+    return `Today, ${timeStr}`;
+  } else if (isYesterday) {
+    return `Yesterday, ${timeStr}`;
+  } else {
+    const dateStr = date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+    return `${dateStr}, ${timeStr}`;
+  }
+}
+
 export default function AdminMessages() {
   const [convos, setConvos] = useState<Convo[]>([]);
   const [archivedConvos, setArchivedConvos] = useState<Convo[]>([]);
@@ -273,7 +301,11 @@ export default function AdminMessages() {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 25}
+      >
         {loadingChat ? (
           <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
         ) : (
@@ -282,6 +314,8 @@ export default function AdminMessages() {
             data={messages} 
             keyExtractor={(i) => i.id}
             contentContainerStyle={styles.chatListContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
             renderItem={({ item }) => {
               const isAdmin = item.sender_role === "admin";
@@ -294,9 +328,7 @@ export default function AdminMessages() {
                   <View style={[styles.bubble, isAdmin ? styles.bubbleAdmin : styles.bubbleCustomer]}>
                     <Text style={[styles.bubbleText, isAdmin && { color: "#fff" }]}>{item.content}</Text>
                     <Text style={[styles.bubbleTime, isAdmin ? { color: "rgba(255,255,255,0.7)" } : { color: "#999" }]}>
-                      {item.created_at?.seconds
-                        ? new Date(item.created_at.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                        : ""}
+                      {formatMessageTimestamp(item.created_at?.seconds)}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -311,6 +343,7 @@ export default function AdminMessages() {
             placeholderTextColor="#aaa"
             value={input} 
             onChangeText={setInput} 
+            onFocus={() => setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 200)}
             multiline 
             maxLength={500}
           />
