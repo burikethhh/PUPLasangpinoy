@@ -179,7 +179,13 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView
+        // On Android the window already resizes for the keyboard (edge-to-edge);
+        // an explicit "height" behavior double-shifts the layout and pushes the
+        // input behind the keyboard. Let the native resize do its job there.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={90}>
         {loading ? (
           <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />
         ) : (

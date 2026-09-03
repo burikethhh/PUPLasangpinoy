@@ -27,6 +27,7 @@ import {
     type MenuItem,
 } from "../../lib/firebase-store";
 import { uploadToCloudinary } from "../../lib/cloudinary";
+import { friendlyFirestoreError } from "../../lib/firebase-helpers";
 import { createLogger } from "../../lib/logger";
 
 const log = createLogger("AdminMenu");
@@ -384,7 +385,7 @@ export default function AdminMenuScreen() {
                         setShowAdjustHistory(true);
                       } catch (e: any) {
                         log.error("Failed to load adjustment history", e);
-                        Alert.alert("Error", e?.message || "Failed to load history. Make sure the inventory_adjustments collection exists in Firestore.");
+                        Alert.alert("Error", friendlyFirestoreError(e, "Failed to load history. Make sure the inventory_adjustments collection exists in Firestore."));
                       }
                       setLoadingHistory(false);
                     }} style={[styles.iconBtn, { backgroundColor: "#3498DB18" }]} disabled={loadingHistory}>
@@ -728,7 +729,7 @@ export default function AdminMenuScreen() {
                         load(true);
                       } catch (e: any) {
                         log.error("Inventory adjustment failed", e);
-                        Alert.alert("Error", e.message);
+                        Alert.alert("Error", friendlyFirestoreError(e, "Failed to apply adjustment."));
                       }
                       setAdjusting(false);
                     }} disabled={!adjustQty.trim() || adjusting}>

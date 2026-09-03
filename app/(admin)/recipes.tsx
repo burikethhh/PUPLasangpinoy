@@ -222,6 +222,12 @@ export default function AdminOrders() {
                 {item.customer_address ? (
                   <Text style={styles.address}>{item.customer_address}</Text>
                 ) : null}
+                {item.order_note ? (
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 4, marginTop: 4, backgroundColor: "#FFF9E6", borderRadius: 8, padding: 8 }}>
+                    <Ionicons name="document-text-outline" size={13} color="#B07820" style={{ marginTop: 1 }} />
+                    <Text style={{ fontSize: 12, color: "#7A5B1E", flex: 1, lineHeight: 17 }}>Note: {item.order_note}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.itemsList}>
                   {item.items?.map((it, idx) => (
                     <Text key={idx} style={styles.itemText}>

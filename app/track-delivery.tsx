@@ -623,6 +623,11 @@ function handleMsg(raw){
             </TouchableOpacity>
           </View>
           <Text style={styles.custAddress} numberOfLines={2}>{order.customer_address}</Text>
+          {order.order_note ? (
+            <Text style={[styles.custAddress, { color: "#B07820", fontStyle: "italic" }]} numberOfLines={2}>
+              Note: {order.order_note}
+            </Text>
+          ) : null}
 
           <View style={styles.staffBtnRow}>
             {!tracking ? (

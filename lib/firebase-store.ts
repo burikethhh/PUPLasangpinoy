@@ -61,6 +61,7 @@ export interface Order {
   customer_address: string;
   customer_lat?: number;
   customer_lng?: number;
+  order_note?: string;
   items: OrderItem[];
   subtotal: number;
   delivery_fee: number;
@@ -261,6 +262,7 @@ export async function createOrder(data: {
   customer_address: string;
   customer_lat?: number;
   customer_lng?: number;
+  order_note?: string;
   items: OrderItem[];
   subtotal: number;
   delivery_fee: number;
@@ -1355,27 +1357,64 @@ export async function notifyGcashPayment(
   customerName: string,
   customerPhone: string,
   amount: number,
-): Promise<void> {
+  opts?: { customerId?: string; orderNumber?: string },
+): Promise<{ viaNotification: boolean; viaChat: boolean }> {
   log.info("Notifying GCash payment", { orderId, amount, customerName });
+  const orderLabel = opts?.orderNumber || orderId;
   const payload = {
     type: "gcash_payment",
     order_id: orderId,
+    order_number: orderLabel,
+    customer_id: opts?.customerId || null,
     customer_name: customerName,
     customer_phone: customerPhone,
     amount,
     paid: false,
     created_at: new Date(),
   };
+
+  let viaNotification = false;
+  let viaChat = false;
+  let lastError: any = null;
+
+  // Channel 1: admin transaction record (needs current Firestore rules).
   try {
     await firestoreOp(
       async () => { await addDoc(collection(db, "notifications"), payload); },
       async () => { await RestApi.createDocument("notifications", payload); },
     );
+    viaNotification = true;
     log.info("GCash payment notification sent", { orderId });
   } catch (e) {
-    log.error("GCash payment notification failed", e);
-    throw e;
+    lastError = e;
+    log.warn("GCash notification write failed, falling back to chat message", e);
   }
+
+  // Channel 2: chat message to the store. The messages collection is readable
+  // by admin/staff, so the store still sees the payment even when the
+  // notifications write is blocked by outdated security rules.
+  if (opts?.customerId) {
+    try {
+      await sendMessage({
+        conversation_id: opts.customerId,
+        sender_id: opts.customerId,
+        sender_name: customerName,
+        sender_role: "customer",
+        content: `GCash payment sent: P${Number(amount).toFixed(2)} for order ${orderLabel}. Please verify. Thank you!`,
+      });
+      viaChat = true;
+      log.info("GCash payment chat message sent", { orderId });
+    } catch (e) {
+      lastError = e;
+      log.warn("GCash chat fallback failed", e);
+    }
+  }
+
+  if (!viaNotification && !viaChat) {
+    log.error("GCash payment notification failed on all channels", lastError);
+    throw lastError;
+  }
+  return { viaNotification, viaChat };
 }
 
 export async function markGcashPaid(notificationId: string): Promise<void> {
@@ -1572,16 +1611,28 @@ export async function addInventoryAdjustment(
   return firestoreOp(
     async () => {
       const ref = await addDoc(collection(db, "inventory_adjustments"), payload);
-      await updateDoc(doc(db, "menu_items", data.item_id), {
-        stock_quantity: Math.max(0, data.previous_qty + data.adjustment),
-      });
+      try {
+        await updateDoc(doc(db, "menu_items", data.item_id), {
+          stock_quantity: Math.max(0, data.previous_qty + data.adjustment),
+        });
+      } catch (e) {
+        // Roll back the adjustment record so history never shows a
+        // change that was not actually applied to the stock level.
+        await deleteDoc(ref).catch(() => {});
+        throw e;
+      }
       return { id: ref.id };
     },
     async () => {
       const id = await RestApi.createDocument("inventory_adjustments", payload);
-      await RestApi.updateDocument("menu_items", data.item_id, {
-        stock_quantity: Math.max(0, data.previous_qty + data.adjustment),
-      });
+      try {
+        await RestApi.updateDocument("menu_items", data.item_id, {
+          stock_quantity: Math.max(0, data.previous_qty + data.adjustment),
+        });
+      } catch (e) {
+        await RestApi.deleteDocument("inventory_adjustments", id).catch(() => {});
+        throw e;
+      }
       return { id };
     },
   );

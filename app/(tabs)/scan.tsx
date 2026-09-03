@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { OrderType, PaymentMethod } from "../../constants/order";
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "../../constants/order";
 import { getCurrentUser, getProfile } from "../../lib/firebase";
+import { friendlyFirestoreError } from "../../lib/firebase-helpers";
 import { createLogger } from "../../lib/logger";
 const log = createLogger("Cart");
 
@@ -47,6 +48,7 @@ export default function CartScreen() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
+  const [orderNote, setOrderNote] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -72,6 +74,10 @@ export default function CartScreen() {
   const [addressSuggestions, setAddressSuggestions] = useState<NominatimSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks whether `coords` actually matches the current address text.
+  // Typing without picking a suggestion (or tapping "Use My Location")
+  // leaves stale phone-GPS coords behind — never trust those at checkout.
+  const [coordsFresh, setCoordsFresh] = useState(false);
 
   // Save address modal
   const [saveAddressModal, setSaveAddressModal] = useState(false);
@@ -184,6 +190,7 @@ export default function CartScreen() {
       const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
       const { latitude, longitude } = loc.coords;
       setCoords({ lat: latitude, lng: longitude });
+      setCoordsFresh(true);
       log.info("Location obtained", { lat: latitude, lng: longitude });
 
       const res = await fetch(
@@ -231,6 +238,9 @@ export default function CartScreen() {
   function handleAddressChange(text: string) {
     setAddress(text);
     setShowSuggestions(false);
+    // The text no longer matches whatever coords we had — mark stale so
+    // checkout re-geocodes instead of saving phone-GPS coords with it.
+    setCoordsFresh(false);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => fetchAddressSuggestions(text), 500);
   }
@@ -238,9 +248,28 @@ export default function CartScreen() {
   function handleSelectSuggestion(suggestion: NominatimSuggestion) {
     setAddress(suggestion.display_name);
     setCoords({ lat: parseFloat(suggestion.lat), lng: parseFloat(suggestion.lon) });
+    setCoordsFresh(true);
     setShowSuggestions(false);
     setAddressSuggestions([]);
     log.debug("Address suggestion selected", { address: suggestion.display_name });
+  }
+
+  // Forward-geocode a typed address into coords (Nominatim).
+  // Used at checkout when the user typed an address without tapping a suggestion.
+  async function geocodeAddressText(query: string): Promise<{ lat: number; lng: number } | null> {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&addressdetails=1`,
+        { headers: { "User-Agent": "FOODFIX-App/2.3" } }
+      );
+      const data = await res.json();
+      if (data && data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+    } catch (e) {
+      log.error("Geocode failed", e);
+    }
+    return null;
   }
 
   async function handleSaveAddress() {
@@ -252,12 +281,23 @@ export default function CartScreen() {
     if (!user) return;
     setSavingAddress(true);
     try {
+      // Pin the typed address before saving, so saved addresses never
+      // store stale phone-GPS coords.
+      let saveCoords = coords;
+      if (!saveCoords || !coordsFresh) {
+        const geo = await geocodeAddressText(address.trim());
+        if (geo) {
+          saveCoords = geo;
+          setCoords(geo);
+          setCoordsFresh(true);
+        }
+      }
       await saveAddress(user.uid, {
         label: saveLabel.trim(),
         address: address.trim(),
         phone: phone.trim(),
-        lat: coords?.lat,
-        lng: coords?.lng,
+        lat: saveCoords?.lat,
+        lng: saveCoords?.lng,
       });
       log.info("Address saved", { label: saveLabel.trim() });
       setSaveAddressModal(false);
@@ -291,6 +331,7 @@ export default function CartScreen() {
     setPhone(addr.phone);
     if (addr.lat && addr.lng) {
       setCoords({ lat: addr.lat, lng: addr.lng });
+      setCoordsFresh(true);
     }
     log.debug("Saved address selected", { label: addr.label });
   }
@@ -350,9 +391,29 @@ export default function CartScreen() {
     if (orderType === "delivery_later" && (!scheduledDate || !scheduledTime))
       return Alert.alert("Schedule Required", "Please set date and time for later delivery.");
 
-    if ((orderType === "delivery_now" || orderType === "delivery_later") && coords) {
+    // Resolve the delivery pin: never trust stale phone-GPS coords with a
+    // manually typed address. If the user typed without tapping a suggestion,
+    // forward-geocode the text so the saved pin matches the address.
+    let deliveryCoords = coords;
+    if (orderType === "delivery_now" || orderType === "delivery_later") {
+      if (!deliveryCoords || !coordsFresh) {
+        const geo = await geocodeAddressText(address.trim());
+        if (geo) {
+          deliveryCoords = geo;
+          setCoords(geo);
+          setCoordsFresh(true);
+          log.info("Checkout address geocoded", { address: address.trim(), ...geo });
+        } else {
+          log.warn("Checkout blocked: address has no pin", { address: address.trim() });
+          return Alert.alert(
+            "Confirm Your Location",
+            "We couldn't pin that address on the map. Please tap one of the suggested addresses, or tap \"Use My Location\"."
+          );
+        }
+      }
+
       const radiusKm = settings?.delivery_radius_km || 10;
-      const distance = calcDistance(STORE_LAT, STORE_LNG, coords.lat, coords.lng);
+      const distance = calcDistance(STORE_LAT, STORE_LNG, deliveryCoords.lat, deliveryCoords.lng);
       if (distance > radiusKm) {
         log.warn("Delivery out of range", { distance, radiusKm });
         return Alert.alert(
@@ -388,8 +449,9 @@ export default function CartScreen() {
         customer_name: profile?.username || "Customer",
         customer_phone: phone.trim(),
         customer_address: address.trim(),
-        customer_lat: coords?.lat,
-        customer_lng: coords?.lng,
+        customer_lat: deliveryCoords?.lat,
+        customer_lng: deliveryCoords?.lng,
+        order_note: orderNote.trim() || undefined,
         items: cart.map((c) => ({
           menu_item_id: c.menu_item_id,
           name: c.name,
@@ -409,6 +471,7 @@ export default function CartScreen() {
       log.info("Order created", { orderId: result.id, orderNumber: result.order_number, total });
       await AsyncStorage.removeItem(CART_KEY);
       setCart([]);
+      setOrderNote("");
       if (paymentMethod === "gcash") {
         setGcashOrder({ orderId: result.id, orderNumber: result.order_number, amount: total });
       } else {
@@ -621,6 +684,25 @@ export default function CartScreen() {
                     <Text style={styles.locationBtnText}>{locating ? "Locating..." : "Use My Location"}</Text>
                   </TouchableOpacity>
                 </View>
+                {(() => {
+                  const radiusKm = settings?.delivery_radius_km || 10;
+                  if (!coords || !coordsFresh) {
+                    return (
+                      <Text style={styles.radiusHintNeutral}>
+                        Tap a suggested address above so we can check if you are within the {radiusKm} km delivery radius.
+                      </Text>
+                    );
+                  }
+                  const dist = calcDistance(STORE_LAT, STORE_LNG, coords.lat, coords.lng);
+                  const inRange = dist <= radiusKm;
+                  return (
+                    <Text style={inRange ? styles.radiusHintOk : styles.radiusHintBad}>
+                      {inRange
+                        ? `Pinned location is ${dist.toFixed(1)} km from the store — within the ${radiusKm} km delivery radius.`
+                        : `Pinned location is ${dist.toFixed(1)} km from the store — outside the ${radiusKm} km delivery radius. Pick Up / Dine In are still available.`}
+                    </Text>
+                  );
+                })()}
               </>
             )}
             <Text style={styles.inputLabel}>Contact Number</Text>
@@ -634,6 +716,18 @@ export default function CartScreen() {
               maxLength={11}
             />
             {phoneError ? <Text style={styles.phoneError}>{phoneError}</Text> : null}
+
+            {/* Order Note (optional) — unit no., floor, landmark, etc. */}
+            <Text style={styles.inputLabel}>Order Note (optional)</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 60, textAlignVertical: "top" }]}
+              placeholder="e.g. Unit 5B, 2nd floor, blue gate, landmark..."
+              value={orderNote}
+              onChangeText={setOrderNote}
+              placeholderTextColor="#aaa"
+              multiline
+              maxLength={300}
+            />
 
             {/* Summary */}
             <View style={styles.summaryCard}>
@@ -716,19 +810,36 @@ export default function CartScreen() {
             <Text style={styles.gcashConfirmNumber}>Send to: {settings?.gcash_number || "N/A"}</Text>
             <TouchableOpacity
               style={[styles.gcashNotifyBtn, notifyingGcash && { opacity: 0.6 }]}
-              onPress={async () => {
-                setNotifyingGcash(true);
-                try {
-                  await notifyGcashPayment(gcashOrder.orderId, customerName, phone, gcashOrder.amount);
-                  log.info("GCash notification sent", { orderId: gcashOrder.orderId, amount: gcashOrder.amount });
-                  Alert.alert("Notification Sent", "The store has been notified of your payment. Track your order in the Orders tab.", [
-                    { text: "View Orders", onPress: () => { setGcashOrder(null); router.replace("/(tabs)/collections"); } }
-                  ]);
-                } catch (e: any) {
-                  log.error("GCash notification failed", e);
-                  Alert.alert("Error", e.message || "Failed to notify store.");
-                }
-                setNotifyingGcash(false);
+              onPress={() => {
+                // QA requirement: confirm the customer actually paid first.
+                Alert.alert(
+                  "Confirm GCash Payment",
+                  `Have you already sent P${gcashOrder.amount.toFixed(2)} via GCash to ${settings?.gcash_number || "the store number"}?\n\nOnly tap "Yes, I've Paid" after sending, so the store can verify your payment.`,
+                  [
+                    { text: "Not Yet", style: "cancel" },
+                    {
+                      text: "Yes, I've Paid",
+                      onPress: async () => {
+                        setNotifyingGcash(true);
+                        try {
+                          const me = getCurrentUser();
+                          await notifyGcashPayment(gcashOrder.orderId, customerName, phone, gcashOrder.amount, {
+                            customerId: me?.uid,
+                            orderNumber: gcashOrder.orderNumber,
+                          });
+                          log.info("GCash notification sent", { orderId: gcashOrder.orderId, amount: gcashOrder.amount });
+                          Alert.alert("Notification Sent", "The store has been notified of your payment and can now verify it under GCash transaction records. Track your order in the Orders tab.", [
+                            { text: "View Orders", onPress: () => { setGcashOrder(null); router.replace("/(tabs)/collections"); } }
+                          ]);
+                        } catch (e: any) {
+                          log.error("GCash notification failed", e);
+                          Alert.alert("Error", friendlyFirestoreError(e, "Failed to notify store."));
+                        }
+                        setNotifyingGcash(false);
+                      },
+                    },
+                  ]
+                );
               }}
               disabled={notifyingGcash}
             >
@@ -820,6 +931,9 @@ const styles = StyleSheet.create({
   },
   locationBtnText: { fontSize: 12, color: "#F25C05", fontWeight: "600" },
   phoneError: { color: "#E74C3C", fontSize: 12, marginHorizontal: 16, marginTop: 2 },
+  radiusHintOk: { color: "#27AE60", fontSize: 12, marginHorizontal: 16, marginTop: 6, lineHeight: 17 },
+  radiusHintBad: { color: "#E74C3C", fontSize: 12, marginHorizontal: 16, marginTop: 6, lineHeight: 17, fontWeight: "600" },
+  radiusHintNeutral: { color: "#B07820", fontSize: 12, marginHorizontal: 16, marginTop: 6, lineHeight: 17 },
   gcashQrSection: {
     marginHorizontal: 16, marginTop: 8, backgroundColor: "#fff",
     borderRadius: 16, padding: 16, alignItems: "center", borderWidth: 1.5, borderColor: "#E8D8A0",

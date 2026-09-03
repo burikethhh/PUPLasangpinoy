@@ -29,6 +29,8 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: "#F25C05",
         tabBarInactiveTintColor: "#888",
+        // Hide the tab bar while typing so the keyboard never covers the chat input.
+        tabBarHideOnKeyboard: true,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",

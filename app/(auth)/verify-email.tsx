@@ -5,7 +5,8 @@ import {
     ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getCurrentUser, logOut, sendFirebaseUserVerification } from "../../lib/firebase";
+import { getCurrentUser, getProfile, logOut, sendFirebaseUserVerification } from "../../lib/firebase";
+import { friendlyFirestoreError } from "../../lib/firebase-helpers";
 import { generateEmailCode, verifyEmailCode } from "../../lib/firebase-store";
 import { createLogger } from "../../lib/logger";
 
@@ -19,7 +20,13 @@ export default function VerifyEmailScreen() {
   const [codeSent, setCodeSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [generatedCode, setGeneratedCode] = useState("");
-  const [useFirebaseEmail, setUseFirebaseEmail] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const [continuing, setContinuing] = useState(false);
+  // Firebase email-link is the primary flow: it needs no Firestore writes,
+  // so verification works even if the deployed security rules are outdated.
+  // The 6-digit code remains as a fallback.
+  const [useFirebaseEmail, setUseFirebaseEmail] = useState(true);
+  const [sent, setSent] = useState(false);
   const user = getCurrentUser();
   const inputs = useRef<(TextInput | null)[]>([]);
 
@@ -32,14 +39,10 @@ export default function VerifyEmailScreen() {
       setVerified(true);
       return;
     }
-    // Automatically generate and send the 6-digit code
-    sendCode();
-    // Also try Firebase email verification in background
-    try {
-      sendFirebaseUserVerification(user).catch(() => {});
-    } catch {}
+    // Primary flow: send the Firebase verification link automatically.
+    sendLink(true);
 
-    // Poll for email verification status
+    // Poll for email verification status (covers link taps outside the app)
     const interval = setInterval(async () => {
       try {
         await user.reload();
@@ -50,6 +53,7 @@ export default function VerifyEmailScreen() {
       } catch {}
     }, 3000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -58,29 +62,39 @@ export default function VerifyEmailScreen() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  async function tryFirebaseVerification() {
+  // Primary flow: Firebase email-link verification (no Firestore needed).
+  async function sendLink(auto = false) {
     if (!user) return;
-    log.info("Sending Firebase email verification", { email: user.email });
+    log.info("Sending Firebase email verification", { email: user.email, auto });
     setSending(true);
+    setSendError("");
     try {
       await sendFirebaseUserVerification(user);
       setSent(true);
       setCountdown(60);
       log.info("Firebase verification email sent", { email: user.email });
-      Alert.alert("Email Sent", "A verification link has been sent to your email.");
+      if (!auto) {
+        Alert.alert("Email Sent", "A verification link has been sent to your email. Tap the link, then return here — this screen updates automatically.");
+      }
     } catch (e: any) {
       log.warn("Firebase email verification error", e);
-      Alert.alert("Notice", "Could not send verification email link. Please use the 6-digit verification code instead.");
+      const msg = e?.code === "auth/too-many-requests"
+        ? "Too many email requests. Please wait a few minutes, then tap Resend — or use the 6-digit code instead."
+        : "Could not send the verification email. Check your connection and tap Resend — or use the 6-digit code instead.";
+      setSendError(msg);
     }
     setSending(false);
   }
 
-  const [sent, setSent] = useState(false);
+  async function tryFirebaseVerification() {
+    return sendLink(false);
+  }
 
   async function sendCode() {
     if (!user?.email) return;
     log.info("Sending verification code", { email: user.email });
     setSending(true);
+    setSendError("");
     try {
       const code = await generateEmailCode(user.email);
       setGeneratedCode(code);
@@ -89,7 +103,9 @@ export default function VerifyEmailScreen() {
       log.info("Verification code generated and sent", { email: user.email });
     } catch (e: any) {
       log.error("Failed to generate verification code", e);
-      Alert.alert("Error", e.message || "Failed to generate verification code.");
+      // Show an inline, friendly message (with retry) instead of a raw
+      // Firestore error popup.
+      setSendError(friendlyFirestoreError(e, "Failed to generate verification code."));
     }
     setSending(false);
   }
@@ -114,7 +130,7 @@ export default function VerifyEmailScreen() {
       }
     } catch (e: any) {
       log.error("Code verification error", e);
-      Alert.alert("Error", e.message || "Failed to verify code.");
+      Alert.alert("Error", friendlyFirestoreError(e, "Failed to verify code."));
     }
     setLoading(false);
   }
@@ -146,6 +162,28 @@ export default function VerifyEmailScreen() {
     router.replace("/(auth)/welcome");
   }
 
+  async function handleBackToSignIn() {
+    await logOut();
+    router.replace("/(auth)/login");
+  }
+
+  // Route verified users to their role's home instead of always
+  // dumping everyone into the customer tabs.
+  async function handleContinue() {
+    const u = getCurrentUser();
+    if (!u) { router.replace("/(auth)/welcome" as any); return; }
+    setContinuing(true);
+    try {
+      const profile = await getProfile(u.uid);
+      if (profile?.is_admin) router.replace("/(admin)" as any);
+      else if (profile?.role === "staff") router.replace("/(staff)" as any);
+      else router.replace("/(tabs)" as any);
+    } catch {
+      router.replace("/(tabs)" as any);
+    }
+    setContinuing(false);
+  }
+
   if (verified) {
     return (
       <SafeAreaView style={styles.container}>
@@ -155,8 +193,8 @@ export default function VerifyEmailScreen() {
           </View>
           <Text style={styles.title}>Email Verified!</Text>
           <Text style={styles.subtitle}>Your email has been verified successfully.</Text>
-          <TouchableOpacity style={styles.continueBtn} onPress={() => router.replace("/(tabs)")}>
-            <Text style={styles.continueBtnText}>Continue</Text>
+          <TouchableOpacity style={styles.continueBtn} onPress={handleContinue} disabled={continuing}>
+            {continuing ? <ActivityIndicator color="#fff" /> : <Text style={styles.continueBtnText}>Continue</Text>}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -180,6 +218,8 @@ export default function VerifyEmailScreen() {
             Tap the button below, then check your email and tap the verification link.{"\n"}
             This screen will update automatically once verified.
           </Text>
+
+          {sendError ? <Text style={styles.inlineError}>{sendError}</Text> : null}
 
           {sent ? (
             <View style={styles.sentBox}>
@@ -206,6 +246,14 @@ export default function VerifyEmailScreen() {
 
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Text style={styles.logoutBtnText}>Use a different account</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.switchModeBtn}
+            onPress={() => { setUseFirebaseEmail(false); setSendError(""); }}>
+            <Text style={styles.switchModeBtnText}>Use 6-digit code instead</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backLoginBtn} onPress={handleBackToSignIn}>
+            <Text style={styles.backLoginBtnText}>Back to Sign In</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -236,11 +284,14 @@ export default function VerifyEmailScreen() {
         ) : null}
 
         {!codeSent ? (
-          <TouchableOpacity
-            style={[styles.sendBtn, sending && { opacity: 0.6 }]}
-            onPress={sendCode} disabled={sending}>
-            {sending ? <ActivityIndicator color="#fff" /> : <Text style={styles.sendBtnText}>Send Verification Code</Text>}
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={[styles.sendBtn, sending && { opacity: 0.6 }]}
+              onPress={sendCode} disabled={sending}>
+              {sending ? <ActivityIndicator color="#fff" /> : <Text style={styles.sendBtnText}>Send Verification Code</Text>}
+            </TouchableOpacity>
+            {sendError ? <Text style={styles.inlineError}>{sendError}</Text> : null}
+          </>
         ) : (
           <>
             <View style={styles.codeRow}>
@@ -277,6 +328,14 @@ export default function VerifyEmailScreen() {
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutBtnText}>Use a different account</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.switchModeBtn}
+          onPress={() => { setUseFirebaseEmail(true); setSendError(""); }}>
+          <Text style={styles.switchModeBtnText}>Use email link instead</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.backLoginBtn} onPress={handleBackToSignIn}>
+          <Text style={styles.backLoginBtnText}>Back to Sign In</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -327,6 +386,18 @@ const styles = StyleSheet.create({
   resendBtnText: { color: "#F25C05", fontSize: 14, fontWeight: "600" },
   logoutBtn: { marginTop: 16, padding: 8 },
   logoutBtnText: { color: "#888", fontSize: 13, textDecorationLine: "underline" },
+  backLoginBtn: {
+    marginTop: 4, padding: 10, borderRadius: 20,
+    backgroundColor: "#F25C0515", borderWidth: 1, borderColor: "#F25C0540",
+    width: "100%", alignItems: "center",
+  },
+  backLoginBtnText: { color: "#F25C05", fontSize: 14, fontWeight: "600" },
+  switchModeBtn: { marginTop: 4, padding: 8 },
+  switchModeBtnText: { color: "#3498DB", fontSize: 13, textDecorationLine: "underline" },
+  inlineError: {
+    color: "#D92614", fontSize: 12, textAlign: "center",
+    marginTop: 12, lineHeight: 18, paddingHorizontal: 8,
+  },
   continueBtn: {
     backgroundColor: "#27AE60", borderRadius: 30, height: 52, width: "100%",
     justifyContent: "center", alignItems: "center", marginTop: 24,

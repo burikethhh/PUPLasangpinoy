@@ -145,6 +145,14 @@ export default function OrdersScreen() {
         {/* Payment row */}
         <Text style={styles.paymentText}>{PAYMENT_METHOD_LABELS[item.payment_method]}</Text>
 
+        {/* Customer order note */}
+        {item.order_note ? (
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 4, marginTop: 6, backgroundColor: "#FFF9E6", borderRadius: 8, padding: 8 }}>
+            <Ionicons name="document-text-outline" size={13} color="#B07820" style={{ marginTop: 1 }} />
+            <Text style={{ fontSize: 12, color: "#7A5B1E", flex: 1, lineHeight: 17 }}>Note: {item.order_note}</Text>
+          </View>
+        ) : null}
+
         {/* Rider info */}
         {item.driver_name && (item.status === "out_for_delivery" || item.status === "delivered") && (
           <View style={styles.riderInfo}>

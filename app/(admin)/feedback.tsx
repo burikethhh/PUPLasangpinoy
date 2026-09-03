@@ -313,9 +313,12 @@ export default function AdminMessages() {
       </View>
 
       <KeyboardAvoidingView
+        // On Android the window already resizes for the keyboard (edge-to-edge);
+        // an explicit "height" behavior double-shifts the layout and pushes the
+        // input behind the keyboard. Let the native resize do its job there.
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 25}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
         {loadingChat ? (
           <ActivityIndicator size="large" color="#F25C05" style={{ marginTop: 40 }} />

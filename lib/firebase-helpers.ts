@@ -85,6 +85,28 @@ export async function checkFirebaseConnectivity(): Promise<{
   }
 }
 
+// Map raw Firestore/Auth errors to user-friendly messages.
+// Permission errors almost always mean one of:
+//  1. The Firestore security rules in the Firebase console are outdated
+//     (run: firebase deploy --only firestore:rules), or
+//  2. The user's auth session expired and they need to log back in.
+export function friendlyFirestoreError(error: any, fallback?: string): string {
+  const raw = error?.message || fallback || "Something went wrong. Please try again.";
+  const msg = String(error?.message || "").toLowerCase();
+  const code = String(error?.code || "").toLowerCase();
+
+  if (
+    msg.includes("missing or insufficient permissions") ||
+    msg.includes("permission-denied") ||
+    msg.includes("permission denied") ||
+    code.includes("permission-denied") ||
+    error?.status === 403
+  ) {
+    return "Permission denied by the database. Please log out and log back in. If this keeps happening, the Firestore rules need to be deployed from the project folder (firebase deploy --only firestore:rules).";
+  }
+  return raw;
+}
+
 // Platform-specific Firebase initialization hints
 export function getFirebaseHints(): string[] {
   const hints: string[] = [];
