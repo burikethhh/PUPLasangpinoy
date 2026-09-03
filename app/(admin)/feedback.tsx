@@ -14,9 +14,20 @@ import {
 
 interface Convo { customer_id: string; customer_name: string; last_message: string; unread: number; }
 
-function formatMessageTimestamp(seconds?: number): string {
-  if (!seconds) return "";
-  const date = new Date(seconds * 1000);
+function formatMessageTimestamp(timestamp?: any): string {
+  if (!timestamp) return "";
+  let date: Date;
+  if (typeof timestamp === "number") {
+    date = new Date(timestamp > 1e11 ? timestamp : timestamp * 1000);
+  } else if (timestamp?.seconds) {
+    date = new Date(timestamp.seconds * 1000);
+  } else if (timestamp instanceof Date) {
+    date = timestamp;
+  } else {
+    date = new Date(timestamp);
+  }
+  if (isNaN(date.getTime())) return "";
+
   const now = new Date();
   const isToday =
     date.getDate() === now.getDate() &&
@@ -328,7 +339,7 @@ export default function AdminMessages() {
                   <View style={[styles.bubble, isAdmin ? styles.bubbleAdmin : styles.bubbleCustomer]}>
                     <Text style={[styles.bubbleText, isAdmin && { color: "#fff" }]}>{item.content}</Text>
                     <Text style={[styles.bubbleTime, isAdmin ? { color: "rgba(255,255,255,0.7)" } : { color: "#999" }]}>
-                      {formatMessageTimestamp(item.created_at?.seconds)}
+                      {formatMessageTimestamp(item.created_at)}
                     </Text>
                   </View>
                 </TouchableOpacity>
