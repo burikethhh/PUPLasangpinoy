@@ -2,9 +2,8 @@ import { ScrollViewStyleReset } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
 
 /**
- * This file is web-only and used to configure the root HTML for every web page.
- * The <head> and <body> tags can be customized here to support Progressive Web App (PWA)
- * features, meta tags, and responsive layout styling.
+ * Root HTML template for Expo Router Web & PWA.
+ * Renders `{children}` directly inside `<body>` to prevent React hydration mismatch (#418).
  */
 export default function Root({ children }: PropsWithChildren) {
   return (
@@ -21,7 +20,7 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
         <link rel="apple-touch-icon" href="/pwa-icon-192.png" />
 
-        {/* iOS / Mobile Web App Meta */}
+        {/* Mobile Web App Meta */}
         <meta name="theme-color" content="#F25C05" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -32,17 +31,19 @@ export default function Root({ children }: PropsWithChildren) {
         {/* Reset ScrollView styles */}
         <ScrollViewStyleReset />
 
-        {/* PWA & Responsive Shell Styling */}
+        {/* Ionicons Fallback @font-face & PWA Styling */}
         <style dangerouslySetInnerHTML={{ __html: responsiveStyles }} />
 
-        {/* Service Worker Registration */}
+        {/* Service Worker Auto-Update & Cache Recovery */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
-                    console.log('ServiceWorker registration failed: ', err);
+                  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                    reg.update();
+                  }).catch(function(err) {
+                    console.log('SW registration note:', err);
                   });
                 });
               }
@@ -50,14 +51,19 @@ export default function Root({ children }: PropsWithChildren) {
           }}
         />
       </head>
-      <body>
-        <div id="root-container">{children}</div>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
 
 const responsiveStyles = `
+  @font-face {
+    font-family: 'Ionicons';
+    src: url('/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf') format('truetype'),
+         url('https://unpkg.com/ionicons@4.5.10-0/dist/fonts/ionicons.ttf') format('truetype');
+    font-display: swap;
+  }
+
   html, body {
     margin: 0;
     padding: 0;
@@ -67,35 +73,22 @@ const responsiveStyles = `
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Desktop and Tablet App Framing */
-  #root-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100%;
-    width: 100%;
-    background-color: #ECE0CA;
-  }
-
+  /* Desktop and Tablet App Framing directly on #root — no wrapper div */
   #root {
     display: flex;
     flex-direction: column;
-    width: 100%;
     height: 100%;
     max-width: 480px;
+    margin: 0 auto;
     background-color: #F9F0DC;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.12);
     position: relative;
     overflow: hidden;
   }
 
   @media (max-width: 600px) {
-    #root-container {
-      background-color: #F9F0DC;
-    }
     #root {
       max-width: 100%;
-      height: 100%;
       box-shadow: none;
     }
   }

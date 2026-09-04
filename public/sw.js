@@ -1,5 +1,5 @@
-// FOODFIX PWA Service Worker v2
-const CACHE_NAME = 'foodfix-pwa-v2';
+// FOODFIX PWA Service Worker v3
+const CACHE_NAME = 'foodfix-pwa-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -9,10 +9,11 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE).catch(() => {});
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -20,25 +21,30 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => {
+            console.log('[SW] Deleting old cache:', name);
+            return caches.delete(name);
+          })
       );
     }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle same-origin GET requests; bypass external APIs (Firebase, Google, etc.)
+  // Only handle same-origin GET requests
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  // Bypass service worker for Firebase Auth / Firestore / REST endpoints
+  // Bypass internal endpoints
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/__/') || url.pathname.startsWith('/api/')) {
     return;
   }
 
-  // Navigation requests: Network-first, fallback to root cached index
+  // Navigation requests: Network-first, fallback to root index.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
@@ -48,7 +54,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: Cache-first, then network, with error handling
+  // Static assets: Cache-first, then network with validation
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -61,13 +67,17 @@ self.addEventListener('fetch', (event) => {
             networkResponse.status === 200 &&
             event.request.url.startsWith(self.location.origin)
           ) {
+            // Validate: do NOT cache HTML fallbacks for fonts/images
+            const ct = networkResponse.headers.get('content-type') || '';
+            if (url.pathname.match(/\.(ttf|woff2?|png|jpe?g|webp|svg)$/i) && ct.includes('text/html')) {
+              return networkResponse;
+            }
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
           }
           return networkResponse;
         })
         .catch(() => {
-          // Graceful fallback for failed static fetches
           return new Response('', { status: 408, statusText: 'Request Timeout' });
         });
     })
