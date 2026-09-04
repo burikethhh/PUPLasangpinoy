@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -97,11 +98,13 @@ export default function WelcomeScreen() {
 
           {/* LOGO */}
           <View style={styles.logoBox}>
-            <View style={styles.logoCircle}>
-              <Ionicons name="restaurant" size={36} color="#fff" />
-            </View>
-            <Text style={styles.appName}>Welcome to Foodfix</Text>
-            <Text style={styles.appSub}>Filipino Food Ordering System</Text>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={styles.logoImg}
+              resizeMode="contain"
+            />
+            <Text style={styles.appName}>FOODFIX</Text>
+            <Text style={styles.appSub}>DERICK&apos;S FOOD HOUSE</Text>
           </View>
 
           {/* LOGIN CARD */}
@@ -209,14 +212,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9F0DC" },
   scroll: { flexGrow: 1, justifyContent: "center", padding: 24 },
   logoBox: { alignItems: "center", marginBottom: 16 },
-  logoCircle: {
-    width: 80, height: 80, borderRadius: 40, backgroundColor: "#F25C05",
-    justifyContent: "center", alignItems: "center", marginBottom: 10, elevation: 6,
-    // @ts-ignore
-    boxShadow: "0px 4px 10px rgba(242, 92, 5, 0.3)",
+  logoImg: {
+    width: 110,
+    height: 110,
+    marginBottom: 8,
   },
-  appName: { fontSize: 26, fontWeight: "bold", color: "#F25C05", textAlign: "center" },
-  appSub: { fontSize: 12, color: "#C07A20", marginTop: 2 },
+  appName: { fontSize: 26, fontWeight: "800", color: "#F25C05", textAlign: "center", letterSpacing: 0.5 },
+  appSub: { fontSize: 13, fontWeight: "700", color: "#6D4C41", marginTop: 2, letterSpacing: 1 },
   card: {
     backgroundColor: "#fff", borderRadius: 24, padding: 28, elevation: 4,
     // @ts-ignore

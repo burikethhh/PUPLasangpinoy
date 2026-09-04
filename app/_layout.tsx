@@ -57,7 +57,7 @@ export default function RootLayout() {
     }
 
     // Log app start
-    rootLog.info('App started', { platform: Platform.OS, version: '4.1.5' });
+    rootLog.info('App started', { platform: Platform.OS, version: '4.1.6' });
     // Show warning on web about potential ad blocker issues
     if (Platform.OS === 'web') {
       const checkFirebase = async () => {
