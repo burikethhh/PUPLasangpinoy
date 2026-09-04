@@ -74,3 +74,5 @@ android/build/
 # Extracted docx & screenshots
 docx_extracted/
 device-screen.png
+.firebase/
+
